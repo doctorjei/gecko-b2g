@@ -408,8 +408,11 @@ impl Inner {
     where
         F: FnOnce() -> ResourceStatus,
     {
-        let mut lock = self.entries.borrow_mut();
-        lock.entry(resource_id.value).or_insert_with(|| f()).clone()
+        if let Ok(mut lock) = self.entries.try_borrow_mut() {
+            lock.entry(resource_id.value).or_insert_with(|| f()).clone()
+        } else {
+            ResourceStatus::MissingOptional
+        }
     }
 
     fn update_resource(&self, resource_id: ResourceId, resource: ResourceOption) -> ResourceOption {
