@@ -150,7 +150,9 @@ packed_simd = { package = "packed_simd_2", git = "https://github.com/hsivonen/pa
 midir = { git = "https://github.com/mozilla/midir.git", rev = "4c11f0ffb5d6a10de4aff40a7b81218b33b94e6f" }
 minidump_writer_linux = { git = "https://github.com/rust-minidump/minidump-writer.git", rev = "75ada456c92a429704691a85e1cb42fef8cafc0d" }
 
+# B2G specific forks
 fluent-fallback = { path = "b2g/forks/fluent-fallback" }
+glean-core = { path = "b2g/forks/glean-core" }
 
 # application-services overrides to make updating them all simpler.
 interrupt-support = { git = "https://github.com/mozilla/application-services", rev = "2689788cecf24c385e6b7440e3aa1a89c511f14a" }
