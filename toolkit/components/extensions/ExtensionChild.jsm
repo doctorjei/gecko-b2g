@@ -390,6 +390,11 @@ class BrowserExtensionContent extends EventEmitter {
     super();
 
     this.policy = policy;
+    // Set a weak reference to this instance on the WebExtensionPolicy expando properties
+    // (because it makes it easier to reach the extension instance from the policy object
+    // without leaking it due to a circular dependency keeping it alive).
+    this.policy.weakExtension = Cu.getWeakReference(this);
+
     this.instanceId = policy.instanceId;
     this.optionalPermissions = policy.optionalPermissions;
 
@@ -421,6 +426,7 @@ class BrowserExtensionContent extends EventEmitter {
     );
 
     // Only used in addon processes.
+    this.blockedParsingDocuments = new WeakSet();
     this.views = new Set();
 
     // Only used for devtools views.
@@ -557,6 +563,18 @@ class BrowserExtensionContent extends EventEmitter {
       return value != null;
     }
     return this.permissions.has(perm);
+  }
+
+  trackBlockedParsingDocument(doc) {
+    this.blockedParsingDocuments.add(doc);
+  }
+
+  untrackBlockedParsingDocument(doc) {
+    this.blockedParsingDocuments.delete(doc);
+  }
+
+  hasContextBlockedParsingDocument(extContext) {
+    return this.blockedParsingDocuments.has(extContext.contentWindow?.document);
   }
 }
 
