@@ -12,14 +12,16 @@ const { XPCOMUtils } = ChromeUtils.import(
   "resource://gre/modules/XPCOMUtils.jsm"
 );
 
-XPCOMUtils.defineLazyModuleGetters(this, {
+const lazy = {};
+
+XPCOMUtils.defineLazyModuleGetters(lazy, {
   ChromeNotifications: "resource://gre/modules/ChromeNotifications.jsm",
   SelectionActionParent: "resource://gre/actors/SelectionActionParent.jsm",
   embeddableProcessInfo: "resource://gre/modules/B2GProcessSelector.jsm",
   WebExtensionsEmbedding: "resource://gre/modules/WebExtensionsEmbedding.jsm",
 });
 
-XPCOMUtils.defineLazyGetter(this, "Screenshot", function() {
+XPCOMUtils.defineLazyGetter(lazy, "Screenshot", function() {
   const { Screenshot } = ChromeUtils.import(
     "resource://gre/modules/Screenshot.jsm"
   );
@@ -27,7 +29,7 @@ XPCOMUtils.defineLazyGetter(this, "Screenshot", function() {
 });
 
 XPCOMUtils.defineLazyServiceGetter(
-  this,
+  lazy,
   "IdleService",
   "@mozilla.org/widget/useridleservice;1",
   "nsIUserIdleService"
@@ -40,7 +42,7 @@ XPCOMUtils.defineLazyServiceGetter(
 
   const systemAlerts = {
     resendAll: resendCallback => {
-      ChromeNotifications.resendAllNotifications(resendCallback);
+      lazy.ChromeNotifications.resendAllNotifications(resendCallback);
     },
     click: data => {
       AlertsEventHandler.click(data);
@@ -69,7 +71,7 @@ XPCOMUtils.defineLazyServiceGetter(
         observer(topic, idleTime);
       };
       _webembed_log(`userIdle addObserver time: ${idleTime}`);
-      IdleService.addIdleObserver(observerXpcom, idleTime);
+      lazy.IdleService.addIdleObserver(observerXpcom, idleTime);
       userIdleObserverMap.set([observer, idleTime], observerXpcom);
     },
     removeObserver: (observer, idleTime) => {
@@ -83,7 +85,7 @@ XPCOMUtils.defineLazyServiceGetter(
       }
       if (observerXpcom) {
         _webembed_log(`userIdle removeObserver time: ${idleTime}`);
-        IdleService.removeIdleObserver(observerXpcom, idleTime);
+        lazy.IdleService.removeIdleObserver(observerXpcom, idleTime);
         userIdleObserverMap.delete(removeKey);
       } else {
         _webembed_log(`removeObserver failed`);
@@ -588,6 +590,14 @@ XPCOMUtils.defineLazyServiceGetter(
           _webembed_log(`No webembedder to launch ${detail.manifestURL}`);
         }
       }, "open-deeplink");
+
+      Services.obs.addObserver((subject, topic, url) => {
+        _webembed_log(`receive on-launch-app ${url}`);
+        let manifestUrl = new URL(url);
+        this.dispatchEvent(
+          new CustomEvent("launch-app", { detail: { manifestUrl } })
+        );
+      }, "on-launch-app");
     }
 
     isDaemonReady() {
@@ -609,7 +619,7 @@ XPCOMUtils.defineLazyServiceGetter(
     takeScreenshot() {
       _webembed_log(`takeScreenshot`);
       try {
-        let file = Screenshot.get(this.shellWindow);
+        let file = lazy.Screenshot.get(this.shellWindow);
         _webembed_log(`takeScreenshot success and the file size: ${file.size}`);
         return file;
       } catch (e) {
@@ -621,7 +631,7 @@ XPCOMUtils.defineLazyServiceGetter(
     doSelectionAction(action) {
       const command = action;
       _webembed_log(`doSelectionAction: ${command}`);
-      SelectionActionParent.sendCommand(command);
+      lazy.SelectionActionParent.sendCommand(command);
     }
 
     // Proxies a subset of nsIEventListenerService, useful eg. to listen
@@ -650,7 +660,9 @@ XPCOMUtils.defineLazyServiceGetter(
     }
 
     getContentProcesses() {
-      return Services.appinfo.getContentProcesses().map(embeddableProcessInfo);
+      return Services.appinfo
+        .getContentProcesses()
+        .map(lazy.embeddableProcessInfo);
     }
   }
 

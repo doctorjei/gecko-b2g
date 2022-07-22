@@ -35,6 +35,7 @@ XPCOMUtils.defineLazyModuleGetters(lazy, {
   SpecialMessageActions:
     "resource://messaging-system/lib/SpecialMessageActions.jsm",
   TargetingContext: "resource://messaging-system/targeting/Targeting.jsm",
+  Utils: "resource://services-settings/Utils.jsm",
   MacAttribution: "resource:///modules/MacAttribution.jsm",
 });
 XPCOMUtils.defineLazyServiceGetters(lazy, {
@@ -78,7 +79,6 @@ const LOCAL_MESSAGE_PROVIDERS = {
 const STARTPAGE_VERSION = "6";
 
 // Remote Settings
-const RS_SERVER_PREF = "services.settings.server";
 const RS_MAIN_BUCKET = "main";
 const RS_COLLECTION_L10N = "ms-language-packs"; // "ms" stands for Messaging System
 const RS_PROVIDERS_WITH_L10N = ["cfr"];
@@ -284,9 +284,7 @@ const MessageLoaderUtils = {
           lazy.RemoteL10n.isLocaleSupported(MessageLoaderUtils.locale)
         ) {
           const recordId = `${RS_FLUENT_RECORD_PREFIX}-${MessageLoaderUtils.locale}`;
-          const kinto = new lazy.KintoHttpClient(
-            Services.prefs.getStringPref(RS_SERVER_PREF)
-          );
+          const kinto = new lazy.KintoHttpClient(lazy.Utils.SERVER_URL);
           const record = await kinto
             .bucket(RS_MAIN_BUCKET)
             .collection(RS_COLLECTION_L10N)
@@ -1691,7 +1689,11 @@ class _ASRouter {
 
   async sendPBNewTabMessage({ tabId, hideDefault }) {
     let message = null;
-
+    const PromoInfo = {
+      FOCUS: { enabledPref: "browser.promo.focus.enabled" },
+      VPN: { enabledPref: "browser.vpn_promo.enabled" },
+      PIN: { enabledPref: "browser.promo.pin.enabled" },
+    };
     await this.loadMessagesFromAllProviders();
 
     // If message has hideDefault property set to true
@@ -1703,6 +1705,18 @@ class _ASRouter {
         ),
       }));
     }
+
+    // Check and filter out messages of any disabled PromoType
+    await this.setState(state => ({
+      messages: state.messages.filter(
+        m =>
+          m.template === "pb_newtab" &&
+          Services.prefs.getBoolPref(
+            PromoInfo[m.content?.promoType]?.enabledPref,
+            true
+          )
+      ),
+    }));
 
     const telemetryObject = { tabId };
     TelemetryStopwatch.start("MS_MESSAGE_REQUEST_TIME_MS", telemetryObject);
