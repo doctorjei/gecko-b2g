@@ -545,7 +545,7 @@ XPCOMUtils.defineLazyServiceGetter(
       }
 
       if (delegates.webExtensions) {
-        WebExtensionsEmbedding.setDelegate(delegates.webExtensions);
+        lazy.WebExtensionsEmbedding.setDelegate(delegates.webExtensions);
       }
 
       Services.obs.addObserver((subject, topic, data) => {
