@@ -175,10 +175,13 @@ pub struct GeckoResourceId {
 
 impl From<&GeckoResourceId> for ResourceId {
     fn from(resource_id: &GeckoResourceId) -> Self {
-        resource_id.value.to_string().to_resource_id(match resource_id.resource_type {
-            GeckoResourceType::Optional => ResourceType::Optional,
-            GeckoResourceType::Required => ResourceType::Required,
-        })
+        resource_id
+            .value
+            .to_string()
+            .to_resource_id(match resource_id.resource_type {
+                GeckoResourceType::Optional => ResourceType::Optional,
+                GeckoResourceType::Required => ResourceType::Required,
+            })
     }
 }
 
@@ -220,23 +223,27 @@ pub unsafe extern "C" fn l10nregistry_get_parent_process_sources(
     // This is architecturally imperfect, but acceptable for simplicity reasons because
     // `L10nRegistry` instance is cheap and mainly servers as a store of state.
     let reg = get_l10n_registry();
-    for name in reg.get_source_names().unwrap() {
-        let source = reg.get_source(&name).unwrap().unwrap();
-        let descriptor = L10nFileSourceDescriptor {
-            name: source.name.as_str().into(),
-            metasource: source.metasource.as_str().into(),
-            locales: source
-                .locales()
-                .iter()
-                .map(|l| l.to_string().into())
-                .collect(),
-            pre_path: source.pre_path.as_str().into(),
-            index: source
-                .get_index()
-                .map(|index| index.into_iter().map(|s| s.into()).collect())
-                .unwrap_or_default(),
-        };
-        sources.push(descriptor);
+    if let Ok(names) = reg.get_source_names() {
+        for name in names {
+            let source = reg.get_source(&name).unwrap().unwrap();
+            let descriptor = L10nFileSourceDescriptor {
+                name: source.name.as_str().into(),
+                metasource: source.metasource.as_str().into(),
+                locales: source
+                    .locales()
+                    .iter()
+                    .map(|l| l.to_string().into())
+                    .collect(),
+                pre_path: source.pre_path.as_str().into(),
+                index: source
+                    .get_index()
+                    .map(|index| index.into_iter().map(|s| s.into()).collect())
+                    .unwrap_or_default(),
+            };
+            sources.push(descriptor);
+        }
+    } else {
+        log::error!("Failed to get l10n registry.");
     }
 }
 
