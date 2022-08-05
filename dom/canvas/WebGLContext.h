@@ -272,7 +272,7 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
     ~LruPosition() { Reset(); }
   };
 
-  mutable LruPosition mLruPosition GUARDED_BY(sLruMutex);
+  mutable LruPosition mLruPosition MOZ_GUARDED_BY(sLruMutex);
 
   void BumpLruLocked(const StaticMutexAutoLock& aProofOfLock);
 
@@ -740,7 +740,7 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
 
  private:
   static StaticMutex sLruMutex;
-  static std::list<WebGLContext*> sLru GUARDED_BY(sLruMutex);
+  static std::list<WebGLContext*> sLru MOZ_GUARDED_BY(sLruMutex);
 
   // State tracking slots
   bool mDitherEnabled = true;
@@ -1317,9 +1317,6 @@ template <typename V, typename M>
 V RoundUpToMultipleOf(const V& value, const M& multiple) {
   return ((value + multiple - 1) / multiple) * multiple;
 }
-
-const char* GetEnumName(GLenum val, const char* defaultRet = "<unknown>");
-std::string EnumString(GLenum val);
 
 class ScopedFBRebinder final {
  private:

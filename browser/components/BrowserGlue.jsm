@@ -139,9 +139,10 @@ const PREF_PDFJS_ISDEFAULT_CACHE_STATE = "pdfjs.enabledCache.state";
 const PREF_DFPI_ENABLED_BY_DEFAULT =
   "privacy.restrict3rdpartystorage.rollout.enabledByDefault";
 
-// Index of Private Browsing icon in firefox.exe
-// Must line up with the one in nsNativeAppSupportWin.h.
-const PRIVATE_BROWSING_ICON_INDEX = 5;
+const PRIVATE_BROWSING_BINARY = "private_browsing.exe";
+// Index of Private Browsing icon in private_browsing.exe
+// Must line up with IDI_PBICON_PB_PB_EXE in nsNativeAppSupportWin.h.
+const PRIVATE_BROWSING_EXE_ICON_INDEX = 1;
 const PREF_PRIVATE_WINDOW_SEPARATION =
   "browser.privacySegmentation.windowSeparation.enabled";
 const PREF_PRIVATE_BROWSING_SHORTCUT_CREATED =
@@ -1816,7 +1817,6 @@ BrowserGlue.prototype = {
     // For the initial rollout of dFPI, set the default cookieBehavior based on the pref
     // set during onboarding when the user chooses to enable protections or not.
     if (!Services.prefs.prefHasUserValue(PREF_DFPI_ENABLED_BY_DEFAULT)) {
-      Services.telemetry.scalarSet("privacy.dfpi_rollout_enabledByDefault", 2);
       return;
     }
     let dFPIEnabled = Services.prefs.getBoolPref(PREF_DFPI_ENABLED_BY_DEFAULT);
@@ -1826,11 +1826,6 @@ BrowserGlue.prototype = {
       dFPIEnabled
         ? Ci.nsICookieService.BEHAVIOR_REJECT_TRACKER_AND_PARTITION_FOREIGN
         : BrowserGlue._defaultCookieBehaviorAtStartup
-    );
-
-    Services.telemetry.scalarSet(
-      "privacy.dfpi_rollout_enabledByDefault",
-      dFPIEnabled ? 1 : 0
     );
   },
 
@@ -2566,7 +2561,9 @@ BrowserGlue.prototype = {
               true
             )
           ) {
-            let exe = Services.dirsvc.get("XREExeF", Ci.nsIFile);
+            let appdir = Services.dirsvc.get("GreD", Ci.nsIFile);
+            let exe = appdir.clone();
+            exe.append(PRIVATE_BROWSING_BINARY);
             let strings = new Localization(
               ["branding/brand.ftl", "browser/browser.ftl"],
               true
@@ -2576,15 +2573,15 @@ BrowserGlue.prototype = {
             ]);
             shellService.createShortcut(
               exe,
-              ["-private-window"],
+              [],
               desc,
               exe,
               // The code we're calling indexes from 0 instead of 1
-              PRIVATE_BROWSING_ICON_INDEX - 1,
+              PRIVATE_BROWSING_EXE_ICON_INDEX - 1,
               winTaskbar.defaultPrivateGroupId,
               "Programs",
               desc + ".lnk",
-              Services.dirsvc.get("GreD", Ci.nsIFile)
+              appdir
             );
             Services.prefs.setBoolPref(
               PREF_PRIVATE_BROWSING_SHORTCUT_CREATED,

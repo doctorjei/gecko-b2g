@@ -1470,6 +1470,7 @@ function _loadURI(browser, uri, params = {}) {
     csp,
     remoteTypeOverride,
     hasValidUserGestureActivation,
+    globalHistoryOptions,
   } = params || {};
   let loadFlags =
     params.loadFlags || params.flags || Ci.nsIWebNavigation.LOAD_FLAGS_NONE;
@@ -1509,6 +1510,17 @@ function _loadURI(browser, uri, params = {}) {
 
   // XXX(nika): Is `browser.isNavigating` necessary anymore?
   browser.isNavigating = true;
+
+  if (globalHistoryOptions?.triggeringSponsoredURL) {
+    browser.setAttribute(
+      "triggeringSponsoredURL",
+      globalHistoryOptions.triggeringSponsoredURL
+    );
+    const time =
+      globalHistoryOptions.triggeringSponsoredURLVisitTimeMS || Date.now();
+    browser.setAttribute("triggeringSponsoredURLVisitTimeMS", time);
+  }
+
   let loadURIOptions = {
     triggeringPrincipal,
     csp,
@@ -1758,7 +1770,6 @@ var gBrowserInit = {
     gPrivateBrowsingUI.init();
     BrowserSearch.init();
     BrowserPageActions.init();
-    gAccessibilityServiceIndicator.init();
     if (gToolbarKeyNavEnabled) {
       ToolbarKeyboardNavigator.init();
     }
@@ -2493,7 +2504,7 @@ var gBrowserInit = {
 
     DownloadsButton.uninit();
 
-    gAccessibilityServiceIndicator.uninit();
+    FirefoxViewHandler.uninit();
 
     if (gToolbarKeyNavEnabled) {
       ToolbarKeyboardNavigator.uninit();
@@ -4392,7 +4403,7 @@ function FillHistoryMenu(aParent) {
   const MAX_HISTORY_MENU_ITEMS = 15;
 
   const tooltipBack = gNavigatorBundle.getString("tabHistory.goBack");
-  const tooltipCurrent = gNavigatorBundle.getString("tabHistory.current");
+  const tooltipCurrent = gNavigatorBundle.getString("tabHistory.reloadCurrent");
   const tooltipForward = gNavigatorBundle.getString("tabHistory.goForward");
 
   function updateSessionHistory(sessionHistory, initial, ssInParent) {
@@ -8204,14 +8215,16 @@ function undoCloseTab(aIndex) {
     aIndex !== undefined
       ? [aIndex]
       : new Array(SessionStore.getLastClosedTabCount(window)).fill(0);
+  let tabsRemoved = false;
   for (let index of tabsToRemove) {
     if (SessionStore.getClosedTabCount(window) > index) {
       tab = SessionStore.undoCloseTab(window, index);
-
-      if (blankTabToRemove) {
-        gBrowser.removeTab(blankTabToRemove);
-      }
+      tabsRemoved = true;
     }
+  }
+
+  if (tabsRemoved && blankTabToRemove) {
+    gBrowser.removeTab(blankTabToRemove);
   }
 
   return tab;
@@ -8355,75 +8368,6 @@ const gRemoteControl = {
     }
 
     return null;
-  },
-};
-
-const gAccessibilityServiceIndicator = {
-  init() {
-    // Pref to enable accessibility service indicator.
-    Services.prefs.addObserver("accessibility.indicator.enabled", this);
-    // Accessibility service init/shutdown event.
-    Services.obs.addObserver(this, "a11y-init-or-shutdown");
-    this._update(Services.appinfo.accessibilityEnabled);
-  },
-
-  _update(accessibilityEnabled = false) {
-    if (this.enabled && accessibilityEnabled) {
-      this._active = true;
-      document.documentElement.setAttribute("accessibilitymode", "true");
-      [
-        ...document.querySelectorAll(".accessibility-indicator"),
-      ].forEach(indicator =>
-        ["click", "keypress"].forEach(type =>
-          indicator.addEventListener(type, this)
-        )
-      );
-    } else if (this._active) {
-      this._active = false;
-      document.documentElement.removeAttribute("accessibilitymode");
-      [
-        ...document.querySelectorAll(".accessibility-indicator"),
-      ].forEach(indicator =>
-        ["click", "keypress"].forEach(type =>
-          indicator.removeEventListener(type, this)
-        )
-      );
-    }
-  },
-
-  observe(subject, topic, data) {
-    if (
-      topic == "nsPref:changed" &&
-      data === "accessibility.indicator.enabled"
-    ) {
-      this._update(Services.appinfo.accessibilityEnabled);
-    } else if (topic === "a11y-init-or-shutdown") {
-      // When "a11y-init-or-shutdown" event is fired, "1" indicates that
-      // accessibility service is started and "0" that it is shut down.
-      this._update(data === "1");
-    }
-  },
-
-  get enabled() {
-    return Services.prefs.getBoolPref("accessibility.indicator.enabled");
-  },
-
-  handleEvent({ key, type }) {
-    if (
-      (type === "keypress" && [" ", "Enter"].includes(key)) ||
-      type === "click"
-    ) {
-      let a11yServicesSupportURL = Services.urlFormatter.formatURLPref(
-        "accessibility.support.url"
-      );
-      // This is a known URL coming from trusted UI
-      openTrustedLinkIn(a11yServicesSupportURL, "tab");
-    }
-  },
-
-  uninit() {
-    Services.prefs.removeObserver("accessibility.indicator.enabled", this);
-    Services.obs.removeObserver(this, "a11y-init-or-shutdown");
   },
 };
 
@@ -9910,12 +9854,28 @@ var ConfirmationHint = {
 
 var FirefoxViewHandler = {
   tab: null,
+  get button() {
+    return document.getElementById("firefox-view-button");
+  },
   init() {
-    if (
-      AppConstants.NIGHTLY_BUILD &&
-      !Services.prefs.getBoolPref("browser.tabs.firefox-view")
-    ) {
+    if (!AppConstants.NIGHTLY_BUILD) {
+      return;
+    }
+    const { FirefoxViewNotificationManager } = ChromeUtils.importESModule(
+      "resource:///modules/firefox-view-notification-manager.sys.mjs"
+    );
+    if (!Services.prefs.getBoolPref("browser.tabs.firefox-view")) {
       document.getElementById("menu_openFirefoxView").hidden = true;
+    } else {
+      let shouldShow = FirefoxViewNotificationManager.shouldNotificationDotBeShowing();
+      this._toggleNotificationDot(shouldShow);
+    }
+    Services.obs.addObserver(this, "firefoxview-notification-dot-update");
+    this.observerAdded = true;
+  },
+  uninit() {
+    if (this.observerAdded) {
+      Services.obs.removeObserver(this, "firefoxview-notification-dot-update");
     }
   },
   openTab() {
@@ -9923,6 +9883,7 @@ var FirefoxViewHandler = {
       this.tab = gBrowser.addTrustedTab("about:firefoxview", { index: 0 });
       this.tab.addEventListener("TabClose", this, { once: true });
       gBrowser.tabContainer.addEventListener("TabSelect", this);
+      window.addEventListener("activate", this);
       gBrowser.hideTab(this.tab);
     }
     gBrowser.selectedTab = this.tab;
@@ -9930,14 +9891,34 @@ var FirefoxViewHandler = {
   handleEvent(e) {
     switch (e.type) {
       case "TabSelect":
-        document
-          .getElementById("firefox-view-button")
-          ?.toggleAttribute("open", e.target == this.tab);
+        this.button?.toggleAttribute("open", e.target == this.tab);
+        this._removeNotificationDotIfTabSelected();
         break;
       case "TabClose":
         this.tab = null;
         gBrowser.tabContainer.removeEventListener("TabSelect", this);
         break;
+      case "activate":
+        this._removeNotificationDotIfTabSelected();
+        break;
     }
+  },
+  observe(sub, topic, data) {
+    if (topic === "firefoxview-notification-dot-update") {
+      let shouldShow = data === "true";
+      this._toggleNotificationDot(shouldShow);
+    }
+  },
+  _removeNotificationDotIfTabSelected() {
+    if (this.tab?.selected) {
+      Services.obs.notifyObservers(
+        null,
+        "firefoxview-notification-dot-update",
+        "false"
+      );
+    }
+  },
+  _toggleNotificationDot(shouldShow) {
+    this.button?.toggleAttribute("attention", shouldShow);
   },
 };

@@ -581,13 +581,13 @@ void GfxInfo::GetData() {
 
   if (!ddxDriver.IsEmpty()) {
     PRInt32 start = 0;
-    PRInt32 loc = ddxDriver.Find(";", PR_FALSE, start);
+    PRInt32 loc = ddxDriver.Find(";", start);
     while (loc != kNotFound) {
       nsCString line(ddxDriver.get() + start, loc - start);
       mDdxDrivers.AppendElement(std::move(line));
 
       start = loc + 1;
-      loc = ddxDriver.Find(";", PR_FALSE, start);
+      loc = ddxDriver.Find(";", start);
     }
   }
 
@@ -844,6 +844,15 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
         OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
         DesktopEnvironment::All, WindowProtocol::All, DriverVendor::MesaAll,
         DeviceFamily::IntelAll, nsIGfxInfo::FEATURE_DMABUF_SURFACE_EXPORT,
+        nsIGfxInfo::FEATURE_BLOCKED_DEVICE, DRIVER_COMPARISON_IGNORED,
+        V(0, 0, 0, 0), "FEATURE_FAILURE_BROKEN_DRIVER", "");
+
+    // Disabled due to:
+    // https://gitlab.freedesktop.org/mesa/mesa/-/issues/6988
+    APPEND_TO_DRIVER_BLOCKLIST_EXT(
+        OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
+        DesktopEnvironment::All, WindowProtocol::All, DriverVendor::MesaAll,
+        DeviceFamily::QualcommAll, nsIGfxInfo::FEATURE_DMABUF_SURFACE_EXPORT,
         nsIGfxInfo::FEATURE_BLOCKED_DEVICE, DRIVER_COMPARISON_IGNORED,
         V(0, 0, 0, 0), "FEATURE_FAILURE_BROKEN_DRIVER", "");
 

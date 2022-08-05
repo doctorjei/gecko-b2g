@@ -1703,10 +1703,10 @@ void nsJSContext::MaybePokeGC() {
     MOZ_ASSERT(reason == JS::GCReason::EAGER_NURSERY_COLLECTION);
     sScheduler.PokeMinorGC(reason);
   }
-  reason = JS::WantEagerMajorGC(rt);
-  if (reason != JS::GCReason::NO_REASON) {
-    PokeGC(reason, nullptr, 0);
-  }
+
+  // Bug 1772638: For now, only do eager minor GCs. Eager major GCs regress some
+  // benchmarks. Hopefully that will be worked out and this will check for
+  // whether an eager major GC is needed.
 }
 
 void nsJSContext::DoLowMemoryGC() {
@@ -2072,6 +2072,16 @@ void nsJSContext::EnsureStatics() {
       SetMemoryPrefChangedCallbackInt,
       "javascript.options.mem.gc_high_frequency_small_heap_growth",
       (void*)JSGC_HIGH_FREQUENCY_SMALL_HEAP_GROWTH);
+
+  Preferences::RegisterCallbackAndCall(
+      SetMemoryPrefChangedCallbackBool,
+      "javascript.options.mem.gc_balanced_heap_limits",
+      (void*)JSGC_BALANCED_HEAP_LIMITS_ENABLED);
+
+  Preferences::RegisterCallbackAndCall(
+      SetMemoryPrefChangedCallbackInt,
+      "javascript.options.mem.gc_heap_growth_factor",
+      (void*)JSGC_HEAP_GROWTH_FACTOR);
 
   Preferences::RegisterCallbackAndCall(
       SetMemoryPrefChangedCallbackInt,

@@ -4297,6 +4297,11 @@ bool BaselineCodeGen<Handler>::emit_CallIter() {
 }
 
 template <typename Handler>
+bool BaselineCodeGen<Handler>::emit_CallContentIter() {
+  return emitCall(JSOp::CallContentIter);
+}
+
+template <typename Handler>
 bool BaselineCodeGen<Handler>::emit_New() {
   return emitCall(JSOp::New);
 }
@@ -6386,7 +6391,7 @@ MethodStatus BaselineCompiler::emitBody() {
 #endif
   }
 
-  MOZ_ASSERT(JSOp(*prevpc) == JSOp::RetRval);
+  MOZ_ASSERT(JSOp(*prevpc) == JSOp::RetRval || JSOp(*prevpc) == JSOp::Return);
   return Method_Compiled;
 }
 

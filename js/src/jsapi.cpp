@@ -57,7 +57,7 @@
 #include "js/Proxy.h"
 #include "js/ScriptPrivate.h"
 #include "js/StableStringChars.h"
-#include "js/Stack.h"
+#include "js/Stack.h"  // JS::NativeStackSize, JS::NativeStackLimitMax, JS::GetNativeStackLimit
 #include "js/StreamConsumer.h"
 #include "js/String.h"  // JS::MaxStringLength
 #include "js/Symbol.h"
@@ -1459,36 +1459,27 @@ JS_GetExternalStringCallbacks(JSString* str) {
   return str->asExternal().callbacks();
 }
 
-static void SetNativeStackLimit(JSContext* cx, JS::StackKind kind,
-                                size_t stackSize) {
+static void SetNativeStackSize(JSContext* cx, JS::StackKind kind,
+                               JS::NativeStackSize stackSize) {
 #ifdef __wasi__
   // WASI makes this easy: we build with the "stack-first" wasm-ld option, so
   // the stack grows downward toward zero. Let's set a limit just a bit above
   // this so that we catch an overflow before a Wasm trap occurs.
   cx->nativeStackLimit[kind] = 1024;
-#else  // __wasi__
-#  if JS_STACK_GROWTH_DIRECTION > 0
+#else   // __wasi__
   if (stackSize == 0) {
-    cx->nativeStackLimit[kind] = UINTPTR_MAX;
+    cx->nativeStackLimit[kind] = JS::NativeStackLimitMax;
   } else {
-    MOZ_ASSERT(cx->nativeStackBase() <= size_t(-1) - stackSize);
-    cx->nativeStackLimit[kind] = cx->nativeStackBase() + stackSize - 1;
+    cx->nativeStackLimit[kind] =
+        JS::GetNativeStackLimit(cx->nativeStackBase(), stackSize - 1);
   }
-#  else   // stack grows up
-  if (stackSize == 0) {
-    cx->nativeStackLimit[kind] = 0;
-  } else {
-    MOZ_ASSERT(cx->nativeStackBase() >= stackSize);
-    cx->nativeStackLimit[kind] = cx->nativeStackBase() - (stackSize - 1);
-  }
-#  endif  // stack grows down
-#endif    // !__wasi__
+#endif  // !__wasi__
 }
 
-JS_PUBLIC_API void JS_SetNativeStackQuota(JSContext* cx,
-                                          size_t systemCodeStackSize,
-                                          size_t trustedScriptStackSize,
-                                          size_t untrustedScriptStackSize) {
+JS_PUBLIC_API void JS_SetNativeStackQuota(
+    JSContext* cx, JS::NativeStackSize systemCodeStackSize,
+    JS::NativeStackSize trustedScriptStackSize,
+    JS::NativeStackSize untrustedScriptStackSize) {
   MOZ_ASSERT(!cx->activation());
 
   if (!trustedScriptStackSize) {
@@ -1503,10 +1494,9 @@ JS_PUBLIC_API void JS_SetNativeStackQuota(JSContext* cx,
     MOZ_ASSERT(untrustedScriptStackSize < trustedScriptStackSize);
   }
 
-  SetNativeStackLimit(cx, JS::StackForSystemCode, systemCodeStackSize);
-  SetNativeStackLimit(cx, JS::StackForTrustedScript, trustedScriptStackSize);
-  SetNativeStackLimit(cx, JS::StackForUntrustedScript,
-                      untrustedScriptStackSize);
+  SetNativeStackSize(cx, JS::StackForSystemCode, systemCodeStackSize);
+  SetNativeStackSize(cx, JS::StackForTrustedScript, trustedScriptStackSize);
+  SetNativeStackSize(cx, JS::StackForUntrustedScript, untrustedScriptStackSize);
 
   if (cx->isMainThreadContext()) {
     cx->initJitStackLimit();
@@ -4200,6 +4190,21 @@ JS_PUBLIC_API bool JS_GetGlobalJitCompilerOption(JSContext* cx,
     case JSJITCOMPILER_OFFTHREAD_COMPILATION_ENABLE:
       *valueOut = rt->canUseOffthreadIonCompilation();
       break;
+    case JSJITCOMPILER_SPECTRE_INDEX_MASKING:
+      *valueOut = jit::JitOptions.spectreIndexMasking ? 1 : 0;
+      break;
+    case JSJITCOMPILER_SPECTRE_OBJECT_MITIGATIONS:
+      *valueOut = jit::JitOptions.spectreObjectMitigations ? 1 : 0;
+      break;
+    case JSJITCOMPILER_SPECTRE_STRING_MITIGATIONS:
+      *valueOut = jit::JitOptions.spectreStringMitigations ? 1 : 0;
+      break;
+    case JSJITCOMPILER_SPECTRE_VALUE_MASKING:
+      *valueOut = jit::JitOptions.spectreValueMasking ? 1 : 0;
+      break;
+    case JSJITCOMPILER_SPECTRE_JIT_TO_CXX_CALLS:
+      *valueOut = jit::JitOptions.spectreJitToCxxCalls ? 1 : 0;
+      break;
     case JSJITCOMPILER_WATCHTOWER_MEGAMORPHIC:
       *valueOut = jit::JitOptions.enableWatchtowerMegamorphic ? 1 : 0;
       break;
@@ -4224,6 +4229,25 @@ JS_PUBLIC_API bool JS_GetGlobalJitCompilerOption(JSContext* cx,
   *valueOut = 0;
 #endif
   return true;
+}
+
+JS_PUBLIC_API void JS::DisableSpectreMitigationsAfterInit() {
+  // This is used to turn off Spectre mitigations in pre-allocated child
+  // processes used for isolated web content. Assert there's a single runtime
+  // and cancel off-thread compilations, to ensure we're not racing with any
+  // compilations.
+  JSContext* cx = TlsContext.get();
+  MOZ_RELEASE_ASSERT(cx);
+  MOZ_RELEASE_ASSERT(JSRuntime::hasSingleLiveRuntime());
+  MOZ_RELEASE_ASSERT(cx->runtime()->wasmInstances.lock()->empty());
+
+  CancelOffThreadIonCompile(cx->runtime());
+
+  jit::JitOptions.spectreIndexMasking = false;
+  jit::JitOptions.spectreObjectMitigations = false;
+  jit::JitOptions.spectreStringMitigations = false;
+  jit::JitOptions.spectreValueMasking = false;
+  jit::JitOptions.spectreJitToCxxCalls = false;
 }
 
 /************************************************************************/

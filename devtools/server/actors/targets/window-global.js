@@ -262,7 +262,7 @@ const windowGlobalTargetPrototype = {
    *          The Session Context to help know what is debugged.
    *          See devtools/server/actors/watcher/session-context.js
    */
-  initialize: function(
+  initialize(
     connection,
     {
       docShell,
@@ -602,7 +602,7 @@ const windowGlobalTargetPrototype = {
       // True for targets created by JSWindowActors, see constructor JSDoc.
       followWindowGlobalLifeCycle: this.followWindowGlobalLifeCycle,
       innerWindowId,
-      parentInnerWindowId: parentInnerWindowId,
+      parentInnerWindowId,
       topInnerWindowId: this.browsingContext.topWindowContext.innerWindowId,
       isTopLevelTarget: this.isTopLevelTarget,
       ignoreSubFrames: this.ignoreSubFrames,
@@ -686,10 +686,10 @@ const windowGlobalTargetPrototype = {
     if (this.docShell) {
       this._unwatchDocShell(this.docShell);
 
-      // If this target is being destroyed as part of a target switch, we don't need to
-      // restore the configuration (this might cause the content page to be focused again
-      // and cause issues in tets).
-      if (!isTargetSwitching) {
+      // If this target is being destroyed as part of a target switch or a mode switch,
+      // we don't need to restore the configuration (this might cause the content page to
+      // be focused again, causing issues in tests and disturbing the user when switching modes).
+      if (!isTargetSwitching && !isModeSwitching) {
         this._restoreTargetConfiguration();
       }
     }
@@ -1546,8 +1546,8 @@ const windowGlobalTargetPrototype = {
     // This event is fired once the document is loaded,
     // after the load event, it's document ready-state is 'complete'.
     this.emit("navigate", {
-      window: window,
-      isTopLevel: isTopLevel,
+      window,
+      isTopLevel,
     });
 
     // We don't do anything for inner frames here.
@@ -1571,7 +1571,7 @@ const windowGlobalTargetPrototype = {
       url: this.url,
       title: this.title,
       state: "stop",
-      isFrameSwitching: isFrameSwitching,
+      isFrameSwitching,
     });
   },
 

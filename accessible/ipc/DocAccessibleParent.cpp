@@ -233,10 +233,15 @@ void DocAccessibleParent::ShutdownOrPrepareForMove(RemoteAccessible* aAcc) {
   }
   // This is a move. Moves are sent as a hide and then a show, but for a move,
   // we want to keep the Accessible alive for reuse later.
-  aAcc->SetParent(nullptr);
   if (aAcc->IsTable() || aAcc->IsTableCell()) {
+    // For table cells, it's important that we do this before the parent is
+    // cleared because CachedTableAccessible::Invalidate needs the ancestry.
     CachedTableAccessible::Invalidate(aAcc);
   }
+  if (aAcc->IsHyperText()) {
+    aAcc->InvalidateCachedHyperTextOffsets();
+  }
+  aAcc->SetParent(nullptr);
   mMovingIDs.EnsureRemoved(id);
   if (aAcc->IsOuterDoc()) {
     // Leave child documents alone. They are added and removed differently to
@@ -611,6 +616,20 @@ mozilla::ipc::IPCResult DocAccessibleParent::RecvCache(
     remote->ApplyCache(aUpdateType, entry.Fields());
   }
 
+  if (aUpdateType == CacheUpdateType::Initial && !aData.IsEmpty()) {
+    RemoteAccessible* target = GetAccessible(aData.ElementAt(0).ID());
+    ProxyShowHideEvent(target, target->RemoteParent(), true, false);
+
+    if (nsCoreUtils::AccEventObserversExist()) {
+      xpcAccessibleGeneric* xpcAcc = GetXPCAccessible(target);
+      xpcAccessibleDocument* doc = GetAccService()->GetXPCDocument(this);
+      nsINode* node = nullptr;
+      RefPtr<xpcAccEvent> event = new xpcAccEvent(
+          nsIAccessibleEvent::EVENT_SHOW, xpcAcc, doc, node, false);
+      nsCoreUtils::DispatchAccEvent(std::move(event));
+    }
+  }
+
   if (nsCOMPtr<nsIObserverService> obsService =
           services::GetObserverService()) {
     obsService->NotifyObservers(nullptr, NS_ACCESSIBLE_CACHE_TOPIC, nullptr);
@@ -788,7 +807,12 @@ ipc::IPCResult DocAccessibleParent::AddChildDoc(DocAccessibleParent* aChildDoc,
   // document it self.
   ProxyEntry* e = mAccessibles.GetEntry(aParentID);
   if (!e) {
+#ifndef FUZZING_SNAPSHOT
+    // This diagnostic assert and the one down below expect a well-behaved
+    // child process. In IPC fuzzing, we directly fuzz parameters of each
+    // method over IPDL and the asserts are not valid under these conditions.
     MOZ_DIAGNOSTIC_ASSERT(false, "Binding to nonexistent proxy!");
+#endif
     return IPC_FAIL(this, "binding to nonexistant proxy!");
   }
 
@@ -800,8 +824,10 @@ ipc::IPCResult DocAccessibleParent::AddChildDoc(DocAccessibleParent* aChildDoc,
   // here.
   if (!outerDoc->IsOuterDoc() || outerDoc->ChildCount() > 1 ||
       (outerDoc->ChildCount() == 1 && !outerDoc->RemoteChildAt(0)->IsDoc())) {
+#ifndef FUZZING_SNAPSHOT
     MOZ_DIAGNOSTIC_ASSERT(false,
                           "Binding to parent that isn't a valid OuterDoc!");
+#endif
     return IPC_FAIL(this, "Binding to parent that isn't a valid OuterDoc!");
   }
 

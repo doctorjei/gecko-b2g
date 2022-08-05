@@ -27,6 +27,7 @@ let openUrl = url => {
     inBackground: false,
     triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
   });
+  return { focusContent: true };
 };
 
 // There are various actions that will either fail or do not
@@ -35,9 +36,9 @@ let openUrl = url => {
 // We may want to show these as disabled buttons, that may
 // aid discovery but may also confuse users.
 let currentPageIsWebContentFilter = () =>
-  !currentBrowser().currentURI.spec.startsWith("about:");
+  !currentBrowser()?.currentURI.spec.startsWith("about:");
 let currentBrowser = () =>
-  lazy.BrowserWindowTracker.getTopWindow().gBrowser.selectedBrowser;
+  lazy.BrowserWindowTracker.getTopWindow()?.gBrowser.selectedBrowser;
 
 XPCOMUtils.defineLazyGetter(lazy, "gFluentStrings", function() {
   return new Localization(["browser/browser.ftl"], true);
@@ -120,11 +121,10 @@ const DEFAULT_ACTIONS = {
     label: "quickactions-screenshot2",
     isActive: currentPageIsWebContentFilter,
     onPick: () => {
-      Services.obs.notifyObservers(
-        null,
-        "menuitem-screenshot-extension",
-        "contextMenu"
-      );
+      lazy.BrowserWindowTracker.getTopWindow()
+        .document.getElementById("Browser:Screenshot")
+        .doCommand();
+      return { focusContent: true };
     },
   },
   settings: {

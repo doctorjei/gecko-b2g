@@ -10,6 +10,7 @@
 #include <stdio.h>   // for nullptr, stdout
 #include <string.h>  // for strcmp
 
+#include "AutoRangeArray.h"              // for AutoRangeArray
 #include "ChangeAttributeTransaction.h"  // for ChangeAttributeTransaction
 #include "CompositionTransaction.h"      // for CompositionTransaction
 #include "DeleteNodeTransaction.h"       // for DeleteNodeTransaction
@@ -5894,9 +5895,9 @@ NS_IMETHODIMP EditorBase::GetWrapWidth(int32_t* aWrapColumn) {
 //
 static void CutStyle(const char* stylename, nsString& styleValue) {
   // Find the current wrapping type:
-  int32_t styleStart = styleValue.Find(stylename, true);
+  int32_t styleStart = styleValue.LowerCaseFindASCII(stylename);
   if (styleStart >= 0) {
-    int32_t styleEnd = styleValue.Find(";", false, styleStart);
+    int32_t styleEnd = styleValue.Find(u";", styleStart);
     if (styleEnd > styleStart) {
       styleValue.Cut(styleStart, styleEnd - styleStart + 1);
     } else {
@@ -5995,6 +5996,7 @@ NS_IMETHODIMP EditorBase::SetNewlineHandling(int32_t aNewlineHandling) {
 bool EditorBase::IsSelectionRangeContainerNotContent() const {
   MOZ_ASSERT(IsEditActionDataAvailable());
 
+  // TODO: Make all callers use !AutoRangeArray::IsInContent() instead.
   const uint32_t rangeCount = SelectionRef().RangeCount();
   for (const uint32_t i : IntegerRange(rangeCount)) {
     MOZ_ASSERT(SelectionRef().RangeCount() == rangeCount);

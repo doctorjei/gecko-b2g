@@ -357,11 +357,15 @@ export class UrlbarController {
           event.preventDefault();
         }
         break;
-      case KeyEvent.DOM_VK_DOWN:
-      case KeyEvent.DOM_VK_UP:
       case KeyEvent.DOM_VK_PAGE_DOWN:
       case KeyEvent.DOM_VK_PAGE_UP:
-        if (event.ctrlKey || event.altKey) {
+        if (event.ctrlKey) {
+          break;
+        }
+      // eslint-disable-next-lined no-fallthrough
+      case KeyEvent.DOM_VK_DOWN:
+      case KeyEvent.DOM_VK_UP:
+        if (event.altKey) {
           break;
         }
         if (this.view.isOpen) {

@@ -46,7 +46,7 @@ class TabPickupList extends HTMLElement {
 
   get fluentStrings() {
     if (!this._fluentStrings) {
-      this._fluentStrings = new Localization(["preview/firefoxView.ftl"], true);
+      this._fluentStrings = new Localization(["browser/firefoxView.ftl"], true);
     }
     return this._fluentStrings;
   }
@@ -104,19 +104,7 @@ class TabPickupList extends HTMLElement {
   }
 
   async getSyncedTabData() {
-    let tabs = [];
-    let clients = await lazy.SyncedTabs.getTabClients();
-
-    for (let client of clients) {
-      for (let tab of client.tabs) {
-        tab.device = client.name;
-        tab.deviceType = client.clientType;
-      }
-      tabs = [...tabs, ...client.tabs.reverse()];
-    }
-    tabs = tabs
-      .sort((a, b) => b.lastUsed - a.lastUsed)
-      .slice(0, this.maxTabsLength);
+    let tabs = await lazy.SyncedTabs.getRecentTabs(this.maxTabsLength);
 
     this.updateTabsList(tabs);
   }

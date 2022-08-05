@@ -21,7 +21,9 @@
 #include "mozilla/Poison.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Printf.h"
+#include "mozilla/ProcessType.h"
 #include "mozilla/ResultExtensions.h"
+#include "mozilla/RuntimeExceptionModule.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_browser.h"
 #include "mozilla/StaticPrefs_fission.h"
@@ -117,7 +119,6 @@
 #  include "mozilla/WinHeaderOnlyUtils.h"
 #  include "mozilla/mscom/ProcessRuntime.h"
 #  include "mozilla/mscom/ProfilerMarkers.h"
-#  include "mozilla/widget/AudioSession.h"
 #  include "WinTokenUtils.h"
 
 #  if defined(MOZ_LAUNCHER_PROCESS)
@@ -4205,6 +4206,11 @@ int XREMain::XRE_mainInit(bool* aExitFlag) {
         SaveWordToEnv("MOZ_CRASHREPORTER_STRINGS_OVERRIDE", overridePath);
       }
     }
+  } else {
+    // We might have registered a runtime exception module very early in process
+    // startup to catch early crashes. This is before we have access to ini file
+    // data, so unregister here if it turns out the crash reporter is disabled.
+    CrashReporter::UnregisterRuntimeExceptionModule();
   }
 
 #if defined(MOZ_SANDBOX) && defined(XP_WIN)
@@ -5909,18 +5915,6 @@ int XREMain::XRE_main(int argc, char* argv[], const BootstrapConfig& aConfig) {
   XRE_CleanupX11ErrorHandler();
 #endif
 
-#if defined(XP_WIN)
-  bool wantAudio = true;
-#  ifdef MOZ_BACKGROUNDTASKS
-  if (BackgroundTasks::IsBackgroundTaskMode()) {
-    wantAudio = false;
-  }
-#  endif
-  if (MOZ_LIKELY(wantAudio)) {
-    mozilla::widget::StopAudioSession();
-  }
-#endif
-
 #ifdef MOZ_INSTRUMENT_EVENT_LOOP
   mozilla::ShutdownEventTracing();
 #endif
@@ -6035,9 +6029,7 @@ nsresult XRE_DeinitCommandLine() {
   return rv;
 }
 
-GeckoProcessType XRE_GetProcessType() {
-  return mozilla::startup::sChildProcessType;
-}
+GeckoProcessType XRE_GetProcessType() { return GetGeckoProcessType(); }
 
 const char* XRE_GetProcessTypeString() {
   return XRE_GeckoProcessTypeToString(XRE_GetProcessType());

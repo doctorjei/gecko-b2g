@@ -31,6 +31,82 @@ input {
   display: none !important;
 }
 
+.onboardingContainer.featureCallout {
+  position: absolute;
+}
+.onboardingContainer.featureCallout, .onboardingContainer.featureCallout .outer-wrapper {
+  height: 0;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] {
+  z-index: 2147483646;
+  height: fit-content;
+  min-height: unset;
+  background-color: transparent;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .brand-logo {
+  margin: 30px 45px 0;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .welcome-text {
+  align-items: baseline;
+  text-align: start;
+  margin-inline: 30px;
+  padding: 20px 0 0;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .welcome-text h1,
+.onboardingContainer.featureCallout .screen[pos=callout] .welcome-text h2 {
+  font-size: 0.8em;
+  margin: 0;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .welcome-text h1 {
+  font-weight: bold;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .welcome-text h2 {
+  margin-block: 10px;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .section-secondary {
+  display: none;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .section-main {
+  height: fit-content;
+  width: fit-content;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .section-main .main-content {
+  overflow: hidden;
+  border: 1px solid #CFCFD8;
+  box-shadow: 0 2px 14px rgba(58, 57, 68, 0.2);
+  border-radius: 4px;
+  padding-block: 0 40px;
+  width: 25em;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .section-main .main-content .steps {
+  align-self: baseline;
+  margin: -38px 30px -30px;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .section-main .main-content .dismiss-button {
+  margin-block: 25px -45px;
+  z-index: 1;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .action-buttons .primary,
+.onboardingContainer.featureCallout .screen[pos=callout] .action-buttons .secondary-cta .secondary {
+  padding: 4px 16px;
+  font-size: 0.8em;
+  height: 2em;
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .action-buttons .primary {
+  font-weight: bold;
+  float: inline-end;
+  margin-inline: 10px 30px;
+  background-color: var(--in-content-button-background);
+  color: var(--in-content-button-text-color);
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .action-buttons .primary:hover {
+  background-color: var(--in-content-button-background-hover);
+}
+.onboardingContainer.featureCallout .screen[pos=callout] .action-buttons .secondary-cta {
+  float: inline-end;
+}
+
 html {
   height: 100%;
 }
@@ -38,6 +114,8 @@ html {
 body {
   --grey-subtitle-1: #696977;
   --newtab-button-secondary-color: #0060DF;
+  --mr-welcome-background-color: #F8F6F4;
+  --mr-welcome-background-gradient: linear-gradient(0deg, rgba(144, 89, 255, 0.2) 0%, rgba(2, 144, 238, 0.2) 100%);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Ubuntu", "Helvetica Neue", sans-serif;
   font-size: 16px;
   position: relative;
@@ -45,6 +123,8 @@ body {
 body[lwt-newtab-brighttext] {
   --grey-subtitle-1: #FFF;
   --newtab-button-secondary-color: #FFF;
+  --mr-welcome-background-color: #333336;
+  --mr-welcome-background-gradient: linear-gradient(0deg, rgba(144, 89, 255, 0.3) 0%, rgba(2, 144, 238, 0.3) 100%);
 }
 
 :root[dialogroot] {
@@ -205,11 +285,24 @@ body[lwt-newtab-brighttext] {
 }
 .onboardingContainer .screen[pos=split] {
   margin: auto;
+  background-color: var(--mr-welcome-background-color);
+  background-image: var(--mr-welcome-background-gradient);
 }
 .onboardingContainer .screen[pos=split] .section-secondary,
 .onboardingContainer .screen[pos=split] .section-main {
   width: 400px;
   height: 550px;
+}
+.onboardingContainer .screen[pos=split] .secondary-cta.top {
+  padding-inline-end: 0;
+}
+@media (max-height: 650px) and (max-width: 990px) {
+  .onboardingContainer .screen[pos=split] .secondary-cta.top {
+    display: none;
+  }
+}
+.onboardingContainer .screen[pos=split] .secondary-cta.top button {
+  color: var(--in-content-page-color);
 }
 .onboardingContainer .screen[pos=split] .section-main {
   flex-direction: row;

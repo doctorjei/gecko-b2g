@@ -18,7 +18,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
 });
 
 // These prefs are relative to the `browser.urlbar` branch.
-const ENABLED_PREF = "quickactions.enabled";
+const ENABLED_PREF = "suggest.quickactions";
 const MATCH_IN_PHRASE_PREF = "quickactions.matchInPhrase";
 const DYNAMIC_TYPE_NAME = "quickactions";
 
@@ -188,7 +188,10 @@ class ProviderQuickActions extends UrlbarProvider {
   }
 
   pickResult(result, itemPicked) {
-    this.#actions.get(itemPicked.dataset.key).onPick();
+    let options = this.#actions.get(itemPicked.dataset.key).onPick() ?? {};
+    if (options.focusContent) {
+      itemPicked.ownerGlobal.gBrowser.selectedBrowser.focus();
+    }
   }
 
   /**

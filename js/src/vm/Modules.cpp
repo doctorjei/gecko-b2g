@@ -115,7 +115,8 @@ static JSObject* CompileModuleHelper(JSContext* cx,
   CHECK_THREAD(cx);
 
   MainThreadErrorContext ec(cx);
-  return frontend::CompileModule(cx, &ec, options, srcBuf);
+  return frontend::CompileModule(cx, &ec, cx->stackLimitForCurrentPrincipal(),
+                                 options, srcBuf);
 }
 
 JS_PUBLIC_API JSObject* JS::CompileModule(JSContext* cx,
@@ -1283,16 +1284,13 @@ bool js::ModuleEvaluate(JSContext* cx, Handle<ModuleObject*> moduleArg,
 
   // Step 9. f result is an abrupt completion, then:
   if (!ok) {
-    if (!cx->isExceptionPending()) {
-      return false;  // Uncatchable exception.
-    }
-
+    // Attempt to take any pending exception, but make sure we still handle
+    // uncatchable exceptions.
     Rooted<Value> error(cx);
-    if (!cx->getPendingException(&error)) {
-      return false;
+    if (cx->isExceptionPending()) {
+      std::ignore = cx->getPendingException(&error);
+      cx->clearPendingException();
     }
-
-    cx->clearPendingException();
 
     // Step 9.a. For each Cyclic Module Record m of stack, do
     for (ModuleObject* m : stack) {

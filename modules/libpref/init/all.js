@@ -1045,6 +1045,12 @@ pref("javascript.options.mem.gc_high_frequency_large_heap_growth", 150);
 // JSGC_LOW_FREQUENCY_HEAP_GROWTH
 pref("javascript.options.mem.gc_low_frequency_heap_growth", 150);
 
+// JSGC_BALANCED_HEAP_LIMITS_ENABLED
+pref("javascript.options.mem.gc_balanced_heap_limits", false);
+
+// JSGC_HEAP_GROWTH_FACTOR
+pref("javascript.options.mem.gc_heap_growth_factor", 40);
+
 // JSGC_ALLOCATION_THRESHOLD
 pref("javascript.options.mem.gc_allocation_threshold_mb", 27);
 
@@ -3273,11 +3279,6 @@ pref("font.size.monospace.x-math", 13);
   // this pref.  Debian 9.x still uses uim as their default IM and it uses key
   // snooper.  So, let's use true for its default value.
   pref("intl.ime.hack.uim.using_key_snooper", true);
-
-  #ifdef MOZ_WIDGET_GTK
-    // maximum number of fonts to substitute for a generic
-    pref("gfx.font_rendering.fontconfig.max_generic_substitutions", 3);
-  #endif
 
 #endif // !ANDROID && !XP_MACOSX && XP_UNIX
 

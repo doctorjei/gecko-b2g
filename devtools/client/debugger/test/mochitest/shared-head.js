@@ -29,9 +29,9 @@ function createDebuggerContext(toolbox) {
   return {
     ...win.dbg,
     commands: toolbox.commands,
-    toolbox: toolbox,
-    win: win,
-    panel: panel,
+    toolbox,
+    win,
+    panel,
   };
 }
 
@@ -555,6 +555,28 @@ function isSelectedFrameSelected(dbg, state) {
   }
 
   return source.id == sourceId;
+}
+
+/**
+ * Checks to see if the frame is selected and the title is correct.
+ *
+ * @param {Object} dbg
+ * @param {Integer} index
+ * @param {String} title
+ */
+function isFrameSelected(dbg, index, title) {
+  const $frame = findElement(dbg, "frame", index);
+
+  const {
+    selectors: { getSelectedFrame, getCurrentThread },
+  } = dbg;
+
+  const frame = getSelectedFrame(getCurrentThread());
+
+  const elSelected = $frame.classList.contains("selected");
+  const titleSelected = frame.displayName == title;
+
+  return elSelected && titleSelected;
 }
 
 /**
