@@ -99,12 +99,12 @@ elif CONFIG["OS_TARGET"] == "Linux":
         "fallback/FallbackFMRadio.cpp",
         "fallback/FallbackNetwork.cpp",
         "fallback/FallbackPowerSupply.cpp",
-        "fallback/FallbackProcessPriority.cpp",
         "fallback/FallbackScreenConfiguration.cpp",
         "fallback/FallbackSensor.cpp",
         "fallback/FallbackUsbManager.cpp",
         "linux/LinuxFlashlightManager.cpp",
         "linux/LinuxMemory.cpp",
+        "linux/LinuxProcessPriority.cpp",
         "linux/LinuxVibration.cpp",
     ]
     if CONFIG["MOZ_B2G"]:

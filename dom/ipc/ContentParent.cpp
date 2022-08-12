@@ -724,17 +724,16 @@ ProcessID GetTelemetryProcessID(const nsACString& remoteType) {
 
 }  // anonymous namespace
 
-UniquePtr<nsTHashMap<nsUint32HashKey, ContentParent*>>
+StaticAutoPtr<nsTHashMap<nsUint32HashKey, ContentParent*>>
     ContentParent::sJSPluginContentParents;
-UniquePtr<nsTArray<ContentParent*>> ContentParent::sPrivateContent;
-UniquePtr<LinkedList<ContentParent>> ContentParent::sContentParents;
+StaticAutoPtr<LinkedList<ContentParent>> ContentParent::sContentParents;
 StaticRefPtr<ContentParent> ContentParent::sRecycledE10SProcess;
 #if defined(XP_LINUX) && defined(MOZ_SANDBOX)
-UniquePtr<SandboxBrokerPolicyFactory>
+StaticAutoPtr<SandboxBrokerPolicyFactory>
     ContentParent::sSandboxBrokerPolicyFactory;
 #endif
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX)
-UniquePtr<std::vector<std::string>> ContentParent::sMacSandboxParams;
+StaticAutoPtr<std::vector<std::string>> ContentParent::sMacSandboxParams;
 #endif
 
 // Set to true when the first content process gets created.
@@ -826,11 +825,11 @@ void ContentParent::StartUp() {
                                        kFissionOmitBlockListValues);
 
 #if defined(XP_LINUX) && defined(MOZ_SANDBOX)
-  sSandboxBrokerPolicyFactory = MakeUnique<SandboxBrokerPolicyFactory>();
+  sSandboxBrokerPolicyFactory = new SandboxBrokerPolicyFactory();
 #endif
 
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX)
-  sMacSandboxParams = MakeUnique<std::vector<std::string>>();
+  sMacSandboxParams = new std::vector<std::string>();
 #endif
 
 #ifdef MOZ_WIDGET_GONK
@@ -1354,8 +1353,7 @@ already_AddRefed<ContentParent> ContentParent::GetNewOrUsedJSPluginProcess(
   if (sJSPluginContentParents) {
     p = sJSPluginContentParents->Get(aPluginID);
   } else {
-    sJSPluginContentParents =
-        MakeUnique<nsTHashMap<nsUint32HashKey, ContentParent*>>();
+    sJSPluginContentParents = new nsTHashMap<nsUint32HashKey, ContentParent*>();
   }
 
   if (p) {
@@ -2115,7 +2113,6 @@ void ContentParent::RemoveFromPool(nsTArray<ContentParent*>& aPool) {
 void ContentParent::AssertNotInPool() {
   MOZ_RELEASE_ASSERT(!mIsInPool);
 
-  MOZ_RELEASE_ASSERT(!sPrivateContent || !sPrivateContent->Contains(this));
   MOZ_RELEASE_ASSERT(sRecycledE10SProcess != this);
   if (IsForJSPlugin()) {
     MOZ_RELEASE_ASSERT(!sJSPluginContentParents ||
@@ -2144,13 +2141,6 @@ void ContentParent::RemoveFromList() {
       }
     }
     return;
-  }
-
-  if (sPrivateContent) {
-    sPrivateContent->RemoveElement(this);
-    if (!sPrivateContent->Length()) {
-      sPrivateContent = nullptr;
-    }
   }
 
   if (!mIsInPool) {
@@ -2903,9 +2893,7 @@ bool ContentParent::LaunchSubprocessResolve(bool aIsSync,
     sCreatedFirstContentProcess = true;
   }
 
-  base::ProcessId procId =
-      base::GetProcId(mSubprocess->GetChildProcessHandle());
-  Open(mSubprocess->TakeInitialPort(), procId);
+  mSubprocess->TakeInitialEndpoint().Bind(this);
 
   ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
   if (!cpm) {
@@ -3058,7 +3046,7 @@ ContentParent::ContentParent(const nsACString& aRemoteType, int32_t aJSPluginID)
 
   // Insert ourselves into the global linked list of ContentParent objects.
   if (!sContentParents) {
-    sContentParents = MakeUnique<LinkedList<ContentParent>>();
+    sContentParents = new LinkedList<ContentParent>();
   }
   sContentParents->insertBack(this);
 
@@ -5639,23 +5627,25 @@ mozilla::ipc::IPCResult ContentParent::RecvCopyFavicon(
 }
 
 mozilla::ipc::IPCResult ContentParent::RecvFindImageText(
-    ShmemImage&& aImage, FindImageTextResolver&& aResolver) {
+    ShmemImage&& aImage, nsTArray<nsCString>&& aLanguages,
+    FindImageTextResolver&& aResolver) {
   RefPtr<DataSourceSurface> surf =
       nsContentUtils::IPCImageToSurface(std::move(aImage), this);
   if (!surf) {
     aResolver(TextRecognitionResultOrError("Failed to read image"_ns));
     return IPC_OK();
   }
-  TextRecognition::FindText(*surf)->Then(
-      GetCurrentSerialEventTarget(), __func__,
-      [resolver = std::move(aResolver)](
-          TextRecognition::NativePromise::ResolveOrRejectValue&& aValue) {
-        if (aValue.IsResolve()) {
-          resolver(TextRecognitionResultOrError(aValue.ResolveValue()));
-        } else {
-          resolver(TextRecognitionResultOrError(aValue.RejectValue()));
-        }
-      });
+  TextRecognition::FindText(*surf, aLanguages)
+      ->Then(
+          GetCurrentSerialEventTarget(), __func__,
+          [resolver = std::move(aResolver)](
+              TextRecognition::NativePromise::ResolveOrRejectValue&& aValue) {
+            if (aValue.IsResolve()) {
+              resolver(TextRecognitionResultOrError(aValue.ResolveValue()));
+            } else {
+              resolver(TextRecognitionResultOrError(aValue.RejectValue()));
+            }
+          });
   return IPC_OK();
 }
 
@@ -5862,11 +5852,6 @@ bool ContentParent::DeallocPWebrtcGlobalParent(PWebrtcGlobalParent* aActor) {
   return true;
 }
 #endif
-
-mozilla::ipc::IPCResult ContentParent::RecvSetOfflinePermission(
-    nsIPrincipal* aPrincipal) {
-  return IPC_OK();
-}
 
 void ContentParent::MaybeInvokeDragSession(BrowserParent* aParent) {
   // dnd uses IPCBlob to transfer data to the content process and the IPC
@@ -6622,7 +6607,6 @@ void ContentParent::BroadcastBlobURLRegistration(
       BlobURLProtocolHandler::IsBlobURLBroadcastPrincipal(aPrincipal);
 
   nsCString uri(aURI);
-  IPC::Principal principal(aPrincipal);
 
   for (auto* cp : AllProcesses(eLive)) {
     if (cp != aIgnoreThisCP) {
@@ -6630,7 +6614,7 @@ void ContentParent::BroadcastBlobURLRegistration(
         continue;
       }
 
-      nsresult rv = cp->TransmitPermissionsForPrincipal(principal);
+      nsresult rv = cp->TransmitPermissionsForPrincipal(aPrincipal);
       if (NS_WARN_IF(NS_FAILED(rv))) {
         break;
       }
@@ -6641,7 +6625,7 @@ void ContentParent::BroadcastBlobURLRegistration(
         break;
       }
 
-      Unused << cp->SendBlobURLRegistration(uri, ipcBlob, principal,
+      Unused << cp->SendBlobURLRegistration(uri, ipcBlob, aPrincipal,
                                             aAgentClusterId);
     }
   }

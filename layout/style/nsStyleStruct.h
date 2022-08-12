@@ -89,8 +89,11 @@ struct ContainSizeAxes {
                      const nsIFrame& aFrame) const;
   IntrinsicSize ContainIntrinsicSize(const IntrinsicSize& aUncontainedSize,
                                      const nsIFrame& aFrame) const;
-  Maybe<nscoord> ContainIntrinsicBSize(const nsIFrame& aFrame) const;
-  Maybe<nscoord> ContainIntrinsicISize(const nsIFrame& aFrame) const;
+
+  Maybe<nscoord> ContainIntrinsicBSize(const nsIFrame& aFrame,
+                                       nscoord aNoneValue = 0) const;
+  Maybe<nscoord> ContainIntrinsicISize(const nsIFrame& aFrame,
+                                       nscoord aNoneValue = 0) const;
 
   const bool mIContained;
   const bool mBContained;
@@ -1103,6 +1106,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleVisibility {
   mozilla::StyleImageRendering mImageRendering;
   mozilla::StyleWritingModeProperty mWritingMode;
   mozilla::StyleTextOrientation mTextOrientation;
+  mozilla::StyleMozBoxLayout mMozBoxLayout;
   mozilla::StylePrintColorAdjust mPrintColorAdjust;
 
   bool IsVisible() const {
@@ -1112,6 +1116,10 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleVisibility {
   bool IsVisibleOrCollapsed() const {
     return mVisible == mozilla::StyleVisibility::Visible ||
            mVisible == mozilla::StyleVisibility::Collapse;
+  }
+
+  bool EmulateMozBoxWithFlex() const {
+    return mMozBoxLayout == mozilla::StyleMozBoxLayout::Flex;
   }
 };
 
@@ -1437,16 +1445,6 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay {
     return IsInnerTableStyle() && mozilla::StyleDisplay::TableCell != mDisplay;
   }
 
-  bool IsXULDisplayStyle() const {
-    // -moz-{inline-}box is XUL, unless we're emulating it with flexbox.
-    if (!mozilla::StaticPrefs::layout_css_emulate_moz_box_with_flex() &&
-        DisplayInside() == mozilla::StyleDisplayInside::MozBox) {
-      return true;
-    }
-
-    return DisplayOutside() == mozilla::StyleDisplayOutside::XUL;
-  }
-
   bool IsFloatingStyle() const { return mozilla::StyleFloat::None != mFloat; }
 
   bool IsPositionedStyle() const {
@@ -1685,42 +1683,22 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay {
 
  private:
   StyleContain EffectiveContainment() const {
-    auto contain = mContain;
-    // content-visibility and container-type implicitly enable some containment
-    // flags.
-    if (MOZ_LIKELY(!mContainerType) &&
-        MOZ_LIKELY(mContentVisibility == StyleContentVisibility::Visible)) {
-      return contain;
-    }
-
+    // content-visibility and container-type values implicitly enable some
+    // containment flags.
+    // FIXME(dshin, bug 1764640): Add in the effect of `container-type`
     switch (mContentVisibility) {
       case StyleContentVisibility::Visible:
-        break;
+        // Most likely case.
+        return mContain;
       case StyleContentVisibility::Auto:
-        contain |=
-            StyleContain::LAYOUT | StyleContain::PAINT | StyleContain::STYLE;
-        break;
+        return mContain | StyleContain::LAYOUT | StyleContain::PAINT |
+               StyleContain::STYLE;
       case StyleContentVisibility::Hidden:
-        contain |= StyleContain::LAYOUT | StyleContain::PAINT |
-                   StyleContain::SIZE | StyleContain::STYLE;
-        break;
+        return mContain | StyleContain::LAYOUT | StyleContain::PAINT |
+               StyleContain::SIZE | StyleContain::STYLE;
     }
-
-    if (mContainerType & mozilla::StyleContainerType::SIZE) {
-      // https://drafts.csswg.org/css-contain-3/#valdef-container-type-size:
-      //     Applies layout containment, style containment, and size containment
-      //     to the principal box.
-      contain |= mozilla::StyleContain::LAYOUT | mozilla::StyleContain::STYLE |
-                 mozilla::StyleContain::SIZE;
-    } else if (mContainerType & mozilla::StyleContainerType::INLINE_SIZE) {
-      // https://drafts.csswg.org/css-contain-3/#valdef-container-type-inline-size:
-      //     Applies layout containment, style containment, and inline-size
-      //     containment to the principal box.
-      contain |= mozilla::StyleContain::LAYOUT | mozilla::StyleContain::STYLE |
-                 mozilla::StyleContain::INLINE_SIZE;
-    }
-
-    return contain;
+    MOZ_ASSERT_UNREACHABLE("Invalid content visibility.");
+    return mContain;
   }
 };
 
