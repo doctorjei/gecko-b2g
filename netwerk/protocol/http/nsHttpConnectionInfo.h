@@ -258,6 +258,12 @@ class nsHttpConnectionInfo final : public ARefBase {
   void SetEchConfig(const nsACString& aEchConfig) { mEchConfig = aEchConfig; }
   const nsCString& GetEchConfig() const { return mEchConfig; }
 
+  bool GetIsUds() const { return mIsUds; }
+  void SetIsUds(bool aIsUds) { mIsUds = aIsUds; }
+
+  void SetUdsPath(const nsACString& aUdsPath) { mUdsPath = aUdsPath; }
+  const nsCString& GetUdsPath() const { return mUdsPath; }
+
  private:
   void Init(const nsACString& host, int32_t port, const nsACString& npnToken,
             const nsACString& username, nsProxyInfo* proxyInfo,
@@ -300,6 +306,9 @@ class nsHttpConnectionInfo final : public ARefBase {
 
   bool mHasIPHintAddress = false;
   nsCString mEchConfig;
+
+  bool mIsUds = false;
+  nsCString mUdsPath;
 
   // for RefPtr
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(nsHttpConnectionInfo, override)

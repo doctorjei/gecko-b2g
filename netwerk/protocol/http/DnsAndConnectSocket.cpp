@@ -12,6 +12,7 @@
 #include "nsIClassOfService.h"
 #include "nsIDNSRecord.h"
 #include "nsIInterfaceRequestorUtils.h"
+#include "nsIFile.h"
 #include "nsIHttpActivityObserver.h"
 #include "nsSocketTransportService2.h"
 #include "nsDNSService2.h"
@@ -1106,27 +1107,38 @@ nsresult DnsAndConnectSocket::TransportSetup::SetupStreams(
        this, ci->HashKey().get(), ci->Origin(), ci->OriginPort(),
        ci->RoutedHost(), ci->RoutedPort()));
 
-  nsCOMPtr<nsIRoutedSocketTransportService> routedSTS(do_QueryInterface(sts));
-  if (routedSTS) {
-    rv = routedSTS->CreateRoutedTransport(
-        socketTypes, ci->GetOrigin(), ci->OriginPort(), ci->GetRoutedHost(),
-        ci->RoutedPort(), ci->ProxyInfo(), mDNSRecord,
-        getter_AddRefs(socketTransport));
-  } else {
-    if (!ci->GetRoutedHost().IsEmpty()) {
-      // There is a route requested, but the legacy nsISocketTransportService
-      // can't handle it.
-      // Origin should be reachable on origin host name, so this should
-      // not be a problem - but log it.
-      LOG(
-          ("DnsAndConnectSocket this=%p using legacy nsISocketTransportService "
-           "means explicit route %s:%d will be ignored.\n",
-           this, ci->RoutedHost(), ci->RoutedPort()));
+  // If the connection information has the UDS flag set, setup a UDS connection.
+  if (ci->GetIsUds()) {
+    nsCOMPtr<nsIFile> localFile;
+    rv = NS_NewNativeLocalFile(ci->GetUdsPath(), false, getter_AddRefs(localFile));
+    if (NS_SUCCEEDED(rv)) {
+      rv = sts->CreateUnixDomainTransport(localFile, getter_AddRefs(socketTransport));
+    } else {
+      printf_stderr("IPFS: failed to create transport at %s : %x\n", ci->GetUdsPath().get(), rv);
     }
+  } else {
+    nsCOMPtr<nsIRoutedSocketTransportService> routedSTS(do_QueryInterface(sts));
+    if (routedSTS) {
+      rv = routedSTS->CreateRoutedTransport(
+          socketTypes, ci->GetOrigin(), ci->OriginPort(), ci->GetRoutedHost(),
+          ci->RoutedPort(), ci->ProxyInfo(), mDNSRecord,
+          getter_AddRefs(socketTransport));
+    } else {
+      if (!ci->GetRoutedHost().IsEmpty()) {
+        // There is a route requested, but the legacy nsISocketTransportService
+        // can't handle it.
+        // Origin should be reachable on origin host name, so this should
+        // not be a problem - but log it.
+        LOG(
+            ("DnsAndConnectSocket this=%p using legacy nsISocketTransportService "
+            "means explicit route %s:%d will be ignored.\n",
+            this, ci->RoutedHost(), ci->RoutedPort()));
+      }
 
-    rv = sts->CreateTransport(socketTypes, ci->GetOrigin(), ci->OriginPort(),
-                              ci->ProxyInfo(), mDNSRecord,
-                              getter_AddRefs(socketTransport));
+      rv = sts->CreateTransport(socketTypes, ci->GetOrigin(), ci->OriginPort(),
+                                ci->ProxyInfo(), mDNSRecord,
+                                getter_AddRefs(socketTransport));
+    }
   }
   NS_ENSURE_SUCCESS(rv, rv);
 

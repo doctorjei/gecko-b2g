@@ -2965,6 +2965,11 @@ nsSocketTransport::SetKeepaliveEnabled(bool aEnable) {
 
 NS_IMETHODIMP
 nsSocketTransport::SetKeepaliveVals(int32_t aIdleTime, int32_t aRetryInterval) {
+  if (mPort == 0) {
+    // UDS socket, not applicable.
+    return NS_OK;
+  }
+
 #if defined(XP_WIN) || defined(XP_UNIX) || defined(XP_MACOSX)
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   if (NS_WARN_IF(aIdleTime <= 0 || kMaxTCPKeepIdle < aIdleTime)) {
@@ -3160,6 +3165,11 @@ static void LogOSError(const char* aPrefix, const void* aObjPtr) {
 
 nsresult nsSocketTransport::PRFileDescAutoLock::SetKeepaliveVals(
     bool aEnabled, int aIdleTime, int aRetryInterval, int aProbeCount) {
+  if (mSocketTransport->mPort == 0) {
+    // UDS socket, not applicable.
+    return NS_OK;
+  }
+
 #if defined(XP_WIN) || defined(XP_UNIX) || defined(XP_MACOSX)
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   if (NS_WARN_IF(aIdleTime <= 0 || kMaxTCPKeepIdle < aIdleTime)) {

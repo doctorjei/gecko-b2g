@@ -34,9 +34,9 @@ impl Protocol {
     }
 }
 
-// Default gateway domain.
-// Use the 'ipfs.gateway' preference to change it.
-static DEFAULT_GATEWAY_DOMAIN: &str = "dweb.link";
+// Default Unix Domain Socket path.
+// Use the 'ipfs.uds_path' preference to change it.
+static DEFAULT_UDS_PATH: &str = "/tmp/ipfsd.http";
 
 // Helper functions to get a char pref with a default value.
 fn fallible_get_char_pref(name: &str, default_value: &str) -> Result<nsCString, nsresult> {
@@ -82,15 +82,16 @@ fn get_char_pref(name: &str, default_value: &str) -> nsCString {
 struct IpfsHandler {
     // The handler protocol.
     protocol: Protocol,
-    gateway_domain: nsCString,
+    uds_path: String,
 }
 
 impl IpfsHandler {
     fn new(protocol: Protocol) -> RefPtr<Self> {
         debug!("IpfsHandler::new {:?}", protocol);
 
+        let uds_path = get_char_pref("ipfs.uds_path", DEFAULT_UDS_PATH);
         Self::allocate(InitIpfsHandler {
-            gateway_domain: get_char_pref("ips.gateway", DEFAULT_GATEWAY_DOMAIN),
+            uds_path: uds_path.to_utf8().replace("/", "%2F"),
             protocol,
         })
     }
@@ -164,32 +165,31 @@ impl IpfsHandler {
             (*uri).GetPathQueryRef(&mut *path_query);
         }
 
-        // Mapping to gateway url:
+        // Mapping to UDS endpoint:
         // ipfs://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq/wiki/Vincent_van_Gogh.html ->
-        // https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.dweb.link/wiki/Vincent_van_Gogh.html
-        //
-        // We don't use the `https://dweb.link/ipfs?uri=...` form because this causes an HTTP redirect and
-        // this doesn't preserve the ipfs:// or ipns:// origin of the loaded document.
+        // http+unix://<uds path>/ipfs/bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq/wiki/Vincent_van_Gogh.html
 
-        let safe_host = if self.protocol == Protocol::Ipfs {
+        let url_path = if self.protocol == Protocol::Ipfs {
             // Try to convert 'host' into a CIDv1
             let cid = Cid::try_from(host.to_utf8().as_ref()).map_err(|_| NS_ERROR_FAILURE)?;
             // Same as Cid::to_string_v1() which is unfortunately private.
             multibase::encode(multibase::Base::Base32Lower, cid.to_bytes().as_slice())
         } else {
-            // For ipns://, convert '-' to '--' and '.' to '-'
-            host.to_utf8().replace('-', "--").replace('.', "-")
+            // For ipns://, just use the host.
+            host.to_string()
         };
 
-        let gateway_url = format!(
-            "https://{}.{}.{}{}",
-            safe_host, scheme, self.gateway_domain, path_query
+        let uds_url = format!(
+            "http+unix://{}/{}/{}{}",
+            self.uds_path, scheme, url_path, path_query
         );
+
+        // println!("IPFS: UDS url is {}", uds_url);
 
         let io_service = xpcom::services::get_IOService().ok_or(NS_ERROR_FAILURE)?;
         unsafe {
             let final_uri: RefPtr<nsIURI> = getter_addrefs(|p| {
-                io_service.NewURI(&*nsCString::from(gateway_url), ptr::null(), ptr::null(), p)
+                io_service.NewURI(&*nsCString::from(uds_url), ptr::null(), ptr::null(), p)
             })?;
 
             io_service.NewChannelFromURIWithLoadInfo(&*final_uri, load_info, retval);

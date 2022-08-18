@@ -95,9 +95,9 @@ struct ParamTraits<mozilla::net::NetAddr> {
 #if defined(XP_UNIX)
     } else if (aParam.raw.family == AF_LOCAL) {
       // Train's already off the rails:  let's get a stack trace at least...
-      MOZ_CRASH(
-          "Error: please post stack trace to "
-          "https://bugzilla.mozilla.org/show_bug.cgi?id=661158");
+      // MOZ_CRASH(
+      //     "Error: please post stack trace to "
+      //     "https://bugzilla.mozilla.org/show_bug.cgi?id=661158");
       aWriter->WriteBytes(aParam.local.path, sizeof(aParam.local.path));
 #endif
     } else {

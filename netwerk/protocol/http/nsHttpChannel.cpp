@@ -6080,6 +6080,14 @@ nsresult nsHttpChannel::BeginConnect() {
                                          mCallbacks, originAttributes);
 
   RefPtr<nsHttpConnectionInfo> connInfo;
+  bool isUds = mURI->SchemeIs("http+unix");
+  if (isUds) {
+    // Hack: use a valid host name to get name resolution to work as-is. Since our scheme is
+    // not https, we also bypass all the "upgrade to https" code paths.
+    host = nsAutoCString("uds.localhost");
+  }
+
+
 #ifdef FUZZING
   if (StaticPrefs::fuzzing_necko_http3()) {
     connInfo =
@@ -6092,6 +6100,16 @@ nsresult nsHttpChannel::BeginConnect() {
 #ifdef FUZZING
   }
 #endif
+
+
+  connInfo->SetIsUds(isUds);
+  if (isUds) {
+    // Unescape the host and store it in the connection info.
+    nsAutoCString uriHost;
+    mURI->GetAsciiHost(uriHost);
+    char* str = ToNewCString(uriHost, mozilla::fallible);
+    connInfo->SetUdsPath(nsCString(nsUnescape(str)));
+  }
 
   bool http2Allowed = !gHttpHandler->IsHttp2Excluded(connInfo);
 

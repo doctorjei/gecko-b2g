@@ -316,6 +316,8 @@ already_AddRefed<nsHttpConnectionInfo> nsHttpConnectionInfo::Clone() const {
   clone->SetIPv6Disabled(GetIPv6Disabled());
   clone->SetHasIPHintAddress(HasIPHintAddress());
   clone->SetEchConfig(GetEchConfig());
+  clone->SetIsUds(GetIsUds());
+  clone->SetUdsPath(GetUdsPath());
   MOZ_ASSERT(clone->Equals(this));
 
   return clone.forget();
@@ -407,6 +409,8 @@ void nsHttpConnectionInfo::SerializeHttpConnectionInfo(
   aArgs.isHttp3() = aInfo->IsHttp3();
   aArgs.hasIPHintAddress() = aInfo->HasIPHintAddress();
   aArgs.echConfig() = aInfo->GetEchConfig();
+  aArgs.isUds() = aInfo->GetIsUds();
+  aArgs.udsPath() = aInfo->GetUdsPath();
 
   if (!aInfo->ProxyInfo()) {
     return;
@@ -452,6 +456,8 @@ nsHttpConnectionInfo::DeserializeHttpConnectionInfoCloneArgs(
   cinfo->SetIPv6Disabled(aInfoArgs.isIPv6Disabled());
   cinfo->SetHasIPHintAddress(aInfoArgs.hasIPHintAddress());
   cinfo->SetEchConfig(aInfoArgs.echConfig());
+  cinfo->SetIsUds(aInfoArgs.isUds());
+  cinfo->SetUdsPath(aInfoArgs.udsPath());
 
   return cinfo.forget();
 }
@@ -478,6 +484,8 @@ void nsHttpConnectionInfo::CloneAsDirectRoute(nsHttpConnectionInfo** outCI) {
   clone->SetIPv6Disabled(GetIPv6Disabled());
   clone->SetHasIPHintAddress(HasIPHintAddress());
   clone->SetEchConfig(GetEchConfig());
+  clone->SetIsUds(GetIsUds());
+  clone->SetUdsPath(GetUdsPath());
 
   clone.forget(outCI);
 }

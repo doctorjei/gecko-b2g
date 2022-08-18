@@ -388,6 +388,8 @@ struct HttpConnectionInfoCloneArgs
   bool hasIPHintAddress;
   nsCString echConfig;
   ProxyInfoCloneArgs[] proxyInfo;
+  bool isUds;
+  nsCString udsPath;
 };
 
 struct ConsoleReportCollected {
