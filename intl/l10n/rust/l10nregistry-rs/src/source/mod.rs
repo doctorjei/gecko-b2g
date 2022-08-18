@@ -13,7 +13,8 @@ use std::{
     hash::{Hash, Hasher},
     pin::Pin,
     rc::Rc,
-    task::Poll,
+    task::{Context, Poll},
+    time::{Duration, Instant},
 };
 
 use futures::{future::Shared, Future, FutureExt};
@@ -408,11 +409,8 @@ impl Inner {
     where
         F: FnOnce() -> ResourceStatus,
     {
-        if let Ok(mut lock) = self.entries.try_borrow_mut() {
-            lock.entry(resource_id.value).or_insert_with(|| f()).clone()
-        } else {
-            ResourceStatus::MissingOptional
-        }
+        let mut lock = self.entries.borrow_mut();
+        lock.entry(resource_id.value).or_insert_with(|| f()).clone()
     }
 
     fn update_resource(&self, resource_id: ResourceId, resource: ResourceOption) -> ResourceOption {
@@ -432,6 +430,35 @@ impl Inner {
             Some(ResourceStatus::Loaded(_)) => Some(true),
             Some(ResourceStatus::Loading(_)) | None => None,
         }
+    }
+
+    fn is_unlocked(&self) -> bool {
+        self.entries.try_borrow_mut().is_ok()
+    }
+}
+
+struct AsyncTimer {
+    started_at: Instant,
+    duration: Duration,
+}
+
+impl AsyncTimer {
+    fn new(duration: Duration) -> Self {
+        Self {
+            started_at: Instant::now(),
+            duration,
+        }
+    }
+}
+
+impl Future for AsyncTimer {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<<Self as futures::Future>::Output> {
+        if self.started_at.elapsed() > self.duration {
+            return Poll::Ready(());
+        }
+        Poll::Pending
     }
 }
 
@@ -461,6 +488,13 @@ async fn read_resource(resource_id: ResourceId, shared: Rc<Inner>) -> ResourceOp
         })
         .unwrap_or_else(|| ResourceOption::missing_resource(&resource_id));
     // insert the resource into the cache
+    // Wait for the shared entries to be unlocked.
+    loop {
+        if shared.is_unlocked() {
+            break;
+        }
+        AsyncTimer::new(Duration::from_millis(10)).await;
+    }
     shared.update_resource(resource_id, resource)
 }
 

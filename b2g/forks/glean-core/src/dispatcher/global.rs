@@ -40,7 +40,7 @@ fn guard() -> DispatchGuard {
 /// This will not block.
 ///
 /// [`flush_init`]: fn.flush_init.html
-pub fn launch(task: impl FnOnce() + Send + 'static) {
+pub fn launch(_task: impl FnOnce() + Send + 'static) {
     // let guard = guard();
     // match guard.launch(task) {
     //     Ok(_) => {}
