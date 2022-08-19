@@ -740,7 +740,8 @@ class ProtonScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCom
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
       className: "section-secondary",
       style: content.background ? {
-        background: content.background
+        background: content.background,
+        "--mr-secondary-background-position-y": content.split_narrow_bkg_position
       } : {}
     }, content.hero_image ? /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_HeroImage__WEBPACK_IMPORTED_MODULE_8__.HeroImage, {
       url: content.hero_image.url
@@ -843,6 +844,7 @@ class ProtonScreen extends (react__WEBPACK_IMPORTED_MODULE_0___default().PureCom
         current: this.props.order,
         total
       }),
+      "data-l10n-attrs": "aria-valuetext",
       role: "meter",
       "aria-valuenow": this.props.order,
       "aria-valuemin": 1,

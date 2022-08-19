@@ -78,10 +78,8 @@ fn get_char_pref(name: &str, default_value: &str) -> nsCString {
     }
 }
 
-#[derive(xpcom)]
-#[xpimplements(nsIProtocolHandler)]
-#[refcnt = "atomic"]
-struct InitIpfsHandler {
+#[xpcom(implement(nsIProtocolHandler), atomic)]
+struct IpfsHandler {
     // The handler protocol.
     protocol: Protocol,
     gateway_domain: nsCString,

@@ -2260,6 +2260,7 @@ var gBrowserInit = {
 
         let hasValidUserGestureActivation = undefined;
         let fromExternal = undefined;
+        let globalHistoryOptions = undefined;
         if (window.arguments[1]) {
           if (!(window.arguments[1] instanceof Ci.nsIPropertyBag2)) {
             throw new Error(
@@ -2275,6 +2276,18 @@ var gBrowserInit = {
           }
           if (extraOptions.hasKey("fromExternal")) {
             fromExternal = extraOptions.getPropertyAsBool("fromExternal");
+          }
+          if (extraOptions.hasKey("triggeringSponsoredURL")) {
+            globalHistoryOptions = {
+              triggeringSponsoredURL: extraOptions.getPropertyAsACString(
+                "triggeringSponsoredURL"
+              ),
+            };
+            if (extraOptions.hasKey("triggeringSponsoredURLVisitTimeMS")) {
+              globalHistoryOptions.triggeringSponsoredURLVisitTimeMS = extraOptions.getPropertyAsUint64(
+                "triggeringSponsoredURLVisitTimeMS"
+              );
+            }
           }
         }
 
@@ -2296,6 +2309,7 @@ var gBrowserInit = {
             forceAboutBlankViewerInCurrent: !!window.arguments[6],
             hasValidUserGestureActivation,
             fromExternal,
+            globalHistoryOptions,
           });
         } catch (e) {
           Cu.reportError(e);
@@ -9930,6 +9944,7 @@ var FirefoxViewHandler = {
       gBrowser.tabContainer.addEventListener("TabSelect", this);
       window.addEventListener("activate", this);
       gBrowser.hideTab(this.tab);
+      this.button?.setAttribute("aria-controls", this.tab.linkedPanel);
     }
     gBrowser.selectedTab = this.tab;
   },
@@ -9937,11 +9952,13 @@ var FirefoxViewHandler = {
     switch (e.type) {
       case "TabSelect":
         this.button?.toggleAttribute("open", e.target == this.tab);
+        this.button?.setAttribute("aria-selected", e.target == this.tab);
         this._removeNotificationDotIfTabSelected();
         break;
       case "TabClose":
         this.tab = null;
         gBrowser.tabContainer.removeEventListener("TabSelect", this);
+        this.button?.removeAttribute("aria-controls");
         break;
       case "activate":
         this._removeNotificationDotIfTabSelected();

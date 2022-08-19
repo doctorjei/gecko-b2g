@@ -3334,18 +3334,6 @@
     "n_values": 16,
     "description": "SSL Handshake Key Exchange Algorithm for resumed handshake (null=0, rsa=1, dh=2, fortezza=3, ecdh=4)"
   },
-  "CLIENT_CERTIFICATE_SCAN_TIME": {
-    "record_in_processes": ["main", "socket"],
-    "products": ["firefox"],
-    "alert_emails": ["seceng-telemetry@mozilla.com", "dkeeler@mozilla.com"],
-    "expires_in_version": "106",
-    "releaseChannelCollection": "opt-out",
-    "kind": "exponential",
-    "high": 60000,
-    "n_buckets": 100,
-    "description": "ms elapsed time scanning for client certificates",
-    "bug_numbers": [1711154, 1736628, 1763524]
-  },
   "CRLITE_VS_OCSP_RESULT": {
     "record_in_processes": ["main", "socket"],
     "products": ["firefox", "fennec"],
@@ -10662,25 +10650,25 @@
     "record_in_processes": ["main"],
     "products": ["firefox"],
     "alert_emails": ["jwatt@jwatt.org", "emilio@mozilla.com"],
-    "expires_in_version": "105",
+    "expires_in_version": "112",
     "description": "Milliseconds taken from when a print is initiated (typically by the user) to when the platform code is sent the print settings to create the initial print preview document.",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 50,
     "releaseChannelCollection": "opt-out",
-    "bug_numbers": [1663733, 1714261, 1745270]
+    "bug_numbers": [1663733, 1714261, 1745270, 1777398]
   },
   "PRINT_INIT_TO_PREVIEW_DOC_SHOWN_MS" : {
     "record_in_processes": ["main"],
     "products": ["firefox"],
     "alert_emails": ["jwatt@jwatt.org", "emilio@mozilla.com"],
-    "expires_in_version": "105",
+    "expires_in_version": "112",
     "description": "Milliseconds taken from when a print is initiated (typically by the user) to when the initial print preview document is shown.",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 50,
     "releaseChannelCollection": "opt-out",
-    "bug_numbers": [1663733, 1714261, 1745270]
+    "bug_numbers": [1663733, 1714261, 1745270, 1777398]
   },
   "DEVTOOLS_COLD_TOOLBOX_OPEN_DELAY_MS": {
     "record_in_processes": ["main"],
@@ -13704,6 +13692,18 @@
     "bug_numbers": [1287987, 1570634, 1685399],
     "releaseChannelCollection": "opt-out"
   },
+  "VIDEO_HDR_PLAY_TIME_MS" : {
+    "record_in_processes": ["main", "content"],
+    "products": ["firefox"],
+    "alert_emails": ["media-alerts@mozilla.com", "bwerth@mozilla.com"],
+    "expires_in_version": "never",
+    "description": "Total time spent playing HDR video in milliseconds.",
+    "kind": "exponential",
+    "high": 14400000,
+    "n_buckets": 100,
+    "bug_numbers": [1777264],
+    "releaseChannelCollection": "opt-out"
+  },
   "VIDEO_ENCRYPTED_PLAY_TIME_MS" : {
     "record_in_processes": ["content"],
     "products": ["firefox"],
@@ -16201,7 +16201,7 @@
     "n_buckets": 50,
     "description": "The time spent waiting for the GPU to complete previously issued drawing commands in milliseconds"
   },
-    "WR_RENDERER_TIME": {
+  "WR_RENDERER_TIME": {
     "record_in_processes": [ "main", "gpu" ],
     "products": [ "firefox" ],
     "alert_emails": [ "gfx-telemetry-alerts@mozilla.com" ],
@@ -16211,6 +16211,17 @@
     "high": 1000,
     "n_buckets": 50,
     "description": "The time spent by WebRender in the Renderer in milliseconds."
+  },
+    "WR_RENDERER_TIME_NO_SC_MS": {
+    "record_in_processes": [ "main", "gpu" ],
+    "products": [ "firefox" ],
+    "alert_emails": [ "gfx-telemetry-alerts@mozilla.com" ],
+    "bug_numbers": [ 1784286 ],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": 1000,
+    "n_buckets": 50,
+    "description": "The time spent by WebRender in the Renderer in milliseconds for frames with no shader compilation."
   },
   "WR_SCENEBUILD_TIME": {
     "record_in_processes": ["main", "gpu"],

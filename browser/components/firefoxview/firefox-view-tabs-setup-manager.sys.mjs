@@ -63,6 +63,7 @@ export const TabsSetupFlowManager = new (class {
       lazy.gNetworkLinkService.linkStatusKnown &&
       lazy.gNetworkLinkService.isLinkUp;
     this.syncIsWorking = true;
+    this.syncIsConnected = lazy.UIState.get().syncEnabled;
 
     this.registerSetupState({
       uiStateIndex: 0,
@@ -71,7 +72,8 @@ export const TabsSetupFlowManager = new (class {
         return (
           this.networkIsOnline &&
           this.syncIsWorking &&
-          !Services.prefs.prefIsLocked(FXA_ENABLED)
+          !Services.prefs.prefIsLocked(FXA_ENABLED) &&
+          this.syncIsConnected
         );
       },
     });
@@ -182,6 +184,7 @@ export const TabsSetupFlowManager = new (class {
       "network-offline": !this.networkIsOnline,
       "sync-error": !this.syncIsWorking,
       "fxa-admin-disabled": Services.prefs.prefIsLocked(FXA_ENABLED),
+      "sync-disconnected": !this.syncIsConnected,
     };
 
     for (let [type, value] of Object.entries(errorStates)) {
@@ -268,6 +271,7 @@ export const TabsSetupFlowManager = new (class {
     switch (topic) {
       case lazy.UIState.ON_UPDATE:
         this.logger.debug("Handling UIState update");
+        this.syncIsConnected = lazy.UIState.get().syncEnabled;
         this.maybeUpdateUI();
         break;
       case TOPIC_DEVICELIST_UPDATED:
@@ -398,12 +402,19 @@ export const TabsSetupFlowManager = new (class {
     Services.telemetry.recordEvent("firefoxview", "fxa_continue", "sync", null);
   }
 
-  openSyncPreferences(window) {
-    const url = "about:preferences?action=pair#sync";
+  async openFxAPairDevice(window) {
+    const url = await lazy.fxAccounts.constructor.config.promisePairingURI({
+      entrypoint: "fxa_app_menu", // Bug 1784363 - update to "fx-view" when available
+    });
     openTabInWindow(window, url, true);
     Services.telemetry.recordEvent("firefoxview", "fxa_mobile", "sync", null, {
-      has_devices: this.mobileDeviceConnected.toString(),
+      has_devices: this.secondaryDeviceConnected.toString(),
     });
+  }
+
+  openSyncPreferences(window) {
+    const url = "about:preferences#sync";
+    openTabInWindow(window, url, true);
   }
 
   syncOpenTabs(containerElem) {

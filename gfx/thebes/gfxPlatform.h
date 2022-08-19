@@ -784,8 +784,6 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
 
   static bool HasVariationFontSupport();
 
-  bool HasNativeColrFontSupport() const { return mHasNativeColrFontSupport; }
-
   // you probably want to use gfxVars::UseWebRender() instead of this
   static bool WebRenderPrefEnabled();
   // you probably want to use gfxVars::UseWebRender() instead of this
@@ -832,6 +830,7 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
   virtual void InitWebGLConfig();
   virtual void InitWebGPUConfig();
   virtual void InitWindowOcclusionConfig();
+  void InitBackdropFilterConfig();
 
   virtual void GetPlatformDisplayInfo(mozilla::widget::InfoObject& aObj) {}
 
@@ -931,10 +930,6 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
 
   // Whether the platform supports rendering OpenType font variations
   static std::atomic<int8_t> sHasVariationFontSupport;
-
-  // Whether the platform font APIs have native support for COLR fonts.
-  // Set to true during initialization on platforms that implement this.
-  bool mHasNativeColrFontSupport = false;
 
   // The global vsync dispatcher. Only non-null in the parent process.
   // Its underlying VsyncSource is either mGlobalHardwareVsyncSource

@@ -9,6 +9,7 @@ import { toggleContainer } from "./helpers.mjs";
 const { TabsSetupFlowManager } = ChromeUtils.importESModule(
   "resource:///modules/firefox-view-tabs-setup-manager.sys.mjs"
 );
+
 const TOPIC_SETUPSTATE_CHANGED = "firefox-view.setupstate.changed";
 
 class TabPickupContainer extends HTMLElement {
@@ -66,8 +67,9 @@ class TabPickupContainer extends HTMLElement {
           TabsSetupFlowManager.openFxASignup(event.target.ownerGlobal);
           break;
         }
-        case "view2-primary-action": {
-          TabsSetupFlowManager.openSyncPreferences(event.target.ownerGlobal);
+        case "view2-primary-action":
+        case "mobile-promo-primary-action": {
+          TabsSetupFlowManager.openFxAPairDevice(event.target.ownerGlobal);
           break;
         }
         case "view3-primary-action": {
@@ -78,14 +80,13 @@ class TabPickupContainer extends HTMLElement {
           TabsSetupFlowManager.dismissMobilePromo(event.target);
           break;
         }
-        case "mobile-promo-primary-action": {
-          TabsSetupFlowManager.openSyncPreferences(event.target.ownerGlobal);
-          break;
-        }
         case "mobile-confirmation-dismiss": {
           TabsSetupFlowManager.dismissMobileConfirmation(event.target);
           break;
         }
+        case "view0-sync-disconnected-action":
+          TabsSetupFlowManager.openSyncPreferences(event.target.ownerGlobal);
+          break;
       }
     }
     // Returning to fxview seems like a likely time for a device check
@@ -163,6 +164,11 @@ class TabPickupContainer extends HTMLElement {
   }
 
   generateErrorMessage() {
+    // this sync-error fluent string needed a correction, which required a new string ID
+    const errorStateDescriptions = {
+      "sync-error": "generic-sync-error",
+    };
+
     const errorStateHeader = this.querySelector(
       "#tabpickup-steps-view0-header"
     );
@@ -177,7 +183,8 @@ class TabPickupContainer extends HTMLElement {
     );
     document.l10n.setAttributes(
       errorStateDescription,
-      `firefoxview-tabpickup-${this.errorState}-description`
+      `firefoxview-tabpickup-${errorStateDescriptions[this.errorState] ||
+        this.errorState}-description`
     );
 
     errorStateButton.hidden = this.errorState == "fxa-admin-disabled";

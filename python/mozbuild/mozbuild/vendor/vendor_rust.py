@@ -419,7 +419,8 @@ Please commit or stash these changes before vendoring, or re-run with `--ignore-
                         logging.ERROR,
                         "package_license_error",
                         {},
-                        """Package {} has a license that is approved for build-time dependencies: {}
+                        """Package {} has a license that is approved for build-time dependencies:
+    {}
     but the package itself is not whitelisted as being a build-time only package.
 
     If your package is build-time only, please add it to the whitelist of build-time

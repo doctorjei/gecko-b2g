@@ -164,7 +164,15 @@ export class ProtonScreen extends React.PureComponent {
     return (
       <div
         className="section-secondary"
-        style={content.background ? { background: content.background } : {}}
+        style={
+          content.background
+            ? {
+                background: content.background,
+                "--mr-secondary-background-position-y":
+                  content.split_narrow_bkg_position,
+              }
+            : {}
+        }
       >
         {content.hero_image ? (
           <HeroImage url={content.hero_image.url} />
@@ -305,6 +313,7 @@ export class ProtonScreen extends React.PureComponent {
                   current: this.props.order,
                   total,
                 })}
+                data-l10n-attrs="aria-valuetext"
                 role="meter"
                 aria-valuenow={this.props.order}
                 aria-valuemin={1}

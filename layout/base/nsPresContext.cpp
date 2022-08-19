@@ -876,7 +876,7 @@ void nsPresContext::AttachPresShell(mozilla::PresShell* aPresShell) {
 }
 
 Maybe<ColorScheme> nsPresContext::GetOverriddenOrEmbedderColorScheme() const {
-  if (IsPrintingOrPrintPreview()) {
+  if (Medium() == nsGkAtoms::print) {
     return Some(ColorScheme::Light);
   }
 
@@ -900,12 +900,9 @@ void nsPresContext::SetColorSchemeOverride(
   mOverriddenOrEmbedderColorScheme = aOverride;
 
   if (mDocument->PreferredColorScheme() != oldScheme) {
-    // We need to restyle because not only media queries have changed, system
-    // colors may as well via the prefers-color-scheme meta tag / effective
-    // color-scheme property value.
-    MediaFeatureValuesChanged({RestyleHint::RecascadeSubtree(), nsChangeHint(0),
-                               MediaFeatureChangeReason::SystemMetricsChange},
-                              MediaFeatureChangePropagation::JustThisDocument);
+    MediaFeatureValuesChanged(
+        MediaFeatureChange::ForPreferredColorSchemeChange(),
+        MediaFeatureChangePropagation::JustThisDocument);
   }
 }
 
@@ -1779,13 +1776,22 @@ void nsPresContext::UIResolutionChangedInternal() {
 
 void nsPresContext::EmulateMedium(nsAtom* aMediaType) {
   MOZ_ASSERT(!aMediaType || aMediaType->IsAsciiLowercase());
+
   RefPtr<const nsAtom> oldMedium = Medium();
+  auto oldScheme = mDocument->PreferredColorScheme();
+
   mMediaEmulationData.mMedium = aMediaType;
 
-  if (Medium() != oldMedium) {
-    MediaFeatureValuesChanged({MediaFeatureChangeReason::MediumChange},
-                              MediaFeatureChangePropagation::JustThisDocument);
+  if (Medium() == oldMedium) {
+    return;
   }
+
+  MediaFeatureChange change(MediaFeatureChangeReason::MediumChange);
+  if (oldScheme != mDocument->PreferredColorScheme()) {
+    change |= MediaFeatureChange::ForPreferredColorSchemeChange();
+  }
+  MediaFeatureValuesChanged(change,
+                            MediaFeatureChangePropagation::JustThisDocument);
 }
 
 void nsPresContext::ContentLanguageChanged() {
@@ -1993,13 +1999,15 @@ void nsPresContext::SetPrintSettings(nsIPrintSettings* aPrintSettings) {
   mDrawColorBackground = mPrintSettings->GetPrintBGColors();
   mDrawImageBackground = mPrintSettings->GetPrintBGImages();
 
-  nsIntMargin unwriteableTwips = mPrintSettings->GetUnwriteableMarginInTwips();
-  NS_ASSERTION(unwriteableTwips.top >= 0 && unwriteableTwips.right >= 0 &&
-                   unwriteableTwips.bottom >= 0 && unwriteableTwips.left >= 0,
-               "Unwriteable twips should be non-negative");
-
   nsIntMargin marginTwips = mPrintSettings->GetMarginInTwips();
-  marginTwips.EnsureAtLeast(unwriteableTwips);
+  if (!mPrintSettings->GetIgnoreUnwriteableMargins()) {
+    nsIntMargin unwriteableTwips =
+        mPrintSettings->GetUnwriteableMarginInTwips();
+    NS_ASSERTION(unwriteableTwips.top >= 0 && unwriteableTwips.right >= 0 &&
+                     unwriteableTwips.bottom >= 0 && unwriteableTwips.left >= 0,
+                 "Unwriteable twips should be non-negative");
+    marginTwips.EnsureAtLeast(unwriteableTwips);
+  }
   mDefaultPageMargin = nsPresContext::CSSTwipsToAppUnits(marginTwips);
 }
 
