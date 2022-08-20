@@ -57,10 +57,8 @@ fn get_char_pref(name: &str, default_value: &str) -> nsCString {
 // Defaulting to the PinephonePro path.
 static DEFAULT_FLASHLIGHT_PATH: &str = "/sys/class/leds/white:flash/";
 
-#[derive(xpcom)]
-#[xpimplements(nsIB2gLinuxHal)]
-#[refcnt = "atomic"]
-struct InitB2gLinuxHal {
+#[xpcom(implement(nsIB2gLinuxHal), atomic)]
+struct B2gLinuxHal {
     flashlight_path: nsCString,
     hal: Option<Mutex<SimpleClient>>,
 }
