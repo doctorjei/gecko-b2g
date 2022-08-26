@@ -2236,7 +2236,8 @@ ScrollDirections AsyncPanZoomController::GetAllowedHandoffDirections() const {
 
 bool AsyncPanZoomController::CanScroll(const ParentLayerPoint& aDelta) const {
   RecursiveMutexAutoLock lock(mRecursiveMutex);
-  return mX.CanScroll(aDelta.x) || mY.CanScroll(aDelta.y);
+  return mX.CanScroll(ParentLayerCoord(aDelta.x)) ||
+         mY.CanScroll(ParentLayerCoord(aDelta.y));
 }
 
 bool AsyncPanZoomController::CanScrollWithWheel(
@@ -2247,11 +2248,11 @@ bool AsyncPanZoomController::CanScrollWithWheel(
   // code in struct ScrollMetadata which defines mDisregardedDirection.
   Maybe<ScrollDirection> disregardedDirection =
       mScrollMetadata.GetDisregardedDirection();
-  if (mX.CanScroll(aDelta.x) &&
+  if (mX.CanScroll(ParentLayerCoord(aDelta.x)) &&
       disregardedDirection != Some(ScrollDirection::eHorizontal)) {
     return true;
   }
-  if (mY.CanScroll(aDelta.y) &&
+  if (mY.CanScroll(ParentLayerCoord(aDelta.y)) &&
       disregardedDirection != Some(ScrollDirection::eVertical)) {
     return true;
   }
