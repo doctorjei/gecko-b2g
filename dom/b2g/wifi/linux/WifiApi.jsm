@@ -12,8 +12,9 @@ const { XPCOMUtils } = ChromeUtils.import(
   "resource://gre/modules/XPCOMUtils.jsm"
 );
 
-XPCOMUtils.defineLazyModuleGetters(this, {
-  Services: "resource://gre/modules/Services.jsm",
+const lazy = {};
+
+XPCOMUtils.defineLazyModuleGetters(lazy, {
   Subprocess: "resource://gre/modules/Subprocess.jsm",
 });
 
@@ -88,7 +89,7 @@ class NetworkManager {
     let commonArgs = ["-c", "no", "-t"];
     let args = parameters.trim().split(" ");
 
-    let proc = await Subprocess.call({
+    let proc = await lazy.Subprocess.call({
       command: this.nmCliPath,
       arguments: commonArgs.concat(args),
       stderr: "stdout",
@@ -141,6 +142,37 @@ class NetworkManager {
     await this.runCommand(`r wifi ${value ? "on" : "off"}`);
     // get the state to trigger wifiUp / wifiDown events as needed.
     await this.getState();
+  }
+
+  async getKnownNetworks() {
+    let command = `-f TYPE,UUID,NAME con`;
+    let networks = await this.runCommand(command, {
+      labels: ["type", "uuid", "name"],
+    });
+    let res = [];
+    for (let network of networks) {
+      // Filter out non-wifi connections.
+      if (network.name.length == 0 || network.type !== "802-11-wireless") {
+        continue;
+      }
+
+      let obj = network;
+
+      obj.connected = false;
+      obj.security = "OPEN";
+      obj.ssid = network.name;
+      // Needed to match the connection to forget.
+      obj.bssid = network.uuid;
+
+      res.push(obj);
+    }
+
+    return res;
+  }
+
+  async forget(network) {
+    let command = `connection delete uuid ${network.bssid}`;
+    await this.runCommand(command);
   }
 
   async getNetworks() {
@@ -379,6 +411,14 @@ class WifiApi {
 
       case "WifiManager:getNetworks":
         this.relayCommand(message.name, "getNetworks", msg);
+        break;
+
+      case "WifiManager:getKnownNetworks":
+        this.relayCommand(message.name, "getKnownNetworks", msg);
+        break;
+
+      case "WifiManager:forget":
+        this.relayCommand(message.name, "forget", msg);
         break;
 
       case "WifiManager:associate":
