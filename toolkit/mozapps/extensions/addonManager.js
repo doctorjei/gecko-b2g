@@ -264,8 +264,25 @@ amManager.prototype = {
 
         let API = AddonManager.webAPI;
         if (payload.type in API) {
+          let resolveFunc = resolve;
+          // If getAllAddons is called from the content side, fetch the icons
+          // here as blobs because content processes can't read files in
+          // the profile directory.
+          if (payload.type === "getAllAddons" && payload.args[0]?.asBlobs) {
+            resolveFunc = async value => {
+              let res = [];
+              for (let addonInfo of value) {
+                try {
+                  let response = await fetch(addonInfo.iconUrl);
+                  addonInfo.blobIcon = await response.blob();
+                } catch (e) {}
+                res.push(addonInfo);
+              }
+              resolve(value);
+            };
+          }
           API[payload.type](aMessage.target, ...payload.args).then(
-            resolve,
+            resolveFunc,
             reject
           );
         } else {

@@ -260,20 +260,17 @@ class WebAPI extends APIObject {
   }
 
   getAllAddons() {
-    return this._apiTask("getAllAddons", [], async list => {
+    return this._apiTask("getAllAddons", [{ asBlobs: true }], async list => {
       if (!list) {
         return [];
       }
 
       let res = new this.window.Array();
       for (let addonInfo of list) {
-        // fetch the icon as a blob since its URL is usually a jar:// one.
-        let response = await fetch(addonInfo.iconUrl);
-        let blob = await response.blob();
-        addonInfo.icon = new this.window.Blob([await blob.arrayBuffer()], {
-          type: blob.type,
+        // Expose various objects in the proper window scope.
+        addonInfo.icon = new this.window.Blob([addonInfo.blobIcon], {
+          type: addonInfo.blobIcon.type,
         });
-
         let addon = new Addon(this.window, this.broker, addonInfo);
         res.push(this.window.Addon._create(this.window, addon));
       }
