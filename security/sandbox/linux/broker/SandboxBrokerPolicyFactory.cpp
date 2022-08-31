@@ -30,6 +30,7 @@
 #include "nsIFileStreams.h"
 #include "nsILineInputStream.h"
 #include "nsIFile.h"
+#include "nsIPrefService.h"
 
 #include "nsNetCID.h"
 #include "prenv.h"
@@ -688,6 +689,29 @@ void SandboxBrokerPolicyFactory::InitContentPolicy() {
   // To access ecc list
   policy->AddPath(rdonly, "/dev/__properties__/u:object_r:radio_prop:s0"); // For ro.ril.ecclist, ril.ecclist, ril.ecclist1
 #endif // MOZ_WIDGET_GONK
+
+#if !defined(MOZ_WIDGET_GONK) && defined(MOZ_B2G)
+  // To connect to the api-daemon at $TEMPDIR/api-daemon-socket or at
+  // the path from the b2g.api-daemon.uds-socket pref
+  // Use the same logic as in b2g/sidl/gecko_sidl/src/common/uds_transport.rs
+  nsAutoCString daemonPath;
+  nsCOMPtr<nsIPrefBranch> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID);
+  if (prefs) {
+    if (NS_FAILED(prefs->GetCharPref("b2g.api-daemon.uds-socket", daemonPath))) {
+      printf_stderr("B2G: No b2g.api-daemon.uds-socket pref set, using default TEMPDIR location\n");
+      nsCOMPtr<nsIFile> file;
+      nsresult rv = NS_GetSpecialDirectory("TmpD", getter_AddRefs(file));
+      if (NS_SUCCEEDED(rv)) {
+        file->AppendNative("api-daemon-socket"_ns);
+        nsAutoString fullPath;
+        file->GetPath(fullPath);
+        daemonPath = NS_ConvertUTF16toUTF8(fullPath);
+      }
+    }
+  }
+  printf_stderr("B2G: sandbox allowing daemon socket path %s\n", daemonPath.get());
+  policy->AddPath(SandboxBroker::MAY_CONNECT, daemonPath.get());
+#endif // !defined(MOZ_WIDGET_GONK) && defined(MOZ_B2G)
 
   // Bug 1732580: when packaged as a strictly confined snap, may need
   // read-access to configuration files under $SNAP/.
