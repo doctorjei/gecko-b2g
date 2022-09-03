@@ -1273,7 +1273,7 @@ bool SandboxBroker::SetSecurityLevelForUtilityProcess(
       "SetJobLevel should never fail with these arguments, what happened?");
 
   auto lockdownLevel = sandbox::USER_LOCKDOWN;
-  if (aSandbox == mozilla::ipc::SandboxingKind::UTILITY_AUDIO_DECODING) {
+  if (aSandbox == mozilla::ipc::SandboxingKind::UTILITY_AUDIO_DECODING_WMF) {
     lockdownLevel = sandbox::USER_LIMITED;
   }
   result = mPolicy->SetTokenLevel(sandbox::USER_RESTRICTED_SAME_ACCESS,
@@ -1336,13 +1336,21 @@ bool SandboxBroker::SetSecurityLevelForUtilityProcess(
                 sandbox::MITIGATION_DLL_SEARCH_ORDER;
   // TODO: Bug 1766432 - Investigate why this crashes in MSAudDecMFT.dll during
   // Utility AudioDecoder process startup only on 32-bits systems.
+  //
   // Investigate also why it crashes (no idea where exactly) for MinGW64 builds
+  // on 32 and 64 archs
   //
   // TODO: Bug 1773005 - AAC seems to not work on Windows < 1703
-  if (IsWin10CreatorsUpdateOrLater()) {
-#if defined(_M_X64) && !defined(__MINGW64__)
+  if (aSandbox != mozilla::ipc::SandboxingKind::UTILITY_AUDIO_DECODING_WMF) {
+#if !defined(__MINGW32__) && !defined(__MINGW64__)
     mitigations |= sandbox::MITIGATION_DYNAMIC_CODE_DISABLE;
+#endif  // !defined(__MINGW32__) && !defined(__MINGW64__)
+  } else {
+    if (IsWin10CreatorsUpdateOrLater()) {
+#if defined(_M_X64) && !defined(__MINGW64__)
+      mitigations |= sandbox::MITIGATION_DYNAMIC_CODE_DISABLE;
 #endif  // defined(_M_X64) && !defined(__MINGW64__)
+    }
   }
 
   if (exceptionModules.isNothing()) {
@@ -1373,7 +1381,8 @@ bool SandboxBroker::SetSecurityLevelForUtilityProcess(
 
   switch (aSandbox) {
     case mozilla::ipc::SandboxingKind::GENERIC_UTILITY:
-    case mozilla::ipc::SandboxingKind::UTILITY_AUDIO_DECODING:
+    case mozilla::ipc::SandboxingKind::UTILITY_AUDIO_DECODING_GENERIC:
+    case mozilla::ipc::SandboxingKind::UTILITY_AUDIO_DECODING_WMF:
       // Nothing specific to perform yet?
       break;
 

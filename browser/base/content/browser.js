@@ -5420,7 +5420,12 @@ var XULBrowserWindow = {
     // via simulated locationchange events such as switching between tabs, however
     // if this is a document navigation then PopupNotifications will be updated
     // via TabsProgressListener.onLocationChange and we do not want it called twice
-    gURLBar.setURI(aLocationURI, aIsSimulated, isSessionRestore);
+    gURLBar.setURI(
+      aLocationURI,
+      aIsSimulated,
+      isSessionRestore,
+      aRequest instanceof Ci.nsIChannel ? aRequest.originalURI : null
+    );
 
     BookmarkingUI.onLocationChange();
     // If we've actually changed document, update the toolbar visibility.
@@ -9878,22 +9883,27 @@ var FirefoxViewHandler = {
     return document.getElementById("firefox-view-button");
   },
   init() {
+    this._updateEnabledState = this._updateEnabledState.bind(this);
     this._updateEnabledState();
-    Services.prefs.addObserver("browser.tabs.firefox-view", this);
+    NimbusFeatures.majorRelease2022.onUpdate(this._updateEnabledState);
 
     if (this._enabled) {
       this._toggleNotificationDot(
         FirefoxViewNotificationManager.shouldNotificationDotBeShowing()
       );
     }
+    XPCOMUtils.defineLazyModuleGetters(this, {
+      SyncedTabs: "resource://services-sync/SyncedTabs.jsm",
+    });
     Services.obs.addObserver(this, "firefoxview-notification-dot-update");
+    gNavToolbox.addEventListener("customizationchange", this);
   },
   uninit() {
     Services.obs.removeObserver(this, "firefoxview-notification-dot-update");
-    Services.prefs.removeObserver("browser.tabs.firefox-view", this);
+    NimbusFeatures.majorRelease2022.off(this._updateEnabledState);
   },
   _updateEnabledState() {
-    this._enabled = Services.prefs.getBoolPref("browser.tabs.firefox-view");
+    this._enabled = NimbusFeatures.majorRelease2022.getVariable("firefoxView");
     // We use a root attribute because there's no guarantee the button is in the
     // DOM, and visibility changes need to take effect even if it isn't in the DOM
     // right now.
@@ -9902,6 +9912,14 @@ var FirefoxViewHandler = {
       !this._enabled
     );
     document.getElementById("menu_openFirefoxView").hidden = !this._enabled;
+  },
+  _maybeRemoveTab() {
+    if (
+      this.tab &&
+      !CustomizableUI.getPlacementOfWidget("firefox-view-button")
+    ) {
+      gBrowser.removeTab(this.tab);
+    }
   },
   openTab(event) {
     if (event?.type == "mousedown" && event?.button != 0) {
@@ -9922,8 +9940,8 @@ var FirefoxViewHandler = {
       case "TabSelect":
         this.button?.toggleAttribute("open", e.target == this.tab);
         this.button?.setAttribute("aria-selected", e.target == this.tab);
-        this._removeNotificationDotIfTabSelected();
         this._recordViewIfTabSelected();
+        this.handleFirefoxViewSelect();
         break;
       case "TabClose":
         this.tab = null;
@@ -9931,7 +9949,10 @@ var FirefoxViewHandler = {
         this.button?.removeAttribute("aria-controls");
         break;
       case "activate":
-        this._removeNotificationDotIfTabSelected();
+        this.handleFirefoxViewSelect();
+        break;
+      case "customizationchange":
+        this._maybeRemoveTab();
         break;
     }
   },
@@ -9941,13 +9962,11 @@ var FirefoxViewHandler = {
         let shouldShow = data === "true";
         this._toggleNotificationDot(shouldShow);
         break;
-      case "nsPref:changed":
-        this._updateEnabledState();
-        break;
     }
   },
-  _removeNotificationDotIfTabSelected() {
+  handleFirefoxViewSelect() {
     if (this.tab?.selected) {
+      this.SyncedTabs.syncTabs();
       Services.obs.notifyObservers(
         null,
         "firefoxview-notification-dot-update",

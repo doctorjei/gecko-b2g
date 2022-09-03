@@ -319,7 +319,7 @@ pref("browser.startup.preXulSkeletonUI", true);
 #endif
 
 // Show an upgrade dialog on major upgrades.
-pref("browser.startup.upgradeDialog.enabled", false);
+pref("browser.startup.upgradeDialog.enabled", true);
 
 // Don't create the hidden window during startup on
 // platforms that don't always need it (Win/Linux).
@@ -499,6 +499,9 @@ pref("browser.urlbar.richSuggestions.tail", true);
 // If true, top sites may include sponsored ones.
 pref("browser.urlbar.sponsoredTopSites", false);
 
+// If true, show the search term in the URL bar for the users default engine.
+pref("browser.urlbar.showSearchTerms", false);
+
 // Controls the empty search behavior in Search Mode:
 //  0 - Show nothing
 //  1 - Show search history
@@ -650,8 +653,8 @@ pref("browser.privatebrowsing.enable-new-indicator", true);
 // Enables the new about:privatebrowsing logo.
 pref("browser.privatebrowsing.enable-new-logo", true);
 
-// Whether the user is opted-in to privacy segmentation.
-pref("browser.privacySegmentation.enabled", false);
+// Whether the user has opted-in to recommended settings for data features.
+pref("browser.dataFeatureRecommendations.enabled", false);
 
 // Temporary pref to control whether or not Private Browsing windows show up
 // as separate icons in the Windows taskbar. This will be removed and become
@@ -1565,7 +1568,7 @@ pref("browser.newtabpage.activity-stream.discoverystream.hybridLayout.enabled", 
 pref("browser.newtabpage.activity-stream.discoverystream.hideCardBackground.enabled", false);
 pref("browser.newtabpage.activity-stream.discoverystream.fourCardLayout.enabled", false);
 pref("browser.newtabpage.activity-stream.discoverystream.newFooterSection.enabled", false);
-pref("browser.newtabpage.activity-stream.discoverystream.saveToPocketCard.enabled", false);
+pref("browser.newtabpage.activity-stream.discoverystream.saveToPocketCardRegions", "");
 pref("browser.newtabpage.activity-stream.discoverystream.hideDescriptions.enabled", false);
 pref("browser.newtabpage.activity-stream.discoverystream.compactGrid.enabled", false);
 pref("browser.newtabpage.activity-stream.discoverystream.compactImages.enabled", false);
@@ -1636,7 +1639,7 @@ pref("browser.aboutwelcome.enabled", true);
 pref("browser.aboutwelcome.screens", "");
 pref("browser.aboutwelcome.skipFocus", true);
 // Used to enable template for MR 2022 Onboarding
-pref("browser.aboutwelcome.templateMR", false);
+pref("browser.aboutwelcome.templateMR", true);
 
 // The pref that controls if the What's New panel is enabled.
 pref("browser.messaging-system.whatsNewPanel.enabled", true);
@@ -1953,7 +1956,7 @@ pref("browser.promo.focus.disallowed_regions", "cn");
 pref("browser.promo.focus.enabled", true);
 
 // Default to enabling pin promos to be shown where allowed.
-pref("browser.promo.pin.enabled", false);
+pref("browser.promo.pin.enabled", true);
 
 // Comma separated string of mozilla vpn supported platforms.
 pref("browser.contentblocking.report.vpn_platforms", "win,mac,linux");

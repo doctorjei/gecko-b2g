@@ -2256,7 +2256,7 @@ BrowserGlue.prototype = {
   },
 
   _monitorPrivacySegmentationPref() {
-    const PREF_ENABLED = "browser.privacySegmentation.enabled";
+    const PREF_ENABLED = "browser.dataFeatureRecommendations.enabled";
     const EVENT_CATEGORY = "privacy_segmentation";
 
     let checkPrivacySegmentationPref = () => {
@@ -4298,7 +4298,7 @@ BrowserGlue.prototype = {
   async _maybeShowDefaultBrowserPrompt() {
     // Highest priority is the upgrade dialog, which can include a "primary
     // browser" request and is limited in various ways, e.g., major upgrades.
-    const dialogVersion = 100;
+    const dialogVersion = 106;
     const dialogVersionPref = "browser.startup.upgradeDialog.version";
     const dialogReason = await (async () => {
       if (!lazy.BrowserHandler.majorUpgrade) {

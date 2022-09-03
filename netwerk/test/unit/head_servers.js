@@ -219,25 +219,41 @@ class BaseProxyCode {
       return;
     }
 
+    let url = new URL(req.url);
     const http = require("http");
-    http
-      .get(req.url, { method: req.method }, proxyresp => {
-        res.writeHead(
-          proxyresp.statusCode,
-          proxyresp.statusMessage,
-          proxyresp.headers
-        );
-        let rawData = "";
-        proxyresp.on("data", chunk => {
-          rawData += chunk;
-        });
-        proxyresp.on("end", () => {
-          res.end(rawData);
-        });
-      })
+    let preq = http
+      .request(
+        {
+          method: req.method,
+          path: url.pathname,
+          port: url.port,
+          host: url.hostname,
+          protocol: url.protocol,
+        },
+        proxyresp => {
+          res.writeHead(
+            proxyresp.statusCode,
+            proxyresp.statusMessage,
+            proxyresp.headers
+          );
+          let rawData = "";
+          proxyresp.on("data", chunk => {
+            rawData += chunk;
+          });
+          proxyresp.on("end", () => {
+            res.end(rawData);
+          });
+        }
+      )
       .on("error", e => {
         console.log(`sock err: ${e}`);
       });
+    if (req.method != "POST") {
+      preq.end();
+    } else {
+      req.on("data", chunk => preq.write(chunk));
+      req.on("end", () => preq.end());
+    }
   }
 
   static onConnect(req, clientSocket, head) {
@@ -433,27 +449,47 @@ class HTTP2ProxyCode {
     global.proxy.on("stream", (stream, headers) => {
       if (headers[":scheme"] === "http") {
         const http = require("http");
-        let url = `${headers[":scheme"]}://${headers[":authority"]}${headers[":path"]}`;
-        http
-          .get(url, { method: headers[":method"] }, proxyresp => {
-            let headers = Object.assign({}, proxyresp.headers);
-            // Filter out some prohibited headers.
-            ["connection", "transfer-encoding", "keep-alive"].forEach(prop => {
-              delete headers[prop];
-            });
-            stream.respond(
-              Object.assign({ ":status": proxyresp.statusCode }, headers)
-            );
-            proxyresp.on("data", chunk => {
-              stream.write(chunk);
-            });
-            proxyresp.on("end", () => {
-              stream.end();
-            });
-          })
+        let url = new URL(
+          `${headers[":scheme"]}://${headers[":authority"]}${headers[":path"]}`
+        );
+        let req = http
+          .request(
+            {
+              method: headers[":method"],
+              path: headers[":path"],
+              port: url.port,
+              host: url.hostname,
+              protocol: url.protocol,
+            },
+            proxyresp => {
+              let proxyheaders = Object.assign({}, proxyresp.headers);
+              // Filter out some prohibited headers.
+              ["connection", "transfer-encoding", "keep-alive"].forEach(
+                prop => {
+                  delete proxyheaders[prop];
+                }
+              );
+              stream.respond(
+                Object.assign({ ":status": proxyresp.statusCode }, proxyheaders)
+              );
+              proxyresp.on("data", chunk => {
+                stream.write(chunk);
+              });
+              proxyresp.on("end", () => {
+                stream.end();
+              });
+            }
+          )
           .on("error", e => {
             console.log(`sock err: ${e}`);
           });
+
+        if (headers[":method"] != "POST") {
+          req.end();
+        } else {
+          stream.on("data", chunk => req.write(chunk));
+          stream.on("end", () => req.end());
+        }
         return;
       }
       if (headers[":method"] !== "CONNECT") {
@@ -481,18 +517,24 @@ class HTTP2ProxyCode {
       const http2 = require("http2");
       socket.on("error", error => {
         const status = error.errno == "ENOTFOUND" ? 404 : 502;
-        console.log(`responsing with http_code='${status}'`);
         try {
-          stream.respond({ ":status": status });
+          // If we already sent headers when the socket connected
+          // then sending the status again would throw.
+          if (!stream.sentHeaders) {
+            stream.respond({ ":status": status });
+          }
           stream.end();
         } catch (exception) {
           stream.close(http2.constants.NGHTTP2_CONNECT_ERROR);
         }
       });
+      stream.on("close", () => {
+        socket.end();
+      });
       socket.on("close", () => {
         stream.close();
       });
-      stream.on("close", () => {
+      stream.on("end", () => {
         socket.end();
       });
       stream.on("aborted", () => {
