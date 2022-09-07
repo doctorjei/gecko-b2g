@@ -2715,7 +2715,8 @@ bool CompilationStencil::serializeStencils(JSContext* cx,
   if (succeededOut) {
     *succeededOut = false;
   }
-  XDRStencilEncoder encoder(cx, buf);
+  MainThreadErrorContext ec(cx);
+  XDRStencilEncoder encoder(cx, &ec, buf);
 
   XDRResult res = encoder.codeStencil(*this);
   if (res.isErr()) {
@@ -2734,7 +2735,7 @@ bool CompilationStencil::serializeStencils(JSContext* cx,
   return true;
 }
 
-bool CompilationStencil::deserializeStencils(JSContext* cx,
+bool CompilationStencil::deserializeStencils(JSContext* cx, ErrorContext* ec,
                                              CompilationInput& input,
                                              const JS::TranscodeRange& range,
                                              bool* succeededOut) {
@@ -2742,7 +2743,7 @@ bool CompilationStencil::deserializeStencils(JSContext* cx,
     *succeededOut = false;
   }
   MOZ_ASSERT(parserAtomData.empty());
-  XDRStencilDecoder decoder(cx, range);
+  XDRStencilDecoder decoder(cx, ec, range);
   JS::DecodeOptions options(input.options);
 
   XDRResult res = decoder.codeStencil(options, *this);
@@ -3990,6 +3991,9 @@ void js::DumpImmutableScriptFlags(js::JSONPrinter& json,
         case ImmutableScriptFlagsEnum::HasMappedArgsObj:
           json.value("HasMappedArgsObj");
           break;
+        case ImmutableScriptFlagsEnum::IsInlinableLargeFunction:
+          json.value("IsInlinableLargeFunction");
+          break;
         case ImmutableScriptFlagsEnum::FunctionHasNewTargetBinding:
           json.value("FunctionHasNewTargetBinding");
           break;
@@ -4073,6 +4077,9 @@ void js::DumpFunctionFlagsItems(js::JSONPrinter& json,
           break;
         case FunctionFlags::Flags::RESOLVED_LENGTH:
           json.value("RESOLVED_LENGTH");
+          break;
+        case FunctionFlags::Flags::GHOST_FUNCTION:
+          json.value("GHOST_FUNCTION");
           break;
         default:
           json.value("Unknown(%x)", i);
@@ -5268,32 +5275,20 @@ already_AddRefed<JS::Stencil> JS::CompileModuleScriptToStencil(
 }
 
 JS_PUBLIC_API JSScript* JS::InstantiateGlobalStencil(
-    JSContext* cx, const JS::InstantiateOptions& options,
-    JS::Stencil* stencil) {
+    JSContext* cx, const JS::InstantiateOptions& options, JS::Stencil* stencil,
+    JS::InstantiationStorage* storage) {
+  MOZ_ASSERT_IF(storage, storage->isValid());
+
   CompileOptions compileOptions(cx);
   options.copyTo(compileOptions);
   Rooted<CompilationInput> input(cx, CompilationInput(compileOptions));
   Rooted<CompilationGCOutput> gcOutput(cx);
-  if (!InstantiateStencils(cx, input.get(), *stencil, gcOutput.get())) {
+  CompilationGCOutput& output = storage ? *storage->gcOutput_ : gcOutput.get();
+
+  if (!InstantiateStencils(cx, input.get(), *stencil, output)) {
     return nullptr;
   }
-
-  return gcOutput.get().script;
-}
-
-JS_PUBLIC_API JSScript* JS::InstantiateGlobalStencil(
-    JSContext* cx, const JS::InstantiateOptions& options, JS::Stencil* stencil,
-    JS::InstantiationStorage* storage) {
-  MOZ_ASSERT(storage->isValid());
-
-  CompileOptions compileOptions(cx);
-  options.copyTo(compileOptions);
-  Rooted<CompilationInput> input(cx, CompilationInput(compileOptions));
-  if (!InstantiateStencils(cx, input.get(), *stencil, *storage->gcOutput_)) {
-    return nullptr;
-  }
-
-  return storage->gcOutput_->script;
+  return output.script;
 }
 
 JS_PUBLIC_API bool JS::StencilIsBorrowed(Stencil* stencil) {
@@ -5301,41 +5296,27 @@ JS_PUBLIC_API bool JS::StencilIsBorrowed(Stencil* stencil) {
 }
 
 JS_PUBLIC_API JSObject* JS::InstantiateModuleStencil(
-    JSContext* cx, const JS::InstantiateOptions& options,
-    JS::Stencil* stencil) {
-  CompileOptions compileOptions(cx);
-  options.copyTo(compileOptions);
-  compileOptions.setModule();
-
-  Rooted<CompilationInput> input(cx, CompilationInput(compileOptions));
-  Rooted<CompilationGCOutput> gcOutput(cx);
-  if (!InstantiateStencils(cx, input.get(), *stencil, gcOutput.get())) {
-    return nullptr;
-  }
-
-  return gcOutput.get().module;
-}
-
-JS_PUBLIC_API JSObject* JS::InstantiateModuleStencil(
     JSContext* cx, const JS::InstantiateOptions& options, JS::Stencil* stencil,
     JS::InstantiationStorage* storage) {
-  MOZ_ASSERT(storage->isValid());
+  MOZ_ASSERT_IF(storage, storage->isValid());
 
   CompileOptions compileOptions(cx);
   options.copyTo(compileOptions);
   compileOptions.setModule();
-
   Rooted<CompilationInput> input(cx, CompilationInput(compileOptions));
-  if (!InstantiateStencils(cx, input.get(), *stencil, *storage->gcOutput_)) {
+  Rooted<CompilationGCOutput> gcOutput(cx);
+  CompilationGCOutput& output = storage ? *storage->gcOutput_ : gcOutput.get();
+
+  if (!InstantiateStencils(cx, input.get(), *stencil, output)) {
     return nullptr;
   }
-
-  return storage->gcOutput_->module;
+  return output.module;
 }
 
 JS::TranscodeResult JS::EncodeStencil(JSContext* cx, JS::Stencil* stencil,
                                       TranscodeBuffer& buffer) {
-  XDRStencilEncoder encoder(cx, buffer);
+  MainThreadErrorContext ec(cx);
+  XDRStencilEncoder encoder(cx, &ec, buffer);
   XDRResult res = encoder.codeStencil(*stencil);
   if (res.isErr()) {
     return res.unwrapErr();
@@ -5355,7 +5336,8 @@ JS::TranscodeResult JS::DecodeStencil(JSContext* cx,
   if (!stencil) {
     return TranscodeResult::Throw;
   }
-  XDRStencilDecoder decoder(cx, range);
+  MainThreadErrorContext ec(cx);
+  XDRStencilDecoder decoder(cx, &ec, range);
   XDRResult res = decoder.codeStencil(options, *stencil);
   if (res.isErr()) {
     return res.unwrapErr();

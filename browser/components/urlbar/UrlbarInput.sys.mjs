@@ -341,6 +341,7 @@ export class UrlbarInput {
   ) {
     if (
       lazy.UrlbarPrefs.get("showSearchTerms") &&
+      !lazy.UrlbarPrefs.get("browser.search.widget.inNavBar") &&
       this.window.gBrowser.userTypedValue == null &&
       !dueToTabSwitch
     ) {
@@ -2610,7 +2611,7 @@ export class UrlbarInput {
     // No point in setting these because we'll handleRevert() a few rows below.
     if (openUILinkWhere == "current") {
       this.value =
-        lazy.UrlbarPrefs.get("showSearchTerms") && resultDetails.searchTerm
+        lazy.UrlbarPrefs.get("showSearchTerms") && resultDetails?.searchTerm
           ? resultDetails.searchTerm
           : url;
       browser.userTypedValue = this.value;
