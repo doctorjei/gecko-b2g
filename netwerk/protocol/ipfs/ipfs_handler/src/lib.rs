@@ -36,7 +36,10 @@ impl Protocol {
 
 // Default Unix Domain Socket path.
 // Use the 'ipfs.uds_path' preference to change it.
+#[cfg(not(target_os = "android"))]
 static DEFAULT_UDS_PATH: &str = "/tmp/ipfsd.http";
+#[cfg(target_os = "android")]
+static DEFAULT_UDS_PATH: &str = "/dev/socket/ipfsd.http";
 
 // Helper functions to get a char pref with a default value.
 fn fallible_get_char_pref(name: &str, default_value: &str) -> Result<nsCString, nsresult> {
