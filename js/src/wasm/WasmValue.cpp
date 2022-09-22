@@ -27,7 +27,7 @@
 #include "vm/JSContext.h"
 #include "vm/JSObject.h"
 #include "vm/StringType.h"
-#include "wasm/TypedObject.h"
+#include "wasm/WasmGcObject.h"
 #include "wasm/WasmJS.h"
 #include "wasm/WasmLog.h"
 
@@ -62,6 +62,13 @@ Val::Val(const LitVal& val) {
 }
 
 void Val::readFromRootedLocation(const void* loc) {
+  memset(&cell_, 0, sizeof(Cell));
+  memcpy(&cell_, loc, type_.size());
+}
+
+void Val::initFromRootedLocation(ValType type, const void* loc) {
+  MOZ_ASSERT(!type_.isValid());
+  type_ = type;
   memset(&cell_, 0, sizeof(Cell));
   memcpy(&cell_, loc, type_.size());
 }
@@ -168,8 +175,8 @@ bool wasm::CheckEqRefValue(JSContext* cx, HandleValue v,
 
   if (v.isObject()) {
     JSObject& obj = v.toObject();
-    if (obj.is<TypedObject>()) {
-      vp.set(AnyRef::fromJSObject(&obj.as<TypedObject>()));
+    if (obj.is<WasmGcObject>()) {
+      vp.set(AnyRef::fromJSObject(&obj.as<WasmGcObject>()));
       return true;
     }
   }
@@ -468,8 +475,8 @@ bool ToJSValue_anyref(JSContext* cx, void* src, MutableHandleValue dst) {
 template <typename Debug = NoDebug>
 bool ToJSValue_lossless(JSContext* cx, const void* src, MutableHandleValue dst,
                         ValType type) {
-  RootedVal srcVal(cx, type);
-  srcVal.get().readFromRootedLocation(src);
+  RootedVal srcVal(cx);
+  srcVal.get().initFromRootedLocation(type, src);
   RootedObject prototype(
       cx, GlobalObject::getOrCreatePrototype(cx, JSProto_WasmGlobal));
   Rooted<WasmGlobalObject*> srcGlobal(

@@ -15,7 +15,9 @@ use std::ops::DerefMut;
 use std::ptr;
 use xpcom::{
     getter_addrefs,
-    interfaces::{nsIChannel, nsILoadInfo, nsIProtocolHandler, nsIURI},
+    interfaces::{
+        nsIChannel, nsIIOService, nsILoadInfo, nsIPrefService, nsIProtocolHandler, nsIURI,
+    },
     RefPtr,
 };
 
@@ -43,7 +45,7 @@ static DEFAULT_UDS_PATH: &str = "/dev/socket/ipfsd.http";
 
 // Helper functions to get a char pref with a default value.
 fn fallible_get_char_pref(name: &str, default_value: &str) -> Result<nsCString, nsresult> {
-    if let Some(pref_service) = xpcom::services::get_PrefService() {
+    if let Ok(pref_service) = xpcom::components::Preferences::service::<nsIPrefService>() {
         let branch = xpcom::getter_addrefs(|p| {
             // Safe because:
             //  * `null` is explicitly allowed per documentation
@@ -189,7 +191,8 @@ impl IpfsHandler {
 
         // println!("IPFS: UDS url is {}", uds_url);
 
-        let io_service = xpcom::services::get_IOService().ok_or(NS_ERROR_FAILURE)?;
+        let io_service =
+            xpcom::components::IO::service::<nsIIOService>().map_err(|_| NS_ERROR_FAILURE)?;
         unsafe {
             let final_uri: RefPtr<nsIURI> = getter_addrefs(|p| {
                 io_service.NewURI(&*nsCString::from(uds_url), ptr::null(), ptr::null(), p)

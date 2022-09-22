@@ -27,12 +27,13 @@
 #include "PeerConnectionCtx.h"
 #include "RTCRtpTransceiver.h"
 #include "libwebrtcglue/AudioConduit.h"
+#include "call/call.h"
 
 namespace mozilla::dom {
 
 LazyLogModule gReceiverLog("RTCRtpReceiver");
 
-NS_IMPL_CYCLE_COLLECTION_CLASS(RTCRtpReceiver)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(RTCRtpReceiver)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(RTCRtpReceiver)
   // We do not do anything here, we wait for BreakCycles to be called
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
@@ -40,7 +41,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(RTCRtpReceiver)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mWindow, mPc, mTransceiver, mTrack)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
-NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(RTCRtpReceiver)
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(RTCRtpReceiver)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(RTCRtpReceiver)
@@ -403,7 +403,7 @@ nsTArray<RefPtr<RTCStatsPromise>> RTCRtpReceiver::GetStatsInternal() {
                 remote.mBytesSent.Construct(
                     videoStats->rtcp_sender_octets_sent);
                 remote.mRemoteTimestamp.Construct(
-                    (webrtc::Timestamp::Millis(
+                    (webrtc::TimeDelta::Millis(
                          videoStats->rtcp_sender_remote_ntp_timestamp_ms) -
                      webrtc::TimeDelta::Seconds(webrtc::kNtpJan1970))
                         .ms());

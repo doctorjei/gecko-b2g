@@ -7,13 +7,19 @@
 #ifndef DOM_FS_TEST_GTEST_FILESYSTEMMOCKS_H_
 #define DOM_FS_TEST_GTEST_FILESYSTEMMOCKS_H_
 
-#include "gtest/gtest.h"
-#include "gmock/gmock.h"
+#include <memory>  // We don't have a mozilla shared pointer for pod types
 
 #include "TestHelpers.h"
-
-#include "fs/FileSystemRequestHandler.h"
 #include "fs/FileSystemChildFactory.h"
+#include "fs/FileSystemRequestHandler.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "js/Promise.h"
+#include "js/RootingAPI.h"
+#include "jsapi.h"
+#include "mozilla/ErrorResult.h"
+#include "mozilla/ScopeExit.h"
+#include "mozilla/UniquePtr.h"
 #include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/DOMException.h"
@@ -23,30 +29,32 @@
 #include "mozilla/dom/PromiseNativeHandler.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/ipc/PBackgroundSharedTypes.h"
-#include "mozilla/ErrorResult.h"
-#include "mozilla/ScopeExit.h"
-#include "mozilla/UniquePtr.h"
 #include "nsIGlobalObject.h"
 #include "nsISupports.h"
 #include "nsISupportsImpl.h"
 #include "nsITimer.h"
 
-#include "jsapi.h"
-#include "js/Promise.h"
-#include "js/RootingAPI.h"
+namespace testing::internal {
 
-#include <memory>  // We don't have a mozilla shared pointer for pod types
+GTEST_API_ ::testing::AssertionResult CmpHelperSTREQ(const char* s1_expression,
+                                                     const char* s2_expression,
+                                                     const nsAString& s1,
+                                                     const nsAString& s2);
+
+}  // namespace testing::internal
 
 namespace mozilla::dom::fs {
 
 inline std::ostream& operator<<(std::ostream& aOut,
-                                const FileSystemEntryMetadata aMetadata) {
+                                const FileSystemEntryMetadata& aMetadata) {
   return aOut;
 }
 
 namespace test {
 
 nsIGlobalObject* GetGlobal();
+
+nsresult GetAsString(const RefPtr<Promise>& aPromise, nsAString& aString);
 
 mozilla::ipc::PrincipalInfo GetPrincipalInfo();
 
@@ -82,6 +90,19 @@ class MockFileSystemRequestHandler : public FileSystemRequestHandler {
   MOCK_METHOD(void, RemoveEntry,
               (RefPtr<FileSystemManager> & aManager,
                const FileSystemChildMetadata& aEntry, bool aRecursive,
+               RefPtr<Promise> aPromise),
+              (override));
+
+  MOCK_METHOD(void, MoveEntry,
+              (RefPtr<FileSystemManager> & aManager, FileSystemHandle* aHandle,
+               const FileSystemEntryMetadata& aEntry,
+               const FileSystemChildMetadata& aNewEntry,
+               RefPtr<Promise> aPromise),
+              (override));
+
+  MOCK_METHOD(void, RenameEntry,
+              (RefPtr<FileSystemManager> & aManager, FileSystemHandle* aHandle,
+               const FileSystemEntryMetadata& aEntry, const Name& aName,
                RefPtr<Promise> aPromise),
               (override));
 
@@ -222,6 +243,14 @@ class TestFileSystemManagerChild : public FileSystemManagerChild {
       void, SendGetFileHandle,
       (const FileSystemGetHandleRequest& request,
        mozilla::ipc::ResolveCallback<FileSystemGetHandleResponse>&& aResolve,
+       mozilla::ipc::RejectCallback&& aReject),
+      (override));
+
+  MOCK_METHOD(
+      void, SendGetAccessHandle,
+      (const FileSystemGetAccessHandleRequest& request,
+       mozilla::ipc::ResolveCallback<FileSystemGetAccessHandleResponse>&&
+           aResolve,
        mozilla::ipc::RejectCallback&& aReject),
       (override));
 

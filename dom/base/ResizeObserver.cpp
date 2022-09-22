@@ -203,9 +203,7 @@ void ResizeObservation::UpdateLastReportedSize(const gfx::Size& aSize) {
 }
 
 // Only needed for refcounted objects.
-NS_IMPL_CYCLE_COLLECTION_CLASS(ResizeObserver)
-
-NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(ResizeObserver)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ResizeObserver)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ResizeObserver)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOwner, mDocument, mActiveTargets,
@@ -526,6 +524,9 @@ static void LastRememberedSizeCallback(
       aObserver.Unobserve(*target);
       continue;
     }
+    MOZ_ASSERT(!frame->IsFrameOfType(nsIFrame::eLineParticipant) ||
+                   frame->IsFrameOfType(nsIFrame::eReplaced),
+               "Should have unobserved non-replaced inline.");
     const nsStylePosition* stylePos = frame->StylePosition();
     const WritingMode wm = frame->GetWritingMode();
     bool canRememberBSize = stylePos->ContainIntrinsicBSize(wm).IsAutoLength();

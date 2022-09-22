@@ -1449,8 +1449,12 @@ void nsIFrame::HandleLastRememberedSize() {
     const auto containAxes = StyleDisplay()->GetContainSizeAxes();
     if ((canRememberBSize && !containAxes.mBContained) ||
         (canRememberISize && !containAxes.mIContained)) {
-      PresContext()->Document()->ObserveForLastRememberedSize(*element);
-      return;
+      bool isNonReplacedInline = IsFrameOfType(nsIFrame::eLineParticipant) &&
+                                 !IsFrameOfType(nsIFrame::eReplaced);
+      if (!isNonReplacedInline) {
+        PresContext()->Document()->ObserveForLastRememberedSize(*element);
+        return;
+      }
     }
   }
   PresContext()->Document()->UnobserveForLastRememberedSize(*element);
@@ -4543,28 +4547,26 @@ static StyleUserSelect UsedUserSelect(const nsIFrame* aFrame) {
 
   // Per https://drafts.csswg.org/css-ui-4/#content-selection:
   //
-  // The computed value is the specified value, except:
+  // The used value is the same as the computed value, except:
   //
-  //   1 - on editable elements where the computed value is always 'contain'
-  //       regardless of the specified value.
-  //   2 - when the specified value is auto, which computes to one of the other
-  //       values [...]
+  //    1 - on editable elements where the used value is always 'contain'
+  //        regardless of the computed value
+  //    2 - when the computed value is auto, in which case the used value is one
+  //        of the other values...
   //
   // See https://github.com/w3c/csswg-drafts/issues/3344 to see why we do this
   // at used-value time instead of at computed-value time.
-  //
-  // Also, we check for auto first to allow explicitly overriding the value for
-  // the editing host.
-  auto style = aFrame->Style()->UserSelect();
-  if (style != StyleUserSelect::Auto) {
-    return style;
-  }
 
   if (aFrame->IsTextInputFrame() || IsEditingHost(aFrame)) {
     // We don't implement 'contain' itself, but we make 'text' behave as
     // 'contain' for contenteditable and <input> / <textarea> elements anyway so
     // this is ok.
     return StyleUserSelect::Text;
+  }
+
+  auto style = aFrame->Style()->UserSelect();
+  if (style != StyleUserSelect::Auto) {
+    return style;
   }
 
   auto* parent = nsLayoutUtils::GetParentOrPlaceholderFor(aFrame);
@@ -6265,8 +6267,9 @@ nsIFrame::SizeComputationResult nsIFrame::ComputeSize(
     }
   }
   const bool isFlexItem =
-      IsFlexItem() &&
-      !parentFrame->HasAnyStateBits(NS_STATE_FLEX_IS_EMULATING_LEGACY_BOX);
+      IsFlexItem() && !parentFrame->HasAnyStateBits(
+                          NS_STATE_FLEX_IS_EMULATING_LEGACY_WEBKIT_BOX |
+                          NS_STATE_FLEX_IS_EMULATING_LEGACY_MOZ_BOX);
   // This variable only gets set (and used) if isFlexItem is true.  It
   // indicates which axis (in this frame's own WM) corresponds to its
   // flex container's main axis.
@@ -9938,12 +9941,13 @@ bool nsIFrame::FinishAndStoreOverflow(OverflowAreas& aOverflowAreas,
 
   if (anyOverflowChanged) {
     SVGObserverUtils::InvalidateDirectRenderingObservers(this);
-    if (IsBlockFrameOrSubclass() &&
-        TextOverflow::CanHaveOverflowMarkers(this)) {
-      DiscardDisplayItems(this, [](nsDisplayItem* aItem) {
-        return aItem->GetType() == DisplayItemType::TYPE_TEXT_OVERFLOW;
-      });
-      SchedulePaint(PAINT_DEFAULT);
+    if (nsBlockFrame* block = do_QueryFrame(this)) {
+      if (TextOverflow::CanHaveOverflowMarkers(block)) {
+        DiscardDisplayItems(this, [](nsDisplayItem* aItem) {
+          return aItem->GetType() == DisplayItemType::TYPE_TEXT_OVERFLOW;
+        });
+        SchedulePaint(PAINT_DEFAULT);
+      }
     }
   }
   return anyOverflowChanged;
@@ -10402,8 +10406,7 @@ nsIFrame::Focusable nsIFrame::IsFocusable(bool aWithMouse) {
   }
 
   PseudoStyleType pseudo = Style()->GetPseudoType();
-  if (pseudo == PseudoStyleType::anonymousFlexItem ||
-      pseudo == PseudoStyleType::anonymousGridItem) {
+  if (pseudo == PseudoStyleType::anonymousItem) {
     return {};
   }
 

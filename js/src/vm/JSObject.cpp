@@ -64,6 +64,7 @@
 #  include "vm/RecordType.h"
 #  include "vm/TupleType.h"
 #endif
+#include "wasm/WasmGcObject.h"
 
 #include "vm/BooleanObject-inl.h"
 #include "vm/EnvironmentObject-inl.h"
@@ -76,7 +77,6 @@
 #include "vm/Realm-inl.h"
 #include "vm/StringObject-inl.h"
 #include "vm/TypedArrayObject-inl.h"
-#include "wasm/TypedObject-inl.h"
 
 using namespace js;
 
@@ -1001,11 +1001,12 @@ static bool InitializePropertiesFromCompatibleNativeObject(
     }
   }
 
-  size_t span = shape->slotSpan();
-  if (!dst->setShapeAndUpdateSlots(cx, shape)) {
+  uint32_t oldSpan = dst->shape()->slotSpan();
+  uint32_t newSpan = shape->slotSpan();
+  if (!dst->setShapeAndAddNewSlots(cx, shape, oldSpan, newSpan)) {
     return false;
   }
-  for (size_t i = JSCLASS_RESERVED_SLOTS(src->getClass()); i < span; i++) {
+  for (size_t i = JSCLASS_RESERVED_SLOTS(src->getClass()); i < newSpan; i++) {
     dst->setSlot(i, src->getSlot(i));
   }
 
@@ -1955,10 +1956,10 @@ bool js::SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto,
   /*
    * Disallow mutating the [[Prototype]] on Typed Objects, per the spec.
    */
-  if (obj->is<TypedObject>()) {
+  if (obj->is<WasmGcObject>()) {
     JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr,
                               JSMSG_CANT_SET_PROTO_OF,
-                              "incompatible TypedObject");
+                              "incompatible WebAssembly object");
     return false;
   }
 
@@ -3308,19 +3309,19 @@ js::gc::AllocKind JSObject::allocKindForTenure(
     return as<ProxyObject>().allocKindForTenure();
   }
 
-  // Inlined typed objects are followed by their data, so make sure we copy
-  // it all over to the new object.
-  if (is<InlineTypedObject>()) {
+  // WasmStructObjects have a variable-length tail which contains the first
+  // few data fields, so make sure we copy it all over to the new object.
+  if (is<WasmStructObject>()) {
     // Figure out the size of this object, from the prototype's RttValue.
     // The objects we are traversing here are all tenured, so we don't need
     // to check forwarding pointers.
-    RttValue& descr = as<InlineTypedObject>().rttValue();
+    RttValue& descr = as<WasmStructObject>().rttValue();
     MOZ_ASSERT(!IsInsideNursery(&descr));
-    return InlineTypedObject::allocKindForRttValue(&descr);
+    return WasmStructObject::allocKindForRttValue(&descr);
   }
 
-  if (is<OutlineTypedObject>()) {
-    return OutlineTypedObject::allocKind();
+  if (is<WasmArrayObject>()) {
+    return WasmArrayObject::allocKind();
   }
 
   // All nursery allocatable non-native objects are handled above.

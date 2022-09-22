@@ -7,10 +7,10 @@
 #ifndef DOM_FS_FILESYSTEMDIRECTORYITERATOR_H_
 #define DOM_FS_FILESYSTEMDIRECTORYITERATOR_H_
 
+#include "mozilla/dom/IterableIterator.h"
 #include "nsCOMPtr.h"
 #include "nsISupports.h"
 #include "nsWrapperCache.h"
-#include "mozilla/dom/IterableIterator.h"
 
 class nsIGlobalObject;
 
@@ -38,7 +38,7 @@ class FileSystemDirectoryIterator : public nsISupports, public nsWrapperCache {
   };
 
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(FileSystemDirectoryIterator)
+  NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(FileSystemDirectoryIterator)
 
   explicit FileSystemDirectoryIterator(nsIGlobalObject* aGlobal,
                                        RefPtr<FileSystemManager>& aManager,
