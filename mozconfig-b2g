@@ -154,3 +154,7 @@ ac_add_options --enable-sandbox
 
 # Don't minify because of https://bugzilla.mozilla.org/show_bug.cgi?id=1758568
 ac_add_options --enable-minify=properties
+
+ac_add_options --enable-wasm-function-references
+ac_add_options --enable-wasm-gc
+
