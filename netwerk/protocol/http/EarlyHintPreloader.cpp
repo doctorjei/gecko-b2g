@@ -18,6 +18,7 @@
 #include "mozilla/net/EarlyHintRegistrar.h"
 #include "mozilla/net/NeckoChannelParams.h"
 #include "mozilla/StaticPrefs_network.h"
+#include "mozilla/Telemetry.h"
 #include "nsAttrValue.h"
 #include "nsAttrValueInlines.h"
 #include "nsCOMPtr.h"
@@ -70,9 +71,9 @@ static uint64_t gEarlyHintPreloaderId{0};
 // OngoingEarlyHints
 //=============================================================================
 
-void OngoingEarlyHints::CancelAllOngoingPreloads() {
+void OngoingEarlyHints::CancelAllOngoingPreloads(const nsACString& aReason) {
   for (auto& preloader : mPreloaders) {
-    preloader->CancelChannel(nsresult::NS_ERROR_ABORT);
+    preloader->CancelChannel(NS_ERROR_ABORT, aReason);
   }
   mStartedPreloads.Clear();
 }
@@ -108,11 +109,15 @@ EarlyHintPreloader::EarlyHintPreloader() {
   mConnectArgs.earlyHintPreloaderId() = ++gEarlyHintPreloaderId;
 };
 
+EarlyHintPreloader::~EarlyHintPreloader() {
+  Telemetry::Accumulate(Telemetry::EH_STATE_OF_PRELOAD_REQUEST, mState);
+}
+
 /* static */
 Maybe<PreloadHashKey> EarlyHintPreloader::GenerateHashKey(
     ASDestination aAs, nsIURI* aURI, nsIPrincipal* aPrincipal,
     CORSMode aCorsMode, const nsAString& aType) {
-  if (aAs == ASDestination::DESTINATION_FONT) {
+  if (aAs == ASDestination::DESTINATION_FONT && aCorsMode != CORS_NONE) {
     return Some(PreloadHashKey::CreateAsFont(aURI, aCorsMode));
   }
   if (aAs == ASDestination::DESTINATION_IMAGE) {
@@ -128,7 +133,7 @@ Maybe<PreloadHashKey> EarlyHintPreloader::GenerateHashKey(
         aURI, aPrincipal, aCorsMode,
         css::SheetParsingMode::eAuthorSheetFeatures));
   }
-  if (aAs == ASDestination::DESTINATION_FETCH) {
+  if (aAs == ASDestination::DESTINATION_FETCH && aCorsMode != CORS_NONE) {
     return Some(PreloadHashKey::CreateAsFetch(aURI, aCorsMode));
   }
   return Nothing();
@@ -322,6 +327,8 @@ nsresult EarlyHintPreloader::OpenChannel(
   rv = mChannel->AsyncOpen(mParentListener);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  SetState(ePreloaderOpened);
+
   return NS_OK;
 }
 
@@ -337,14 +344,19 @@ EarlyHintConnectArgs EarlyHintPreloader::Register() {
   return mConnectArgs;
 }
 
-nsresult EarlyHintPreloader::CancelChannel(nsresult aStatus) {
+nsresult EarlyHintPreloader::CancelChannel(nsresult aStatus,
+                                           const nsACString& aReason) {
   // clear redirect channel in case this channel is cleared between the call of
   // EarlyHintPreloader::AsyncOnChannelRedirect and
   // EarlyHintPreloader::OnRedirectResult
   mRedirectChannel = nullptr;
   if (mChannel) {
-    mChannel->Cancel(aStatus);
+    if (mSuspended) {
+      mChannel->Resume();
+    }
+    mChannel->CancelWithReason(aStatus, aReason);
     mChannel = nullptr;
+    SetState(ePreloaderCancelled);
   }
   return NS_OK;
 }
@@ -375,11 +387,12 @@ void EarlyHintPreloader::SetParentChannel() {
 
 // Adapted from
 // https://searchfox.org/mozilla-central/rev/b4150d1c6fae0c51c522df2d2c939cf5ad331d4c/netwerk/ipc/DocumentLoadListener.cpp#1311
-bool EarlyHintPreloader::InvokeStreamListenerFunctions() {
+void EarlyHintPreloader::InvokeStreamListenerFunctions() {
   AssertIsOnMainThread();
 
-  LOG(("EarlyHintPreloader::RedirectToParent [this=%p parent=%p]\n", this,
-       mParent.get()));
+  LOG((
+      "EarlyHintPreloader::InvokeStreamListenerFunctions [this=%p parent=%p]\n",
+      this, mParent.get()));
 
   if (nsCOMPtr<nsIIdentChannel> channel = do_QueryInterface(mChannel)) {
     MOZ_ASSERT(mChannelId);
@@ -413,7 +426,8 @@ bool EarlyHintPreloader::InvokeStreamListenerFunctions() {
   mChannel = nullptr;
   mParent = nullptr;
   mParentListener = nullptr;
-  return true;
+
+  SetState(ePreloaderUsed);
 }
 
 //-----------------------------------------------------------------------------
