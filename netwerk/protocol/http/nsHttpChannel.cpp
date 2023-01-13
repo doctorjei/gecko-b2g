@@ -1601,7 +1601,6 @@ nsresult nsHttpChannel::CallOnStartRequest() {
     } else if (opaqueResponse == OpaqueResponse::Sniff) {
       MOZ_DIAGNOSTIC_ASSERT(mORB);
       nsresult rv = mORB->EnsureOpaqueResponseIsAllowedAfterSniff(this);
-      MOZ_DIAGNOSTIC_ASSERT(!mORB->IsSniffing());
 
       if (NS_FAILED(rv)) {
         return rv;
@@ -5117,6 +5116,15 @@ nsresult nsHttpChannel::SetupReplacementChannel(nsIURI* newURI,
   // upgraded even if the initial request was exempted by https-first/ -only
   nsCOMPtr<nsILoadInfo> newLoadInfo = newChannel->LoadInfo();
   nsHTTPSOnlyUtils::PotentiallyClearExemptFlag(newLoadInfo);
+
+  // pass on the early hint observer to be able to process `103 Early Hints`
+  // responses after cross origin redirects
+  if (mEarlyHintObserver) {
+    if (RefPtr<nsHttpChannel> httpChannelImpl = do_QueryObject(newChannel)) {
+      httpChannelImpl->SetEarlyHintObserver(mEarlyHintObserver);
+    }
+    mEarlyHintObserver = nullptr;
+  }
 
   nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(newChannel);
   if (!httpChannel) return NS_OK;  // no other options to set

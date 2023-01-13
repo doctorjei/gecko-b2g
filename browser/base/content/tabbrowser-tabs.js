@@ -38,7 +38,6 @@
 
       this.baseConnect();
 
-      this._hoveredTab = null;
       this._blockDblClick = false;
       this._tabDropIndicator = this.querySelector(".tab-drop-indicator");
       this._dragOverDelay = 350;
@@ -1214,15 +1213,6 @@
         "first-visible-unpinned-tab",
         "true"
       );
-
-      let hoveredTab = this._hoveredTab;
-      if (hoveredTab) {
-        hoveredTab._mouseleave();
-      }
-      hoveredTab = this.querySelector("tab:hover");
-      if (hoveredTab) {
-        hoveredTab._mouseenter();
-      }
     }
 
     _updateCloseButtons() {

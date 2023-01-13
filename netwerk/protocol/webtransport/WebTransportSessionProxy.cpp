@@ -15,6 +15,7 @@
 #include "nsProxyRelease.h"
 #include "nsSocketTransportService2.h"
 #include "mozilla/Logging.h"
+#include "mozilla/StaticPrefs_network.h"
 
 namespace mozilla::net {
 
@@ -93,6 +94,8 @@ nsresult WebTransportSessionProxy::AsyncConnect(
   rv = mChannel->AsyncOpen(this);
   if (NS_FAILED(rv)) {
     MutexAutoLock lock(mMutex);
+    mChannel = nullptr;
+    mListener = nullptr;
     ChangeState(WebTransportSessionProxyState::DONE);
   }
   return rv;
@@ -534,6 +537,17 @@ NS_IMETHODIMP
 WebTransportSessionProxy::AsyncOnChannelRedirect(
     nsIChannel* aOldChannel, nsIChannel* aNewChannel, uint32_t aFlags,
     nsIAsyncVerifyRedirectCallback* callback) {
+  // Currently implementation we do not reach this part of the code
+  // as location headers are not forwarded by the http3 stack to the applicaion.
+  // Hence, the channel is aborted due to the location header check in
+  // nsHttpChannel::AsyncProcessRedirection This comment must be removed  after
+  // the  following neqo bug is resolved
+  // https://github.com/mozilla/neqo/issues/1364
+  if (!StaticPrefs::network_webtransport_redirect_enabled()) {
+    LOG(("Channel Redirects are disabled for WebTransport sessions"));
+    return NS_ERROR_ABORT;
+  }
+
   nsCOMPtr<nsIURI> newURI;
   nsresult rv = NS_GetFinalChannelURI(aNewChannel, getter_AddRefs(newURI));
   NS_ENSURE_SUCCESS(rv, rv);
