@@ -806,7 +806,7 @@ def eme_choices(target):
 # on aarch64 Windows.
 @depends(build_project, eme_choices, target)
 def eme_default(build_project, choices, target):
-    if build_project == "browser":
+    if (build_project == "browser" or build_project == "b2g") and target.os != "Android":
         if target.kernel != "WINNT" or target.cpu != "aarch64":
             return choices
 
