@@ -1639,6 +1639,8 @@ struct BaseCompiler final {
   [[nodiscard]] bool emitRefTest();
   [[nodiscard]] bool emitRefCast();
   [[nodiscard]] bool emitBrOnCastCommon(bool onSuccess);
+  [[nodiscard]] bool emitRefAsStruct();
+  [[nodiscard]] bool emitBrOnNonStruct();
   [[nodiscard]] bool emitExternInternalize();
   [[nodiscard]] bool emitExternExternalize();
 
@@ -1653,11 +1655,15 @@ struct BaseCompiler final {
     static void emitTrapSite(BaseCompiler* bc);
   };
 
+  // Load a pointer to the TypeDefInstanceData for a given type index
+  RegPtr loadTypeDefInstanceData(uint32_t typeIndex);
+  // Load a pointer to the TypeDef for a given type index
   RegPtr loadTypeDef(uint32_t typeIndex);
+
   // Branch to the label if the WasmGcObject `object` is/is not a subtype of
   // `typeIndex`.
   void branchGcObjectType(RegRef object, uint32_t typeIndex, Label* label,
-                          bool onSuccess);
+                          bool succeedOnNull, bool onSuccess);
   RegPtr emitGcArrayGetData(RegRef rp);
   template <typename NullCheckPolicy>
   RegI32 emitGcArrayGetNumElements(RegRef rp);

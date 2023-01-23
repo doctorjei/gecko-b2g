@@ -1586,16 +1586,6 @@
   value: false
   mirror: always
 
-#
-- name: browser.swipe.navigation-icon-move-distance
-  type: uint32_t
-#if defined(XP_LINUX) || defined(XP_WIN)
-  value: 100
-#else
-  value: 0
-#endif
-  mirror: always
-
 # Whether we should draw the tabs on top of the titlebar.
 #
 # no (0), yes (1), or default (2), which is true everywhere except Linux.
@@ -1972,6 +1962,14 @@
 - name: cookiebanners.service.mode
   type: uint32_t
   value: 0
+  mirror: always
+
+# When set to true, cookie banners are detected and detection events are
+# dispatched, but they will not be handled. Requires the service to be enabled
+# for the desired mode via pref cookiebanners.service.mode*
+- name: cookiebanners.service.detectOnly
+  type: bool
+  value: false
   mirror: always
 
 # Controls the cookie banner handling mode in private browsing. Same mode
@@ -4020,6 +4018,11 @@
 - name: dom.serviceWorkers.testing.persistTemporarilyInstalledAddons
   type: RelaxedAtomicBool
   value: false
+  mirror: always
+
+- name: dom.workers.pFetch.enabled
+  type: RelaxedAtomicBool
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 - name: dom.workers.requestAnimationFrame
@@ -9008,6 +9011,13 @@
   value: true
   mirror: always
 
+# Enable experimental enhanced color CSS color spaces. (lab(), lch(), oklab(), oklch(), color())
+- name: layout.css.more_color_4.enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+  rust: true
+
 # The margin used for detecting relevancy for `content-visibility: auto`.
 - name: layout.css.content-visibility-relevant-content-margin
   type: float
@@ -11689,13 +11699,13 @@
 # Enable 103 Early Hint status code (RFC 8297)
 - name: network.early-hints.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 # Enable `Link: rel=preconnect` in 103 Early Hint response.
 - name: network.early-hints.preconnect.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 # How long we should wait for EarlyHintPreloader to be used.
@@ -13598,7 +13608,7 @@
 # No way to enable on Android, Bug 1552602
 - name: security.webauth.u2f
   type: bool
-  value: @IS_NOT_ANDROID@
+  value: false
   mirror: always
 
 # WebAuthn CTAP2 support
@@ -15102,6 +15112,16 @@
 #  1: Always
 #  2: Auto (depending on the system)
 - name: widget.gtk.grab-pointer
+  type: int32_t
+  value: 2
+  mirror: always
+
+# Whether we should try ignore bogus leave-notify events from the window
+# manager.
+#  0: Never
+#  1: Always
+#  2: Auto (depending on the system)
+- name: widget.gtk.ignore-bogus-leave-notify
   type: int32_t
   value: 2
   mirror: always

@@ -11,8 +11,6 @@
   --toolbar-non-lwt-bgcolor: -moz-dialog;
   --toolbar-non-lwt-textcolor: -moz-dialogtext;
 
-  --panel-separator-color: hsla(210,4%,10%,.14);
-
   --arrowpanel-field-background: rgba(249,249,250,.3);
 
   --chrome-content-separator-color: #e1e1e2;
@@ -23,7 +21,6 @@
 }
 
 :root[lwt-popup-brighttext] {
-  --panel-separator-color: rgba(249,249,250,.1);
   --arrowpanel-field-background: rgba(12,12,13,.3);
 }
 
@@ -438,21 +435,4 @@ moz-input-box > menupopup .context-menu-add-engine > .menu-iconic-left {
 #UITourTooltipClose {
   margin-inline-end: -10px;
   margin-top: -14px;
-}
-
-#historySwipeAnimationPreviousArrow {
-  background: url("chrome://browser/skin/history-swipe-arrow.svg")
-              center left / 64px 128px no-repeat transparent;
-  will-change: transform;
-}
-#historySwipeAnimationPreviousArrow:-moz-locale-dir(rtl) {
-  transform: scaleX(-1);
-}
-#historySwipeAnimationNextArrow {
-  background: url("chrome://browser/skin/history-swipe-arrow.svg")
-              center left / 64px 128px no-repeat transparent;
-  will-change: transform;
-}
-#historySwipeAnimationNextArrow:-moz-locale-dir(ltr) {
-  transform: scaleX(-1);
 }

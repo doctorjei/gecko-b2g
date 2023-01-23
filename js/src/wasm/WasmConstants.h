@@ -495,6 +495,10 @@ enum class GcOp {
   BrOnCast = 0x46,
   BrOnCastFail = 0x47,
 
+  // Dart compatibility instruction
+  RefAsStruct = 0x59,
+  BrOnNonStruct = 0x64,
+
   // Extern/any coercion operations
   ExternInternalize = 0x70,
   ExternExternalize = 0x71,
@@ -1031,14 +1035,6 @@ static const unsigned MaxFunctionBytes = 7654321;
 
 // These limits pertain to our WebAssembly implementation only, but may make
 // sense to get into the shared limits spec eventually.
-
-// See PackedTypeCode for exact bits available for these fields depending on
-// platform
-#ifdef JS_64BIT
-static const unsigned MaxTypeIndex = 1000000;
-#else
-static const unsigned MaxTypeIndex = 15000;
-#endif
 
 static const unsigned MaxRecGroups = 1000000;
 static const unsigned MaxSubTypingDepth = 31;

@@ -3704,16 +3704,27 @@ class FunctionCompiler {
 
   // Returns an MDefinition holding the type definition for `typeIndex`.
   [[nodiscard]] MDefinition* loadTypeDef(uint32_t typeIndex) {
-    uint32_t typeIdOffset = moduleEnv().offsetOfTypeId(typeIndex);
+    uint32_t typeDefOffset = moduleEnv().offsetOfTypeDef(typeIndex);
 
     auto* load =
-        MWasmLoadGlobalVar::New(alloc(), MIRType::Pointer, typeIdOffset,
+        MWasmLoadGlobalVar::New(alloc(), MIRType::Pointer, typeDefOffset,
                                 /*isConst=*/true, instancePointer_);
     if (!load) {
       return nullptr;
     }
     curBlock_->add(load);
     return load;
+  }
+
+  [[nodiscard]] MDefinition* loadTypeDefInstanceData(uint32_t typeIndex) {
+    size_t offset = Instance::offsetOfGlobalArea() +
+                    moduleEnv_.offsetOfTypeDefInstanceData(typeIndex);
+    auto* result = MWasmDerivedPointer::New(alloc(), instancePointer_, offset);
+    if (!result) {
+      return nullptr;
+    }
+    curBlock_->add(result);
+    return result;
   }
 
   /********************************************** WasmGC: struct helpers ***/
@@ -3949,17 +3960,17 @@ class FunctionCompiler {
   [[nodiscard]] MDefinition* createDefaultInitializedArrayObject(
       uint32_t lineOrBytecode, uint32_t typeIndex, MDefinition* numElements) {
     // Get the type definition for the array as a whole.
-    MDefinition* arrayTypeDef = loadTypeDef(typeIndex);
-    if (!arrayTypeDef) {
+    MDefinition* typeDefData = loadTypeDefInstanceData(typeIndex);
+    if (!typeDefData) {
       return nullptr;
     }
 
-    // Create call: arrayObject = Instance::arrayNew(numElements, arrayTypeDef)
+    // Create call: arrayObject = Instance::arrayNew(numElements, typeDefData)
     // If the requested size exceeds MaxArrayPayloadBytes, the MIR generated
     // by this call will trap.
     MDefinition* arrayObject;
     if (!emitInstanceCall2(lineOrBytecode, SASigArrayNew, numElements,
-                           arrayTypeDef, &arrayObject)) {
+                           typeDefData, &arrayObject)) {
       return nullptr;
     }
 
@@ -4186,11 +4197,12 @@ class FunctionCompiler {
   }
 
   [[nodiscard]] MDefinition* isGcObjectSubtypeOf(MDefinition* object,
-                                                 uint32_t castTypeIndex) {
+                                                 uint32_t castTypeIndex,
+                                                 bool succeedOnNull) {
     auto* superTypeDef = loadTypeDef(castTypeIndex);
     auto* isSubTypeOf = MWasmGcObjectIsSubtypeOf::New(
         alloc(), object, superTypeDef,
-        moduleEnv_.types->type(castTypeIndex).subTypingDepth());
+        moduleEnv_.types->type(castTypeIndex).subTypingDepth(), succeedOnNull);
     curBlock_->add(isSubTypeOf);
     return isSubTypeOf;
   }
@@ -4200,7 +4212,8 @@ class FunctionCompiler {
   // have a type that is a subtype of (or the same as) `castToTypeDef` after
   // this point.
   [[nodiscard]] bool refCast(MDefinition* ref, uint32_t castTypeIndex) {
-    MDefinition* success = isGcObjectSubtypeOf(ref, castTypeIndex);
+    MDefinition* success =
+        isGcObjectSubtypeOf(ref, castTypeIndex, /*succeedOnNull=*/true);
     if (!success) {
       return false;
     }
@@ -4213,7 +4226,7 @@ class FunctionCompiler {
   // Generate MIR that computes a boolean value indicating whether or not it
   // is possible to downcast `ref` to `castToTypeDef`.
   [[nodiscard]] MDefinition* refTest(MDefinition* ref, uint32_t castTypeIndex) {
-    return isGcObjectSubtypeOf(ref, castTypeIndex);
+    return isGcObjectSubtypeOf(ref, castTypeIndex, /*succeedOnNull=*/false);
   }
 
   // Generates MIR for br_on_cast and br_on_cast_fail.
@@ -4242,7 +4255,8 @@ class FunctionCompiler {
     MDefinition* ref = values.back();
     MOZ_ASSERT(ref->type() == MIRType::RefOrNull);
 
-    MDefinition* success = isGcObjectSubtypeOf(ref, castTypeIndex);
+    MDefinition* success =
+        isGcObjectSubtypeOf(ref, castTypeIndex, /*succeedOnNull=*/false);
     if (!success) {
       return false;
     }
@@ -4267,6 +4281,32 @@ class FunctionCompiler {
     }
 
     curBlock_->end(test);
+    curBlock_ = fallthroughBlock;
+    return true;
+  }
+
+  [[nodiscard]] bool brOnNonStruct(const DefVector& values) {
+    if (inDeadCode()) {
+      return true;
+    }
+
+    MBasicBlock* fallthroughBlock = nullptr;
+    if (!newBlock(curBlock_, &fallthroughBlock)) {
+      return false;
+    }
+
+    MOZ_ASSERT(values.length() > 0);
+    MOZ_ASSERT(values.back()->type() == MIRType::RefOrNull);
+
+    MGoto* jump = MGoto::New(alloc(), fallthroughBlock);
+    if (!jump) {
+      return false;
+    }
+    if (!pushDefs(values)) {
+      return false;
+    }
+
+    curBlock_->end(jump);
     curBlock_ = fallthroughBlock;
     return true;
   }
@@ -6494,14 +6534,14 @@ static bool EmitStructNew(FunctionCompiler& f) {
 
   // Allocate a default initialized struct.  This requires the type definition
   // for the struct.
-  MDefinition* structTypeDef = f.loadTypeDef(typeIndex);
-  if (!structTypeDef) {
+  MDefinition* typeDefData = f.loadTypeDefInstanceData(typeIndex);
+  if (!typeDefData) {
     return false;
   }
 
-  // Create call: structObject = Instance::structNew(structTypeDef)
+  // Create call: structObject = Instance::structNew(typeDefData)
   MDefinition* structObject;
-  if (!f.emitInstanceCall1(lineOrBytecode, SASigStructNew, structTypeDef,
+  if (!f.emitInstanceCall1(lineOrBytecode, SASigStructNew, typeDefData,
                            &structObject)) {
     return false;
   }
@@ -6537,14 +6577,14 @@ static bool EmitStructNewDefault(FunctionCompiler& f) {
 
   // Allocate a default initialized struct.  This requires the type definition
   // for the struct.
-  MDefinition* structTypeDef = f.loadTypeDef(typeIndex);
-  if (!structTypeDef) {
+  MDefinition* typeDefData = f.loadTypeDefInstanceData(typeIndex);
+  if (!typeDefData) {
     return false;
   }
 
-  // Create call: structObject = Instance::structNew(structTypeDef)
+  // Create call: structObject = Instance::structNew(typeDefData)
   MDefinition* structObject;
-  if (!f.emitInstanceCall1(lineOrBytecode, SASigStructNew, structTypeDef,
+  if (!f.emitInstanceCall1(lineOrBytecode, SASigStructNew, typeDefData,
                            &structObject)) {
     return false;
   }
@@ -6736,9 +6776,9 @@ static bool EmitArrayNewData(FunctionCompiler& f) {
     return true;
   }
 
-  // Get the type definition for the array as a whole.
-  MDefinition* arrayTypeDef = f.loadTypeDef(typeIndex);
-  if (!arrayTypeDef) {
+  // Get the type definition data for the array as a whole.
+  MDefinition* typeDefData = f.loadTypeDefInstanceData(typeIndex);
+  if (!typeDefData) {
     return false;
   }
 
@@ -6750,13 +6790,12 @@ static bool EmitArrayNewData(FunctionCompiler& f) {
 
   // Create call:
   // arrayObject = Instance::arrayNewData(segByteOffset:u32, numElements:u32,
-  //                                      arrayTypeDef:word, segIndex:u32)
+  //                                      typeDefData:word, segIndex:u32)
   // If the requested size exceeds MaxArrayPayloadBytes, the MIR generated by
   // this call will trap.
   MDefinition* arrayObject;
   if (!f.emitInstanceCall4(lineOrBytecode, SASigArrayNewData, segByteOffset,
-                           numElements, arrayTypeDef, segIndexM,
-                           &arrayObject)) {
+                           numElements, typeDefData, segIndexM, &arrayObject)) {
     return false;
   }
 
@@ -6780,8 +6819,9 @@ static bool EmitArrayNewElem(FunctionCompiler& f) {
   }
 
   // Get the type definition for the array as a whole.
-  MDefinition* arrayTypeDef = f.loadTypeDef(typeIndex);
-  if (!arrayTypeDef) {
+  // Get the type definition data for the array as a whole.
+  MDefinition* typeDefData = f.loadTypeDefInstanceData(typeIndex);
+  if (!typeDefData) {
     return false;
   }
 
@@ -6793,13 +6833,12 @@ static bool EmitArrayNewElem(FunctionCompiler& f) {
 
   // Create call:
   // arrayObject = Instance::arrayNewElem(segElemIndex:u32, numElements:u32,
-  //                                      arrayTypeDef:word, segIndex:u32)
+  //                                      typeDefData:word, segIndex:u32)
   // If the requested size exceeds MaxArrayPayloadBytes, the MIR generated by
   // this call will trap.
   MDefinition* arrayObject;
   if (!f.emitInstanceCall4(lineOrBytecode, SASigArrayNewElem, segElemIndex,
-                           numElements, arrayTypeDef, segIndexM,
-                           &arrayObject)) {
+                           numElements, typeDefData, segIndexM, &arrayObject)) {
     return false;
   }
 
@@ -7001,6 +7040,27 @@ static bool EmitBrOnCastCommon(FunctionCompiler& f, bool onSuccess) {
 
   return f.brOnCastCommon(onSuccess, labelRelativeDepth, castTypeIndex,
                           labelType, values);
+}
+
+static bool EmitRefAsStruct(FunctionCompiler& f) {
+  MDefinition* value;
+  if (!f.iter().readConversion(ValType(RefType::any()),
+                               ValType(RefType::struct_().asNonNullable()),
+                               &value)) {
+    return false;
+  }
+  f.iter().setResult(value);
+  return true;
+}
+
+static bool EmitBrOnNonStruct(FunctionCompiler& f) {
+  uint32_t labelRelativeDepth;
+  ResultType labelType;
+  DefVector values;
+  if (!f.iter().readBrOnNonStruct(&labelRelativeDepth, &labelType, &values)) {
+    return false;
+  }
+  return f.brOnNonStruct(values);
 }
 
 static bool EmitExternInternalize(FunctionCompiler& f) {
@@ -7640,6 +7700,10 @@ static bool EmitBodyExprs(FunctionCompiler& f) {
             CHECK(EmitBrOnCastCommon(f, /*onSuccess=*/true));
           case uint32_t(GcOp::BrOnCastFail):
             CHECK(EmitBrOnCastCommon(f, /*onSuccess=*/false));
+          case uint32_t(GcOp::RefAsStruct):
+            CHECK(EmitRefAsStruct(f));
+          case uint32_t(GcOp::BrOnNonStruct):
+            CHECK(EmitBrOnNonStruct(f));
           case uint16_t(GcOp::ExternInternalize):
             CHECK(EmitExternInternalize(f));
           case uint16_t(GcOp::ExternExternalize):
