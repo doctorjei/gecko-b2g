@@ -71,7 +71,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e9dd62f37dea550caf48c77591dc50bd1a378ce08855be1a0c42a97b7550fb"
 dependencies = [
  "android_log-sys",
- "env_logger 0.9.3",
+ "env_logger 0.9.999",
  "log",
  "once_cell",
 ]
@@ -378,9 +378,9 @@ dependencies = [
 
 [[package]]
 name = "authenticator"
-version = "0.4.0-alpha.6"
+version = "0.4.0-alpha.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0bad0926d74984fd6932d928c65efbc0f14d37873d0316a664621898bfcd80c"
+checksum = "178ca28a8c8b156a4f7aa70e789d87a598fa71a2a66094ed92dee513b3cdf868"
 dependencies = [
  "base64",
  "bitflags",
@@ -1196,12 +1196,11 @@ dependencies = [
 [[package]]
 name = "cssparser"
 version = "0.30.0"
-source = "git+https://github.com/servo/rust-cssparser?rev=722b30d2f1634714befab967ecae627813fa4cf0#722b30d2f1634714befab967ecae627813fa4cf0"
+source = "git+https://github.com/servo/rust-cssparser?rev=d3670a89bae26ba3a8db4758eb7976616113987d#d3670a89bae26ba3a8db4758eb7976616113987d"
 dependencies = [
  "cssparser-macros",
  "dtoa-short",
  "itoa",
- "matches",
  "phf",
  "proc-macro2",
  "quote",
@@ -1212,7 +1211,7 @@ dependencies = [
 [[package]]
 name = "cssparser-macros"
 version = "0.6.0"
-source = "git+https://github.com/servo/rust-cssparser?rev=722b30d2f1634714befab967ecae627813fa4cf0#722b30d2f1634714befab967ecae627813fa4cf0"
+source = "git+https://github.com/servo/rust-cssparser?rev=d3670a89bae26ba3a8db4758eb7976616113987d#d3670a89bae26ba3a8db4758eb7976616113987d"
 dependencies = [
  "quote",
  "syn",
@@ -1305,8 +1304,7 @@ dependencies = [
 [[package]]
 name = "d3d12"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "827914e1f53b1e0e025ecd3d967a7836b7bcb54520f90e21ef8df7b4d88a2759"
+source = "git+https://github.com/gfx-rs/d3d12-rs?rev=a990c93#a990c93ec64eeab78f2292763d0715da9dba1d59"
 dependencies = [
  "bitflags",
  "libloading",
@@ -1682,22 +1680,18 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.8.999"
+version = "0.9.999"
 dependencies = [
- "env_logger 0.9.3",
+ "env_logger 0.10.0",
 ]
 
 [[package]]
 name = "env_logger"
-version = "0.9.3"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
+checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
 dependencies = [
- "atty",
- "humantime",
  "log",
- "regex",
- "termcolor",
 ]
 
 [[package]]
@@ -1712,7 +1706,7 @@ dependencies = [
 [[package]]
 name = "error-support"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "lazy_static",
  "log",
@@ -2184,7 +2178,7 @@ name = "gecko_logger"
 version = "0.1.0"
 dependencies = [
  "app_services_logger",
- "env_logger 0.9.3",
+ "env_logger 0.9.999",
  "lazy_static",
  "log",
 ]
@@ -2464,7 +2458,7 @@ dependencies = [
  "bincode",
  "chrono",
  "crossbeam-channel",
- "env_logger 0.9.3",
+ "env_logger 0.9.999",
  "flate2",
  "log",
  "once_cell",
@@ -2761,12 +2755,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
 
 [[package]]
-name = "humantime"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
-
-[[package]]
 name = "hyper"
 version = "0.14.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2847,7 +2835,7 @@ dependencies = [
 [[package]]
 name = "interrupt-support"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "lazy_static",
  "parking_lot 0.12.999",
@@ -3754,12 +3742,11 @@ dependencies = [
 
 [[package]]
 name = "mp4parse"
-version = "0.13.0"
-source = "git+https://github.com/mozilla/mp4parse-rust?rev=3bfc47d9a571d0842676043ba60716318e946c06#3bfc47d9a571d0842676043ba60716318e946c06"
+version = "0.16.0"
+source = "git+https://github.com/mozilla/mp4parse-rust?rev=eb0b625bd7e888d05ebcfc7685e2501b34c3b374#eb0b625bd7e888d05ebcfc7685e2501b34c3b374"
 dependencies = [
  "bitreader",
  "byteorder",
- "env_logger 0.8.999",
  "fallible_collections",
  "log",
  "num-traits",
@@ -3772,8 +3759,8 @@ version = "0.1.0"
 
 [[package]]
 name = "mp4parse_capi"
-version = "0.13.0"
-source = "git+https://github.com/mozilla/mp4parse-rust?rev=3bfc47d9a571d0842676043ba60716318e946c06#3bfc47d9a571d0842676043ba60716318e946c06"
+version = "0.16.0"
+source = "git+https://github.com/mozilla/mp4parse-rust?rev=eb0b625bd7e888d05ebcfc7685e2501b34c3b374#eb0b625bd7e888d05ebcfc7685e2501b34c3b374"
 dependencies = [
  "byteorder",
  "fallible_collections",
@@ -3833,7 +3820,7 @@ checksum = "a2983372caf4480544083767bf2d27defafe32af49ab4df3a0b7fc90793a3664"
 [[package]]
 name = "naga"
 version = "0.10.0"
-source = "git+https://github.com/gfx-rs/naga?rev=e98bd92#e98bd9264c3a6b04dff15a6b1213c0c80201740a"
+source = "git+https://github.com/gfx-rs/naga?rev=1be8024#1be8024bda3594987b417bead5024b98be9ab521"
 dependencies = [
  "bit-set",
  "bitflags",
@@ -3856,7 +3843,7 @@ version = "0.6.3"
 source = "git+https://github.com/mozilla/neqo?tag=v0.6.3#4fe628bb911e4437169d974baa628c159e96f879"
 dependencies = [
  "chrono",
- "env_logger 0.9.3",
+ "env_logger 0.9.999",
  "lazy_static",
  "log",
  "qlog",
@@ -4033,7 +4020,7 @@ dependencies = [
 [[package]]
 name = "nss_build_common"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 
 [[package]]
 name = "nsstring"
@@ -4199,7 +4186,7 @@ version = "0.1.4"
 dependencies = [
  "byteorder",
  "core-foundation",
- "env_logger 0.9.3",
+ "env_logger 0.9.999",
  "lazy_static",
  "libloading",
  "log",
@@ -5239,7 +5226,7 @@ name = "smoosh"
 version = "0.1.0"
 dependencies = [
  "bumpalo",
- "env_logger 0.9.3",
+ "env_logger 0.9.999",
  "jsparagus",
  "log",
 ]
@@ -5267,7 +5254,7 @@ dependencies = [
 [[package]]
 name = "sql-support"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "ffi-support",
  "interrupt-support",
@@ -5449,7 +5436,7 @@ dependencies = [
 [[package]]
 name = "sync-guid"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "base64",
  "rand 0.8.5",
@@ -5460,7 +5447,7 @@ dependencies = [
 [[package]]
 name = "sync15"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "anyhow",
  "error-support",
@@ -5490,7 +5477,7 @@ dependencies = [
 [[package]]
 name = "tabs"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "anyhow",
  "error-support",
@@ -6259,7 +6246,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "viaduct"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "ffi-support",
  "log",
@@ -6415,7 +6402,7 @@ dependencies = [
 [[package]]
 name = "webext-storage"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=51b984ecb21ba00694c3eee33364123a064a7cbb#51b984ecb21ba00694c3eee33364123a064a7cbb"
+source = "git+https://github.com/mozilla/application-services?rev=c6370008f53328529e8bcf06aaa5014dffcd298b#c6370008f53328529e8bcf06aaa5014dffcd298b"
 dependencies = [
  "error-support",
  "ffi-support",
@@ -6570,7 +6557,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "0.14.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=fac4731288117d951d0944d96cf0b00fa006dd6c#fac4731288117d951d0944d96cf0b00fa006dd6c"
+source = "git+https://github.com/gfx-rs/wgpu?rev=24a904256e225b20b11fb30f914ef53212a2909e#24a904256e225b20b11fb30f914ef53212a2909e"
 dependencies = [
  "arrayvec",
  "bit-vec",
@@ -6593,7 +6580,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "0.14.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=fac4731288117d951d0944d96cf0b00fa006dd6c#fac4731288117d951d0944d96cf0b00fa006dd6c"
+source = "git+https://github.com/gfx-rs/wgpu?rev=24a904256e225b20b11fb30f914ef53212a2909e#24a904256e225b20b11fb30f914ef53212a2909e"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -6631,7 +6618,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "0.14.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=fac4731288117d951d0944d96cf0b00fa006dd6c#fac4731288117d951d0944d96cf0b00fa006dd6c"
+source = "git+https://github.com/gfx-rs/wgpu?rev=24a904256e225b20b11fb30f914ef53212a2909e#24a904256e225b20b11fb30f914ef53212a2909e"
 dependencies = [
  "bitflags",
  "serde",
@@ -6723,7 +6710,7 @@ dependencies = [
 [[package]]
 name = "wpf-gpu-raster"
 version = "0.1.0"
-source = "git+https://github.com/FirefoxGraphics/wpf-gpu-raster?rev=e07e3741d1613b1b7ddb85a1120ed4071b3d6a56#e07e3741d1613b1b7ddb85a1120ed4071b3d6a56"
+source = "git+https://github.com/FirefoxGraphics/wpf-gpu-raster?rev=a6514854d4518b02f2805719ff6cd74dae7dfde6#a6514854d4518b02f2805719ff6cd74dae7dfde6"
 dependencies = [
  "typed-arena-nomut",
 ]

@@ -5,7 +5,6 @@
 
 let sandbox;
 
-/* import-globals-from ../../browser/head-common.js */
 Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/browser/components/urlbar/tests/browser/head-common.js",
   this
@@ -97,6 +96,15 @@ async function setUpTelemetryTest({
   merinoSuggestions = null,
   config = QuickSuggestTestUtils.DEFAULT_CONFIG,
 }) {
+  if (UrlbarPrefs.get("resultMenu")) {
+    todo(
+      false,
+      "telemetry for the result menu to be implemented in bug 1790020"
+    );
+    await SpecialPowers.pushPrefEnv({
+      set: [["browser.urlbar.resultMenu", false]],
+    });
+  }
   await SpecialPowers.pushPrefEnv({
     set: [
       // Enable blocking on primary sponsored and nonsponsored suggestions so we
@@ -351,8 +359,7 @@ async function doImpressionOnlyTest({
         (r.result.payload.url ||
           (r.result.type == UrlbarUtils.RESULT_TYPE.SEARCH &&
             (r.result.payload.query || r.result.payload.suggestion))) &&
-        (r.hasAttribute("selectable") ||
-          r.querySelector("urlbarView-row-inner[selectable]"))
+        r.hasAttribute("row-selectable")
       ) {
         otherRow = r;
       }

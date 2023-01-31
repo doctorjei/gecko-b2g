@@ -32,7 +32,8 @@ IndiceWrapper::IndiceWrapper(Mp4parseByteData& aIndice) {
 
 size_t IndiceWrapper::Length() const { return mIndice.length; }
 
-bool IndiceWrapper::GetIndice(size_t aIndex, Index::Indice& aIndice) const {
+bool IndiceWrapper::GetIndice(size_t aIndex,
+                              MP4SampleIndex::Indice& aIndice) const {
   if (aIndex >= mIndice.length) {
     MOZ_LOG(gMP4MetadataLog, LogLevel::Error, ("Index overflow in indice"));
     return false;
@@ -354,8 +355,17 @@ MP4Metadata::ResultAndTrackInfo MP4Metadata::GetTrackInfo(
                                           TrackTypeToStr(aType), aTrackNumber)),
                 nullptr};
       }
+
+      auto indices = GetTrackIndice(info.track_id);
+      if (!indices.Ref()) {
+        // non fatal
+        MOZ_LOG(gMP4MetadataLog, LogLevel::Warning,
+                ("Can't get index table for audio track, duration might be "
+                 "slightly incorrect"));
+      }
       auto track = mozilla::MakeUnique<MP4AudioInfo>();
-      MediaResult updateStatus = track->Update(&info, &audio);
+      MediaResult updateStatus =
+          track->Update(&info, &audio, indices.Ref().get());
       if (NS_FAILED(updateStatus)) {
         MOZ_LOG(gMP4MetadataLog, LogLevel::Warning,
                 ("Updating audio track failed with %s",
@@ -431,7 +441,8 @@ MP4Metadata::ResultAndCryptoFile MP4Metadata::Crypto() const {
   return {NS_OK, &mCrypto};
 }
 
-MP4Metadata::ResultAndIndice MP4Metadata::GetTrackIndice(uint32_t aTrackId) {
+MP4Metadata::ResultAndIndice MP4Metadata::GetTrackIndice(
+    uint32_t aTrackId) const {
   Mp4parseByteData indiceRawData = {};
 
   uint8_t fragmented = false;

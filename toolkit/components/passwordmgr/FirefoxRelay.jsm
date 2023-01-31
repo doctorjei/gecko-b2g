@@ -46,6 +46,7 @@ XPCOMUtils.defineLazyGetter(lazy, "fxAccounts", () =>
 XPCOMUtils.defineLazyGetter(lazy, "strings", function() {
   return new Localization([
     "branding/brand.ftl",
+    "browser/branding/sync-brand.ftl",
     "browser/branding/brandings.ftl",
     "browser/firefoxRelay.ftl",
   ]);
@@ -59,7 +60,7 @@ async function getRelayTokenAsync() {
   try {
     return await lazy.fxAccounts.getOAuthToken({ scope: config.scope });
   } catch (e) {
-    Cu.reportError(`There was an error getting the user's token: ${e.message}`);
+    console.error(`There was an error getting the user's token: ${e.message}`);
     return undefined;
   }
 }

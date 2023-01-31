@@ -623,6 +623,7 @@ RefPtr<WebGLContext> WebGLContext::Create(HostWebGLContext& host,
   out->options = webgl->mOptions;
   out->limits = *webgl->mLimits;
   out->uploadableSdTypes = UploadableSdTypes();
+  out->vendor = webgl->gl->Vendor();
 
   return webgl;
 }
@@ -1200,6 +1201,7 @@ bool WebGLContext::PushRemoteTexture(WebGLFramebuffer* fb,
     case layers::SurfaceDescriptor::TSurfaceDescriptorD3D10:
     case layers::SurfaceDescriptor::TSurfaceDescriptorMacIOSurface:
     case layers::SurfaceDescriptor::TSurfaceTextureDescriptor:
+    case layers::SurfaceDescriptor::TSurfaceDescriptorAndroidHardwareBuffer:
       keepAlive = surf;
       break;
     default:

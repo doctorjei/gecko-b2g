@@ -1791,6 +1791,7 @@
       "alpha_y_bpc_mismatch",
       "ispe_mismatch",
       "invalid_cicp",
+      "no_samples",
       "invalid_parse_status",
       "missing_brand",
       "ftyp_not_first",
@@ -1805,7 +1806,8 @@
       "item_type_missing",
       "construction_method",
       "item_loc_not_found",
-      "no_item_data_box"
+      "no_item_data_box",
+      "uncategorized"
     ],
     "description": "Decode result of AVIF image",
     "bug_numbers": [1670827]
@@ -10789,10 +10791,10 @@
     "record_in_processes": ["content"],
     "products": ["firefox"],
     "alert_emails": ["media-alerts@mozilla.com"],
-    "expires_in_version": "112",
+    "expires_in_version": "118",
     "kind": "boolean",
     "description": "Reports a true value when a page requests canPlayType for a matroska media type.",
-    "bug_numbers": [1429986, 1570634, 1606206, 1689266, 1754643]
+    "bug_numbers": [1429986, 1570634, 1606206, 1689266, 1754643, 1813150]
   },
   "MEDIA_HLS_CANPLAY_REQUESTED": {
     "record_in_processes": ["content"],
@@ -13582,7 +13584,11 @@
       "socket-crash",
       "socket-hang",
       "utility-crash",
-      "utility-hang"
+      "utility-hang",
+      "sandboxbroker-crash",
+      "sandboxbroker-hang",
+      "forkserver-crash",
+      "forkserver-hang"
     ],
     "releaseChannelCollection": "opt-out",
     "description": "An attempt to submit a crash. Keyed on the CrashManager Crash.type."
@@ -16118,30 +16124,6 @@
     "kind": "enumerated",
     "n_values": 64,
     "description": "URL CLassifier-related (aka Safe Browsing) UI events. See nsIUrlClassifierUITelemetry.idl for the specific values."
-  },
- "WEBAUTHN_CREATE_CREDENTIAL_MS": {
-    "record_in_processes": ["main"],
-    "products": ["firefox", "fennec"],
-    "alert_emails": ["seceng-telemetry@mozilla.com", "rmf@mozilla.com"],
-    "expires_in_version": "112",
-    "releaseChannelCollection": "opt-out",
-    "kind": "exponential",
-    "high": 120000,
-    "n_buckets": 100,
-    "bug_numbers": [1265472, 1558870, 1630155, 1689269, 1754650],
-    "description": "Time in milliseconds to complete a WebAuthn create credential."
-  },
-  "WEBAUTHN_GET_ASSERTION_MS": {
-    "record_in_processes": ["main"],
-    "products": ["firefox", "fennec"],
-    "alert_emails": ["seceng-telemetry@mozilla.com", "rmf@mozilla.com"],
-    "expires_in_version": "112",
-    "releaseChannelCollection": "opt-out",
-    "kind": "exponential",
-    "high": 120000,
-    "n_buckets": 100,
-    "bug_numbers": [1265472, 1558870, 1630155, 1689269, 1754650],
-    "description": "Time in milliseconds to complete a WebAuthn get assertion."
   },
   "GFX_OMTP_PAINT_TIME": {
     "record_in_processes": ["content"],

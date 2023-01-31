@@ -4,9 +4,6 @@
 
 "use strict";
 
-const {
-  storageTypePool,
-} = require("resource://devtools/server/actors/storage.js");
 const EventEmitter = require("resource://devtools/shared/event-emitter.js");
 const {
   getAllBrowsingContextsForContext,
@@ -38,7 +35,8 @@ function getFilteredStorageEvents(updates, storageType) {
 }
 
 class ParentProcessStorage {
-  constructor(storageKey, storageType) {
+  constructor(ActorConstructor, storageKey, storageType) {
+    this.ActorConstructor = ActorConstructor;
     this.storageKey = storageKey;
     this.storageType = storageType;
 
@@ -86,6 +84,13 @@ class ParentProcessStorage {
         addonInnerWindowId,
       } = watcherActor.sessionContext;
       await this._spawnActor(addonBrowsingContextID, addonInnerWindowId);
+    } else if (watcherActor.sessionContext.type == "all") {
+      const parentProcessTargetActor = this.watcherActor.getTargetActorInParentProcess();
+      const {
+        browsingContextID,
+        innerWindowId,
+      } = parentProcessTargetActor.form();
+      await this._spawnActor(browsingContextID, innerWindowId);
     } else {
       throw new Error(
         "Unsupported session context type=" + watcherActor.sessionContext.type
@@ -126,11 +131,9 @@ class ParentProcessStorage {
   }
 
   async _spawnActor(browsingContextID, innerWindowId) {
-    const ActorConstructor = storageTypePool.get(this.storageKey);
-
     const storageActor = new StorageActorMock(this.watcherActor);
     this.storageActor = storageActor;
-    this.actor = new ActorConstructor(storageActor);
+    this.actor = new this.ActorConstructor(storageActor);
 
     // Some storage types require to prelist their stores
     if (typeof this.actor.preListStores === "function") {
@@ -400,7 +403,10 @@ class StorageActorMock extends EventEmitter {
   }
 
   get parentActor() {
-    return { isRootActor: this.watcherActor.sessionContext.type == "all" };
+    return {
+      isRootActor: this.watcherActor.sessionContext.type == "all",
+      addonId: this.watcherActor.sessionContext.addonId,
+    };
   }
 
   /**

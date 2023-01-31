@@ -3196,7 +3196,8 @@ void SVGTextFrame::PaintSVG(gfxContext& aContext, const gfxMatrix& aTransform,
       ctxSR.EnsureSaved(&aContext);
       // This may change the gfxContext's transform (for non-scaling stroke),
       // in which case this needs to happen before we call SetMatrix() below.
-      SVGUtils::SetupStrokeGeometry(frame, &aContext, outerContextPaint);
+      SVGUtils::SetupStrokeGeometry(frame->GetParent(), &aContext,
+                                    outerContextPaint);
     }
 
     nscoord startEdge, endEdge;
@@ -4707,15 +4708,14 @@ void SVGTextFrame::DoTextPathLayout() {
         }
         partialAdvances.AppendElement(partialAdvance);
       }
-      if (skippedEndOfTextPath) {
-        break;
-      }
 
-      // Any final undisplayed characters the CharIterator skipped over.
-      MOZ_ASSERT(j <= it.TextElementCharIndex());
-      while (j < it.TextElementCharIndex()) {
-        partialAdvances.AppendElement(partialAdvance);
-        ++j;
+      if (!skippedEndOfTextPath) {
+        // Any final undisplayed characters the CharIterator skipped over.
+        MOZ_ASSERT(j <= it.TextElementCharIndex());
+        while (j < it.TextElementCharIndex()) {
+          partialAdvances.AppendElement(partialAdvance);
+          ++j;
+        }
       }
 
       gfxFloat halfAdvance =
@@ -4828,7 +4828,7 @@ void SVGTextFrame::DoGlyphPositioning() {
   TextNodeCorrespondenceRecorder::RecordCorrespondence(this);
 
   // Determine the positions of each character in app units.
-  nsTArray<nsPoint> charPositions;
+  AutoTArray<nsPoint, 64> charPositions;
   DetermineCharPositions(charPositions);
 
   if (charPositions.IsEmpty()) {
@@ -4855,7 +4855,7 @@ void SVGTextFrame::DoGlyphPositioning() {
   }
 
   // Get the x, y, dx, dy, rotate values for the subtree.
-  nsTArray<gfxPoint> deltas;
+  AutoTArray<gfxPoint, 16> deltas;
   if (!ResolvePositions(deltas, adjustingTextLength)) {
     // If ResolvePositions returned false, it means either there were some
     // characters in the DOM but none of them are displayed, or there was

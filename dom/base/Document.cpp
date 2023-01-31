@@ -172,6 +172,7 @@
 #include "mozilla/dom/FeaturePolicyUtils.h"
 #include "mozilla/dom/FontFaceSet.h"
 #include "mozilla/dom/FromParser.h"
+#include "mozilla/dom/HighlightRegistry.h"
 #include "mozilla/dom/HTMLAllCollection.h"
 #include "mozilla/dom/HTMLBodyElement.h"
 #include "mozilla/dom/HTMLCollectionBinding.h"
@@ -1979,12 +1980,6 @@ static uint32_t ConvertToUnsignedFromDouble(double aNumber) {
 
 void Document::RecordPageLoadEventTelemetry(
     glean::perf::PageLoadExtra& aEventTelemetryData) {
-  static bool sTelemetryEventEnabled = false;
-  if (!sTelemetryEventEnabled) {
-    sTelemetryEventEnabled = true;
-    Telemetry::SetEventRecordingEnabled("page_load"_ns, true);
-  }
-
   // If the page load time is empty, then the content wasn't something we want
   // to report (i.e. not a top level document).
   if (!aEventTelemetryData.loadTime) {
@@ -2531,6 +2526,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(Document)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFontFaceSet)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mReadyForIdle)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocumentL10n)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mHighlightRegistry)
 
   // Traverse all Document nsCOMPtrs.
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mParser)
@@ -2673,6 +2669,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Document)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFontFaceSet)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mReadyForIdle)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocumentL10n)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mHighlightRegistry)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mParser)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mOnloadBlocker)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDOMImplementation)
@@ -6844,7 +6841,9 @@ already_AddRefed<PresShell> Document::CreatePresShell(
   }
 
   presShell->Init(aContext, aViewManager);
-
+  if (RefPtr<class HighlightRegistry> highlightRegistry = mHighlightRegistry) {
+    highlightRegistry->AddHighlightSelectionsToFrameSelection(IgnoreErrors());
+  }
   // Gaining a shell causes changes in how media queries are evaluated, so
   // invalidate that.
   aContext->MediaFeatureValuesChanged(
@@ -18103,6 +18102,13 @@ void Document::ClearOOPChildrenLoading() {
   if (!oopChildrenLoading.IsEmpty()) {
     UnblockOnload(false);
   }
+}
+
+HighlightRegistry& Document::HighlightRegistry() {
+  if (!mHighlightRegistry) {
+    mHighlightRegistry = MakeRefPtr<class HighlightRegistry>(this);
+  }
+  return *mHighlightRegistry;
 }
 
 }  // namespace mozilla::dom

@@ -29,6 +29,13 @@ XPCOMUtils.defineLazyPreferenceGetter(
   "media.videocontrols.picture-in-picture.display-text-tracks.enabled",
   false
 );
+XPCOMUtils.defineLazyPreferenceGetter(
+  lazy,
+  "IMPROVED_CONTROLS_ENABLED_PREF",
+  "media.videocontrols.picture-in-picture.improved-video-controls.enabled",
+  false
+);
+
 const TOGGLE_ENABLED_PREF =
   "media.videocontrols.picture-in-picture.video-toggle.enabled";
 const PIP_ENABLED_PREF = "media.videocontrols.picture-in-picture.enabled";
@@ -162,12 +169,23 @@ export class PictureInPictureLauncherChild extends JSWindowActorChild {
       );
     }
 
-    let timestamp = PictureInPictureChild.videoWrapper.formatTimestamp(
-      video.currentTime,
-      video.duration
-    );
-    let scrubberPosition =
-      timestamp === undefined ? undefined : video.currentTime / video.duration;
+    let timestamp = undefined;
+    let scrubberPosition = undefined;
+
+    if (lazy.IMPROVED_CONTROLS_ENABLED_PREF) {
+      timestamp = PictureInPictureChild.videoWrapper.formatTimestamp(
+        PictureInPictureChild.videoWrapper.getCurrentTime(video),
+        PictureInPictureChild.videoWrapper.getDuration(video)
+      );
+
+      // Scrubber is hidden if undefined, so only set it to something else
+      // if the timestamp is not undefined.
+      scrubberPosition =
+        timestamp === undefined
+          ? undefined
+          : PictureInPictureChild.videoWrapper.getCurrentTime(video) /
+            PictureInPictureChild.videoWrapper.getDuration(video);
+    }
 
     // All other requests to toggle PiP should open a new PiP
     // window
@@ -1495,7 +1513,7 @@ export class PictureInPictureChild extends JSWindowActorChild {
 
     if (!this.isSubtitlesEnabled) {
       this.isSubtitlesEnabled = true;
-      this.sendAsyncMessage("PictureInPicture:ShowSubtitlesButton");
+      this.sendAsyncMessage("PictureInPicture:EnableSubtitlesButton");
     }
 
     let allCuesArray = [...textTrackCues];
@@ -1718,8 +1736,9 @@ export class PictureInPictureChild extends JSWindowActorChild {
       }
       case "timeupdate":
       case "durationchange": {
-        let currentTime = event.target.currentTime;
-        let duration = event.target.duration;
+        let video = this.getWeakVideo();
+        let currentTime = this.videoWrapper.getCurrentTime(video);
+        let duration = this.videoWrapper.getDuration(video);
         let scrubberPosition = currentTime === 0 ? 0 : currentTime / duration;
         let timestamp = this.videoWrapper.formatTimestamp(
           currentTime,
@@ -1727,7 +1746,7 @@ export class PictureInPictureChild extends JSWindowActorChild {
         );
         // There's no point in sending this message unless we have a
         // reasonable timestamp.
-        if (timestamp !== undefined) {
+        if (timestamp !== undefined && lazy.IMPROVED_CONTROLS_ENABLED_PREF) {
           this.sendAsyncMessage(
             "PictureInPicture:SetTimestampAndScrubberPosition",
             {
@@ -2356,7 +2375,7 @@ export class PictureInPictureChild extends JSWindowActorChild {
         }
       );
     } else {
-      this.sendAsyncMessage("PictureInPicture:HideSubtitlesButton");
+      this.sendAsyncMessage("PictureInPicture:DisableSubtitlesButton");
     }
     this.#subtitlesEnabled = val;
   }
@@ -2529,7 +2548,7 @@ class PictureInPictureChildVideoWrapper {
     if (!this.#PictureInPictureChild.isSubtitlesEnabled && text) {
       this.#PictureInPictureChild.isSubtitlesEnabled = true;
       this.#PictureInPictureChild.sendAsyncMessage(
-        "PictureInPicture:ShowSubtitlesButton"
+        "PictureInPicture:EnableSubtitlesButton"
       );
     }
     let pipWindowTracksContainer = this.#PictureInPictureChild.document.getElementById(

@@ -1962,9 +1962,8 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
    * **lower is better**: false
    * **page cycles**: 5
    * **page timeout**: 180000
-   * **repository**: https://github.com/camillobruni/Speedometer
-   * **repository branch**: 2022-12-08_interactive_runner
-   * **repository revision**: 9e2d82c75a66cae636db1888e916276075a137b8
+   * **repository**: https://github.com/WebKit/Speedometer
+   * **repository revision**: ef8d58c9883d176f672e9862a0c3293253f8607b
    * **submetric summary method**: median
    * **subtest lower is better**: true
    * **subtest name filters**: tests/,s3/
@@ -2305,9 +2304,8 @@ Standard benchmarks are third-party tests (i.e. Speedometer) that we have integr
    * **lower is better**: false
    * **page cycles**: 5
    * **page timeout**: 420000
-   * **repository**: https://github.com/camillobruni/Speedometer
-   * **repository branch**: 2022-12-08_interactive_runner
-   * **repository revision**: 9e2d82c75a66cae636db1888e916276075a137b8
+   * **repository**: https://github.com/WebKit/Speedometer
+   * **repository revision**: ef8d58c9883d176f672e9862a0c3293253f8607b
    * **submetric summary method**: median
    * **subtest lower is better**: true
    * **subtest name filters**: tests/,s3/
@@ -11807,10 +11805,10 @@ Tests for page-load performance. The links direct to the actual websites that ar
    * **page cycles**: 25
    * **page timeout**: 60000
    * **playback**: mitmproxy
-   * **playback pageset manifest**: mitm7-linux-firefox-imgur.manifest
+   * **playback pageset manifest**: mitm8-linux-firefox-imgur.manifest
    * **playback version**: 8.1.1
    * **preferences**: {"media.autoplay.default": 5, "media.autoplay.ask-permission": true, "media.autoplay.blocking_policy": 1, "media.autoplay.block-webaudio": true, "media.allowed-to-play.enabled": false, "media.block-autoplay-until-in-foreground": true}
-   * **secondary url**: `<https://imgur.com/gallery/L13Ci>`__
+   * **secondary url**: `<https://imgur.com/gallery/rCXZUil>`__
    * **test url**: `<https://imgur.com/gallery/m5tYJL6>`__
    * **type**: pageload
    * **unit**: ms

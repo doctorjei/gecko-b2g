@@ -105,6 +105,9 @@
 #ifdef JS_SIMULATOR_LOONG64
 #  include "jit/loong64/Simulator-loong64.h"
 #endif
+#ifdef JS_SIMULATOR_RISCV64
+#  include "jit/riscv64/Simulator-riscv64.h"
+#endif
 #include "jit/CacheIRHealth.h"
 #include "jit/InlinableNatives.h"
 #include "jit/Ion.h"
@@ -11012,8 +11015,14 @@ static bool SetContextOptions(JSContext* cx, const OptionParser& op) {
     jit::JitOptions.enableWatchtowerMegamorphic = false;
   }
 
-  if (op.getBoolOption("enable-iterator-indices")) {
-    jit::JitOptions.disableIteratorIndices = false;
+  if (const char* str = op.getStringOption("ion-iterator-indices")) {
+    if (strcmp(str, "on") == 0) {
+      jit::JitOptions.disableIteratorIndices = false;
+    } else if (strcmp(str, "off") == 0) {
+      jit::JitOptions.disableIteratorIndices = true;
+    } else {
+      return OptionFailure("ion-iterator-indices", str);
+    }
   }
 
 #if defined(JS_SIMULATOR_ARM)
@@ -11045,6 +11054,28 @@ static bool SetContextOptions(JSContext* cx, const OptionParser& op) {
   }
 #endif
 
+#ifdef DEBUG
+#  ifdef JS_CODEGEN_RISCV64
+  if (op.getBoolOption("riscv-debug")) {
+    jit::Assembler::FLAG_riscv_debug = true;
+  }
+#  endif
+#  ifdef JS_SIMULATOR_RISCV64
+  if (op.getBoolOption("trace-sim")) {
+    jit::Simulator::FLAG_trace_sim = true;
+  }
+  if (op.getBoolOption("debug-sim")) {
+    jit::Simulator::FLAG_debug_sim = true;
+  }
+  if (op.getBoolOption("riscv-trap-to-simulator-debugger")) {
+    jit::Simulator::FLAG_riscv_trap_to_simulator_debugger = true;
+  }
+  int32_t stopAt = op.getIntOption("riscv-sim-stop-at");
+  if (stopAt >= 0) {
+    jit::Simulator::StopSimAt = stopAt;
+  }
+#  endif
+#endif
   reportWarnings = op.getBoolOption('w');
   compileOnly = op.getBoolOption('c');
   printTiming = op.getBoolOption('b');
@@ -11736,6 +11767,9 @@ int main(int argc, char** argv) {
       !op.addStringOption(
           '\0', "ion-optimize-shapeguards", "on/off",
           "Eliminate redundant shape guards (default: on, off to disable)") ||
+      !op.addStringOption('\0', "ion-iterator-indices", "on/off",
+                          "Optimize property access in for-in loops "
+                          "(default: on, off to disable)") ||
       !op.addBoolOption('\0', "ion-check-range-analysis",
                         "Range analysis checking") ||
       !op.addBoolOption('\0', "ion-extra-checks",
@@ -11752,8 +11786,6 @@ int main(int argc, char** argv) {
                         "Enable Watchtower optimizations") ||
       !op.addBoolOption('\0', "disable-watchtower",
                         "Disable Watchtower optimizations") ||
-      !op.addBoolOption('\0', "enable-iterator-indices",
-                        "Enable iterator indices optimization") ||
       !op.addBoolOption('\0', "scalar-replace-arguments",
                         "Use scalar replacement to optimize ArgumentsObject") ||
       !op.addStringOption(
@@ -11869,6 +11901,9 @@ int main(int argc, char** argv) {
       !op.addBoolOption('\0', "no-incremental-gc", "Disable Incremental GC") ||
       !op.addBoolOption('\0', "enable-parallel-marking",
                         "Turn on parallel marking") ||
+      !op.addIntOption(
+          '\0', "marking-threads", "COUNT",
+          "Set the number of threads used for parallel marking to COUNT.", 0) ||
       !op.addStringOption('\0', "nursery-strings", "on/off",
                           "Allocate strings in the nursery") ||
       !op.addStringOption('\0', "nursery-bigints", "on/off",
@@ -11908,6 +11943,19 @@ int main(int argc, char** argv) {
                        "Stop the LoongArch64 simulator after the given "
                        "NUMBER of instructions.",
                        -1) ||
+#ifdef JS_CODEGEN_RISCV64
+      !op.addBoolOption('\0', "riscv-debug", "debug print riscv info.") ||
+#endif
+#ifdef JS_SIMULATOR_RISCV64
+      !op.addBoolOption('\0', "trace-sim", "print simulator info.") ||
+      !op.addBoolOption('\0', "debug-sim", "debug simulator.") ||
+      !op.addBoolOption('\0', "riscv-trap-to-simulator-debugger",
+                        "trap into simulator debuggger.") ||
+      !op.addIntOption('\0', "riscv-sim-stop-at", "NUMBER",
+                       "Stop the riscv simulator after the given "
+                       "NUMBER of instructions.",
+                       -1) ||
+#endif
       !op.addIntOption('\0', "nursery-size", "SIZE-MB",
                        "Set the maximum nursery size in MB",
                        JS::DefaultNurseryMaxBytes / 1024 / 1024) ||
@@ -12331,6 +12379,10 @@ int main(int argc, char** argv) {
 
   if (op.getBoolOption("enable-parallel-marking")) {
     JS_SetGCParameter(cx, JSGC_PARALLEL_MARKING_ENABLED, true);
+  }
+  int32_t markingThreads = op.getIntOption("marking-threads");
+  if (markingThreads > 0) {
+    JS_SetGCParameter(cx, JSGC_MARKING_THREAD_COUNT, markingThreads);
   }
 
   JS_SetGCParameter(cx, JSGC_SLICE_TIME_BUDGET_MS, 5);

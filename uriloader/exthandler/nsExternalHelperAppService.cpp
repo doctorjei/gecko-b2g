@@ -3495,11 +3495,14 @@ nsExternalHelperAppService::ValidateFileNameForSaving(
   nsLocalFile::CheckForReservedFileName(fileName);
 #endif
 
-  // If the extension is .lnk or .local, replace it with .download, as these
+  // If the extension is one these types, replace it with .download, as these
   // types of files can have signifance on Windows. This happens for any file,
   // not just those with the shortcut mime type.
-  if (StringEndsWith(fileName, u".lnk"_ns) ||
-      StringEndsWith(fileName, u".local"_ns)) {
+  if (StringEndsWith(fileName, u".lnk"_ns, nsCaseInsensitiveStringComparator) ||
+      StringEndsWith(fileName, u".local"_ns,
+                     nsCaseInsensitiveStringComparator) ||
+      StringEndsWith(fileName, u".url"_ns, nsCaseInsensitiveStringComparator) ||
+      StringEndsWith(fileName, u".scf"_ns, nsCaseInsensitiveStringComparator)) {
     fileName.AppendLiteral(".download");
   }
 
@@ -3514,15 +3517,15 @@ nsExternalHelperAppService::ValidateFileNameForSaving(
               "chrome://global/locale/contentAreaCommands.properties",
               getter_AddRefs(bundle)))) {
         nsAutoString defaultFileName;
-        bundle->GetStringFromName("DefaultSaveFileName", defaultFileName);
+        bundle->GetStringFromName("UntitledSaveFileName", defaultFileName);
         // Append any existing extension to the default filename.
         fileName = defaultFileName + fileName;
       }
     }
 
-    // Use 'index' as a last resort.
+    // Use 'Untitled' as a last resort.
     if (!fileName.Length()) {
-      fileName.AssignLiteral("index");
+      fileName.AssignLiteral("Untitled");
     }
   }
 

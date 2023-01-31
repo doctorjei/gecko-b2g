@@ -713,16 +713,10 @@ var gHistorySwipeAnimation = {
       return;
     }
 
-    let prevOpacity = window
-      .getComputedStyle(this._prevBox)
-      .getPropertyValue("opacity");
-    let nextOpacity = window
-      .getComputedStyle(this._nextBox)
-      .getPropertyValue("opacity");
     let box = null;
-    if (prevOpacity > 0) {
+    if (!this._prevBox.collapsed) {
       box = this._prevBox;
-    } else if (nextOpacity > 0) {
+    } else if (!this._nextBox.collapsed) {
       box = this._nextBox;
     }
     if (box != null) {
@@ -734,6 +728,19 @@ var gHistorySwipeAnimation = {
       this._isStoppingAnimation = false;
       this._removeBoxes();
     }
+  },
+
+  _willGoBack: function HSA_willGoBack(aVal) {
+    return (
+      ((aVal > 0 && this.isLTR) || (aVal < 0 && !this.isLTR)) && this._canGoBack
+    );
+  },
+
+  _willGoForward: function HSA_willGoForward(aVal) {
+    return (
+      ((aVal > 0 && !this.isLTR) || (aVal < 0 && this.isLTR)) &&
+      this._canGoForward
+    );
   },
 
   /**
@@ -765,28 +772,25 @@ var gHistorySwipeAnimation = {
     // Compute the icon radius based on preferences.
     const radius =
       this.minRadius + progress * (this.maxRadius - this.minRadius);
-    if ((aVal >= 0 && this.isLTR) || (aVal <= 0 && !this.isLTR)) {
-      // The intention is to go back.
-      if (this._canGoBack) {
-        this._prevBox.collapsed = false;
-        this._nextBox.collapsed = true;
-        this._prevBox.style.translate = `${translate}px 0px`;
-        if (radius >= 0) {
-          this._prevBox
-            .querySelectorAll("circle")[1]
-            .setAttribute("r", `${radius}`);
-        }
-
-        if (Math.abs(aVal) >= 0.25) {
-          // If `aVal` goes above 0.25, it means history navigation will be
-          // triggered once after the user lifts their fingers, it's time to
-          // trigger __indicator__ animations by adding `will-navigate` class.
-          this._prevBox.querySelector("svg").classList.add("will-navigate");
-        } else {
-          this._prevBox.querySelector("svg").classList.remove("will-navigate");
-        }
+    if (this._willGoBack(aVal)) {
+      this._prevBox.collapsed = false;
+      this._nextBox.collapsed = true;
+      this._prevBox.style.translate = `${translate}px 0px`;
+      if (radius >= 0) {
+        this._prevBox
+          .querySelectorAll("circle")[1]
+          .setAttribute("r", `${radius}`);
       }
-    } else if (this._canGoForward) {
+
+      if (Math.abs(aVal) >= 0.25) {
+        // If `aVal` goes above 0.25, it means history navigation will be
+        // triggered once after the user lifts their fingers, it's time to
+        // trigger __indicator__ animations by adding `will-navigate` class.
+        this._prevBox.querySelector("svg").classList.add("will-navigate");
+      } else {
+        this._prevBox.querySelector("svg").classList.remove("will-navigate");
+      }
+    } else if (this._willGoForward(aVal)) {
       // The intention is to go forward.
       this._nextBox.collapsed = false;
       this._prevBox.collapsed = true;
@@ -803,6 +807,11 @@ var gHistorySwipeAnimation = {
       } else {
         this._nextBox.querySelector("svg").classList.remove("will-navigate");
       }
+    } else {
+      this._prevBox.collapsed = true;
+      this._nextBox.collapsed = true;
+      this._prevBox.style.translate = "none";
+      this._nextBox.style.translate = "none";
     }
   },
 

@@ -28,6 +28,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   NewTabUtils: "resource://gre/modules/NewTabUtils.sys.mjs",
   OsEnvironment: "resource://gre/modules/OsEnvironment.sys.mjs",
   PageDataService: "resource:///modules/pagedata/PageDataService.sys.mjs",
+  PermissionUI: "resource:///modules/PermissionUI.sys.mjs",
   PlacesBackups: "resource://gre/modules/PlacesBackups.sys.mjs",
   PlacesDBUtils: "resource://gre/modules/PlacesDBUtils.sys.mjs",
   PlacesUIUtils: "resource:///modules/PlacesUIUtils.sys.mjs",
@@ -75,7 +76,6 @@ XPCOMUtils.defineLazyModuleGetters(lazy, {
   PageActions: "resource:///modules/PageActions.jsm",
   PageThumbs: "resource://gre/modules/PageThumbs.jsm",
   PdfJs: "resource://pdf.js/PdfJs.jsm",
-  PermissionUI: "resource:///modules/PermissionUI.jsm",
   PluralForm: "resource://gre/modules/PluralForm.jsm",
   ProcessHangMonitor: "resource:///modules/ProcessHangMonitor.jsm",
   PublicSuffixList: "resource://gre/modules/netwerk-dns/PublicSuffixList.jsm",
@@ -1627,7 +1627,7 @@ BrowserGlue.prototype = {
         let { Troubleshoot } = ChromeUtils.importESModule(
           "resource://gre/modules/Troubleshoot.sys.mjs"
         );
-        Troubleshoot.snapshot(snapshotData => {
+        Troubleshoot.snapshot().then(snapshotData => {
           // for privacy we remove crash IDs and all preferences (but bug 1091944
           // exists to expose prefs once we are confident of privacy implications)
           delete snapshotData.crashes;
@@ -3516,7 +3516,7 @@ BrowserGlue.prototype = {
   _migrateUI: function BG__migrateUI() {
     // Use an increasing number to keep track of the current migration state.
     // Completely unrelated to the current Firefox release number.
-    const UI_VERSION = 133;
+    const UI_VERSION = 134;
     const BROWSER_DOCURL = AppConstants.BROWSER_CHROME_URL;
 
     const PROFILE_DIR = Services.dirsvc.get("ProfD", Ci.nsIFile).path;
@@ -3923,7 +3923,7 @@ BrowserGlue.prototype = {
           .catch(console.error)
           .then(() => enableProfilerButton(wasAddonActive))
           .catch(console.error);
-      }, Cu.reportError);
+      }, console.error);
     }
 
     // Clear unused socks proxy backup values - see bug 1625773.
@@ -4129,19 +4129,6 @@ BrowserGlue.prototype = {
       }
     }
 
-    if (currentUIVersion < 117) {
-      // Update urlbar result groups for the following changes:
-      // 110 (bug 1662167): Add INPUT_HISTORY group
-      // 111 (bug 1677126): Add REMOTE_TABS group
-      // 112 (bug 1712352): Add ABOUT_PAGES group
-      // 113 (bug 1714409): Add HEURISTIC_ENGINE_ALIAS group
-      // 114 (bug 1662172): Add HEURISTIC_BOOKMARK_KEYWORD group
-      // 115 (bug 1713322): Move TAIL_SUGGESTION group and rename properties
-      // 116 (bug 1717509): Remove HEURISTIC_UNIFIED_COMPLETE group
-      // 117 (bug 1710518): Add GENERAL_PARENT group
-      lazy.UrlbarPrefs.migrateResultGroups();
-    }
-
     if (currentUIVersion < 120) {
       // Migrate old titlebar bool pref to new int-based one.
       const oldPref = "browser.tabs.drawInTitlebar";
@@ -4334,6 +4321,8 @@ BrowserGlue.prototype = {
     if (currentUIVersion < 133) {
       xulStore.removeValue(BROWSER_DOCURL, "urlbar-container", "width");
     }
+
+    // Migration 134 was removed because it was no longer necessary.
 
     // Update the migration version.
     Services.prefs.setIntPref("browser.migration.version", UI_VERSION);
@@ -5210,7 +5199,7 @@ var ContentBlockingCategoriesPrefs = {
  * can also be overridden by system add-ons or tests to provide new ones.
  *
  * This override ability is provided by Integration.sys.mjs. See
- * PermissionUI.jsm for an example of how to provide a new prompt
+ * PermissionUI.sys.mjs for an example of how to provide a new prompt
  * from an add-on.
  */
 const ContentPermissionIntegration = {
@@ -5228,7 +5217,7 @@ const ContentPermissionIntegration = {
    *        Example: "geolocation"
    * @param {nsIContentPermissionRequest} request
    *        The request for a permission from content.
-   * @return {PermissionPrompt} (see PermissionUI.jsm),
+   * @return {PermissionPrompt} (see PermissionUI.sys.mjs),
    *         or undefined if the type cannot be handled.
    */
   createPermissionPrompt(type, request) {

@@ -407,6 +407,22 @@ bool DrawTargetWebgl::Init(const IntSize& size, const SurfaceFormat format) {
   } else if (!mSkia->Init(size, SurfaceFormat::B8G8R8A8)) {
     return false;
   }
+
+  // Allocate an unclipped copy of the DT pointing to its data.
+  uint8_t* dtData = nullptr;
+  IntSize dtSize;
+  int32_t dtStride = 0;
+  SurfaceFormat dtFormat = SurfaceFormat::UNKNOWN;
+  if (!mSkia->LockBits(&dtData, &dtSize, &dtStride, &dtFormat)) {
+    return false;
+  }
+  mSkiaNoClip = new DrawTargetSkia;
+  if (!mSkiaNoClip->Init(dtData, dtSize, dtStride, dtFormat, true)) {
+    mSkia->ReleaseBits(dtData);
+    return false;
+  }
+  mSkia->ReleaseBits(dtData);
+
   SetPermitSubpixelAA(IsOpaque(format));
   return true;
 }
@@ -428,6 +444,10 @@ bool DrawTargetWebgl::SharedContext::Initialize() {
   }
 
   mMaxTextureSize = mWebgl->Limits().maxTex2dSize;
+
+  if (kIsMacOS) {
+    mRasterizationTruncates = mWebgl->Vendor() == gl::GLVendor::ATI;
+  }
 
   CachePrefs();
 
@@ -2547,7 +2567,7 @@ static Maybe<WGR::VertexBuffer> GeneratePathVertexBuffer(
     WGR::OutputVertex* aBuffer, size_t aBufferCapacity) {
   WGR::VertexBuffer vb = WGR::wgr_path_rasterize_to_tri_list(
       &aPath.mPath, aClipRect.x, aClipRect.y, aClipRect.width, aClipRect.height,
-      true, false, aBuffer, aBufferCapacity);
+      true, false, false, aBuffer, aBufferCapacity);
   if (!vb.len || (aBuffer && vb.len > aBufferCapacity)) {
     WGR::wgr_vertex_buffer_release(vb);
     return Nothing();
@@ -3843,7 +3863,8 @@ void DrawTargetWebgl::MarkSkiaChanged(const DrawOptions& aOptions) {
       if (mWebglValid) {
         mProfile.OnLayer();
         mSkiaLayer = true;
-        mSkia->Clear();
+        mSkia->DetachAllSnapshots();
+        mSkiaNoClip->ClearRect(Rect(mSkiaNoClip->GetRect()));
       }
     }
     // The WebGL context is no longer up-to-date.
@@ -3888,8 +3909,10 @@ void DrawTargetWebgl::FlattenSkia() {
     return;
   }
   if (RefPtr<DataSourceSurface> base = ReadSnapshot()) {
-    mSkia->BlendSurface(base, GetRect(), IntPoint(),
-                        CompositionOp::OP_DEST_OVER);
+    mSkia->DetachAllSnapshots();
+    mSkiaNoClip->DrawSurface(base, Rect(GetRect()), Rect(GetRect()),
+                             DrawSurfaceOptions(SamplingFilter::POINT),
+                             DrawOptions(1.f, CompositionOp::OP_DEST_OVER));
   }
   mSkiaLayer = false;
 }

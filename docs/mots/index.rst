@@ -138,7 +138,7 @@ Tracking detection and content-blocking.
     * - Peer(s)
       -
         | `Andrea Marchesini (baku) <https://people.mozilla.org/s?query=baku>`__
-        | `Dimi Lee (dimi) <https://people.mozilla.org/s?query=dimi>`__
+        | `Dimi Lee (dlee) <https://people.mozilla.org/s?query=dlee>`__
         | `Paul Zühlcke (pbz) <https://people.mozilla.org/s?query=pbz>`__
         | `Johann Hofmann (johannh) <https://people.mozilla.org/s?query=johannh>`__
     * - Peer(s) Emeritus
@@ -356,7 +356,7 @@ Native content-based security features enforced in the ContentSecurityManager, i
 
     * - Owner(s)
       -
-        | `ckerschbaumer <https://people.mozilla.org/s?query=ckerschbaumer>`__
+        | `Christoph Kerschbaumer (ckerschb) <https://people.mozilla.org/s?query=ckerschb>`__
     * - Peer(s)
       -
         | `Tanvi Vyas (tanvi) <https://people.mozilla.org/s?query=tanvi>`__
@@ -1648,7 +1648,7 @@ Caps is the capabilities-based security system.
     * - Peer(s)
       -
         | `Boris Zbarsky (bzbarsky) <https://people.mozilla.org/s?query=bzbarsky>`__
-        | `ckerschbaumer <https://people.mozilla.org/s?query=ckerschbaumer>`__
+        | `Christoph Kerschbaumer (ckerschb) <https://people.mozilla.org/s?query=ckerschb>`__
     * - Peer(s) Emeritus
       - Brendan Eich, Johnny Stenback, Dan Veditz
     * - Includes
@@ -2685,7 +2685,7 @@ The application update services.
 
     * - Owner(s)
       -
-        | `Kirk Steuber (bytesized) <https://people.mozilla.org/s?query=bytesized>`__
+        | `Robin Steuber (bytesized) <https://people.mozilla.org/s?query=bytesized>`__
     * - Peer(s)
       -
         | `Molly Howell (mhowell) <https://people.mozilla.org/s?query=mhowell>`__
@@ -2780,8 +2780,7 @@ The downloads UI and service.
     * - Peer(s)
       -
         | `Gijs <https://people.mozilla.org/s?query=Gijs>`__
-    * - Peer(s) Emeritus
-      - Micah Tigley
+        | `Micah Tigley (micah) <https://people.mozilla.org/s?query=micah>`__
     * - Includes
       -
         | `browser/components/downloads/\*\*/\* <https://searchfox.org/mozilla-central/search?q=&path=browser/components/downloads/\*\*/\*>`__
@@ -2875,7 +2874,7 @@ Form detection and autocomplete.
     * - Peer(s)
       -
         | `Tim Giles (tgiles) <https://people.mozilla.org/s?query=tgiles>`__
-        | `Dimi Lee (dimi) <https://people.mozilla.org/s?query=dimi>`__
+        | `Dimi Lee (dlee) <https://people.mozilla.org/s?query=dlee>`__
     * - Owner(s) Emeritus
       - Matthew Noorenberghe
     * - Includes
@@ -3016,7 +3015,7 @@ Managing, saving and filling logins.
       -
         | `Jared Wein (jaws) <https://people.mozilla.org/s?query=jaws>`__
         | `Tim Giles (tgiles) <https://people.mozilla.org/s?query=tgiles>`__
-        | `Dimi Lee (dimi) <https://people.mozilla.org/s?query=dimi>`__
+        | `Dimi Lee (dlee) <https://people.mozilla.org/s?query=dlee>`__
         | `Sam Foster (sfoster) <https://people.mozilla.org/s?query=sfoster>`__
     * - Owner(s) Emeritus
       - Matthew Noorenberghe
@@ -3045,12 +3044,11 @@ A component that allows video elements to be pulled out into an always-on-top wi
       -
         | `Molly Howell (mhowell) <https://people.mozilla.org/s?query=mhowell>`__
         | `Mike Conley (mconley) <https://people.mozilla.org/s?query=mconley>`__
+        | `Micah Tigley (micah) <https://people.mozilla.org/s?query=micah>`__
     * - Peer(s)
       -
         | `Niklas Baumgardner (niklas) <https://people.mozilla.org/s?query=niklas>`__
         | `kpatenio (kpatenio) <https://people.mozilla.org/s?query=kpatenio>`__
-    * - Owner(s) Emeritus
-      - Micah Tigley
     * - Includes
       -
         | `toolkit/components/pictureinpicture <https://searchfox.org/mozilla-central/search?q=&path=toolkit/components/pictureinpicture>`__

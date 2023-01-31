@@ -47,13 +47,13 @@ add_task(async function basic() {
   const testData = [
     {
       description: "Normal result to quick action button",
-      mousedown: ".urlbarView-row:nth-child(1)",
+      mousedown: ".urlbarView-row:nth-child(1) > .urlbarView-row-inner",
       mouseup: ".urlbarView-quickaction-row[data-key=test-downloads]",
       expected: "about:downloads",
     },
     {
       description: "Normal result to out of result",
-      mousedown: ".urlbarView-row:nth-child(1)",
+      mousedown: ".urlbarView-row:nth-child(1) > .urlbarView-row-inner",
       mouseup: "body",
       expected: false,
     },
@@ -124,11 +124,11 @@ add_task(async function outOfBrowser() {
   const testData = [
     {
       description: "Normal result to out of browser",
-      mousedown: ".urlbarView-row:nth-child(1)",
+      mousedown: ".urlbarView-row:nth-child(1) > .urlbarView-row-inner",
     },
     {
       description: "Normal result to out of result",
-      mousedown: ".urlbarView-row:nth-child(1)",
+      mousedown: ".urlbarView-row:nth-child(1) > .urlbarView-row-inner",
       expected: false,
     },
     {
@@ -175,9 +175,10 @@ add_task(async function withSelectionByKeyboard() {
       mousedown: "body",
       mouseup: "body",
       expected: {
-        selectedElementByKey: "#urlbar-results .urlbarView-row[selected]",
+        selectedElementByKey:
+          "#urlbar-results .urlbarView-row > .urlbarView-row-inner[selected]",
         selectedElementAfterMouseDown:
-          "#urlbar-results .urlbarView-row[selected]",
+          "#urlbar-results .urlbarView-row > .urlbarView-row-inner[selected]",
         actionedPage: false,
       },
     },
@@ -199,7 +200,8 @@ add_task(async function withSelectionByKeyboard() {
       mousedown: ".urlbarView-quickaction-row[data-key=test-downloads]",
       mouseup: ".urlbarView-quickaction-row[data-key=test-downloads]",
       expected: {
-        selectedElementByKey: "#urlbar-results .urlbarView-row[selected]",
+        selectedElementByKey:
+          "#urlbar-results .urlbarView-row > .urlbarView-row-inner[selected]",
         selectedElementAfterMouseDown:
           ".urlbarView-quickaction-row[data-key=test-downloads]",
         actionedPage: "about:downloads",
@@ -320,6 +322,13 @@ add_task(async function withDnsFirstForSingleWordsPref() {
 });
 
 add_task(async function buttons() {
+  if (UrlbarPrefs.get("resultMenu")) {
+    todo(
+      false,
+      "the menu button is only visible on hover, so not as easily testable as the block and help buttons."
+    );
+    return;
+  }
   let initialTabUrl = "https://example.com/initial";
   let mainResultUrl = "https://example.com/main";
   let mainResultHelpUrl = "https://example.com/help";
@@ -339,9 +348,17 @@ add_task(async function buttons() {
         {
           url: mainResultUrl,
           helpUrl: mainResultHelpUrl,
-          helpL10n: { id: "firefox-suggest-urlbar-learn-more" },
+          helpL10n: {
+            id: UrlbarPrefs.get("resultMenu")
+              ? "urlbar-result-menu-learn-more-about-firefox-suggest"
+              : "firefox-suggest-urlbar-learn-more",
+          },
           isBlockable: true,
-          blockL10n: { id: "firefox-suggest-urlbar-block" },
+          blockL10n: {
+            id: UrlbarPrefs.get("resultMenu")
+              ? "urlbar-result-menu-dismiss-firefox-suggest"
+              : "firefox-suggest-urlbar-block",
+          },
         }
       ),
       new UrlbarResult(
@@ -383,12 +400,26 @@ add_task(async function buttons() {
         JSON.stringify(rowUrls)
     );
   };
+  let assertResultMenuOpen = () => {
+    Assert.equal(
+      gURLBar.view.resultMenu.state,
+      "showing",
+      "Result menu is open"
+    );
+    EventUtils.synthesizeKey("KEY_Escape");
+  };
 
   let testData = [
     {
-      description: "Block button to block button",
-      mousedown: ".urlbarView-row:nth-child(1) .urlbarView-button-block",
-      afterMouseupCallback: assertBlockResultCalled,
+      description: UrlbarPrefs.get("resultMenu")
+        ? "Menu button to menu button"
+        : "Block button to block button",
+      mousedown: UrlbarPrefs.get("resultMenu")
+        ? ".urlbarView-row:nth-child(1) .urlbarView-button-menu"
+        : ".urlbarView-row:nth-child(1) .urlbarView-button-block",
+      afterMouseupCallback: UrlbarPrefs.get("resultMenu")
+        ? assertResultMenuOpen
+        : assertBlockResultCalled,
       expected: {
         mousedownSelected: false,
         topSites: {
@@ -402,6 +433,7 @@ add_task(async function buttons() {
       },
     },
     {
+      skip: UrlbarPrefs.get("resultMenu"),
       description: "Help button to help button",
       mousedown: ".urlbarView-row:nth-child(1) .urlbarView-button-help",
       expected: {
@@ -411,25 +443,35 @@ add_task(async function buttons() {
       },
     },
     {
-      description: "Row-inner to block button",
+      description: UrlbarPrefs.get("resultMenu")
+        ? "Row-inner to menu button"
+        : "Row-inner to block button",
       mousedown: ".urlbarView-row:nth-child(1) > .urlbarView-row-inner",
-      mouseup: ".urlbarView-row:nth-child(1) .urlbarView-button-block",
-      afterMouseupCallback: assertBlockResultCalled,
+      mouseup: UrlbarPrefs.get("resultMenu")
+        ? ".urlbarView-row:nth-child(1) .urlbarView-button-menu"
+        : ".urlbarView-row:nth-child(1) .urlbarView-button-block",
+      afterMouseupCallback: UrlbarPrefs.get("resultMenu")
+        ? assertResultMenuOpen
+        : assertBlockResultCalled,
       expected: {
         mousedownSelected: true,
         topSites: {
           pageProxyState: "invalid",
-          value: otherResultUrl,
+          value: UrlbarPrefs.get("resultMenu") ? initialTabUrl : otherResultUrl,
         },
         searchString: {
           pageProxyState: "invalid",
-          value: otherResultUrl,
+          value: UrlbarPrefs.get("resultMenu") ? searchString : otherResultUrl,
         },
       },
     },
     {
-      description: "Block button to row-inner",
-      mousedown: ".urlbarView-row:nth-child(1) .urlbarView-button-block",
+      description: UrlbarPrefs.get("resultMenu")
+        ? "Menu button to row-inner"
+        : "Block button to row-inner",
+      mousedown: UrlbarPrefs.get("resultMenu")
+        ? ".urlbarView-row:nth-child(1) .urlbarView-button-menu"
+        : ".urlbarView-row:nth-child(1) .urlbarView-button-block",
       mouseup: ".urlbarView-row:nth-child(1) > .urlbarView-row-inner",
       expected: {
         mousedownSelected: false,
@@ -440,9 +482,22 @@ add_task(async function buttons() {
   ];
 
   for (let showTopSites of [true, false]) {
-    for (let { description, mousedown, mouseup, expected } of testData) {
+    for (let {
+      description,
+      mousedown,
+      mouseup,
+      expected,
+      afterMouseupCallback = null,
+      skip = false,
+    } of testData) {
+      if (skip) {
+        info(
+          `Skipping test with showTopSites = ${showTopSites}: ${description}`
+        );
+        continue;
+      }
       info(`Running test with showTopSites = ${showTopSites}: ${description}`);
-      mouseup = mouseup || mousedown;
+      mouseup ||= mousedown;
 
       await BrowserTestUtils.withNewTab(initialTabUrl, async () => {
         Assert.equal(
@@ -525,8 +580,8 @@ add_task(async function buttons() {
           return;
         }
 
-        if (expected.afterMouseupCallback) {
-          await expected.afterMouseupCallback();
+        if (afterMouseupCallback) {
+          await afterMouseupCallback();
         }
 
         let state = showTopSites ? expected.topSites : expected.searchString;

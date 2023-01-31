@@ -47,7 +47,7 @@ describe("MultiStageAboutWelcomeProton module", () => {
 
     it("should render secondary section with content background for split positioned screens", () => {
       const BACKGROUND_URL =
-        "chrome://activity-stream/content/data/content/assets/proton-bkg.avif";
+        "chrome://activity-stream/content/data/content/assets/confetti.svg";
       const SCREEN_PROPS = {
         content: {
           position: "split",
@@ -189,6 +189,32 @@ describe("MultiStageAboutWelcomeProton module", () => {
       assert.ok(wrapper.exists());
       assert.equal(wrapper.find(".additional-cta.cta-link").exists(), true);
     });
+
+    it("should not render a progress bar if there is 1 step", () => {
+      const SCREEN_PROPS = {
+        content: {
+          title: "test title",
+          progress_bar: true,
+        },
+        totalNumberOfScreens: 1,
+      };
+      const wrapper = mount(<MultiStageProtonScreen {...SCREEN_PROPS} />);
+      assert.ok(wrapper.exists());
+      assert.equal(wrapper.find(".steps.progress-bar").exists(), false);
+    });
+
+    it("should render a progress bar if there are 2 steps", () => {
+      const SCREEN_PROPS = {
+        content: {
+          title: "test title",
+          progress_bar: true,
+        },
+        totalNumberOfScreens: 2,
+      };
+      const wrapper = mount(<MultiStageProtonScreen {...SCREEN_PROPS} />);
+      assert.ok(wrapper.exists());
+      assert.equal(wrapper.find(".steps.progress-bar").exists(), true);
+    });
   });
 
   describe("AboutWelcomeDefaults for proton", () => {
@@ -270,7 +296,8 @@ describe("MultiStageAboutWelcomeProton module", () => {
         id: "DEFAULT_ABOUTWELCOME_PROTON",
         template: "multistage",
         transitions: true,
-        background_url: `chrome://activity-stream/content/data/content/assets/proton-bkg.avif`,
+        background_url:
+          "chrome://activity-stream/content/data/content/assets/confetti.svg",
         screens: [
           {
             id: "AW_PIN_FIREFOX",

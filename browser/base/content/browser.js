@@ -42,6 +42,7 @@ ChromeUtils.defineESModuleGetters(this, {
   PromptUtils: "resource://gre/modules/PromptUtils.sys.mjs",
   Sanitizer: "resource:///modules/Sanitizer.sys.mjs",
   ScreenshotsUtils: "resource:///modules/ScreenshotsUtils.sys.mjs",
+  SearchUIUtils: "resource:///modules/SearchUIUtils.sys.mjs",
   SessionStartup: "resource:///modules/sessionstore/SessionStartup.sys.mjs",
   SessionStore: "resource:///modules/sessionstore/SessionStore.sys.mjs",
   ShortcutUtils: "resource://gre/modules/ShortcutUtils.sys.mjs",
@@ -1970,6 +1971,7 @@ var gBrowserInit = {
 
     BookmarkingUI.init();
     BrowserSearch.delayedStartupInit();
+    SearchUIUtils.init();
     gProtectionsHandler.init();
     HomePage.delayedStartup().catch(console.error);
 
@@ -3971,7 +3973,11 @@ const BrowserSearch = {
       ? Services.search.getDefaultPrivate
       : Services.search.getDefault;
     let defaultEngine = await getDefault();
-
+    if (!this._searchInitComplete) {
+      // If we haven't finished initialising, ensure the placeholder
+      // preference is set for the next startup.
+      SearchUIUtils.updatePlaceholderNamePreference(defaultEngine, isPrivate);
+    }
     this._updateURLBarPlaceholder(defaultEngine.name, isPrivate, delayUpdate);
   },
 
@@ -3994,12 +4000,7 @@ const BrowserSearch = {
     }
 
     const engine = Services.search.getEngineByName(engineName);
-    const prefName =
-      "browser.urlbar.placeholderName" + (isPrivate ? ".private" : "");
-    if (engine.isAppProvided) {
-      Services.prefs.setStringPref(prefName, engineName);
-    } else {
-      Services.prefs.clearUserPref(prefName);
+    if (!engine.isAppProvided) {
       // Set the engine name to an empty string for non-default engines, which'll
       // make sure we display the default placeholder string.
       engineName = "";
@@ -7467,29 +7468,22 @@ var ToolbarContextMenu = {
       element.hidden = !addon;
     }
 
-    // The pinToToolbar item is only available in the toolbar context menu popup,
-    // and not in the overflow panel context menu, and should only be made visible
-    // for addons when the Unified Extensions UI is enabled.
     if (pinToToolbar) {
-      pinToToolbar.hidden = !addon || !gUnifiedExtensions.isEnabled;
+      pinToToolbar.hidden = !addon;
     }
 
     reportExtension.hidden = !addon || !gAddonAbuseReportEnabled;
 
     if (addon) {
-      if (gUnifiedExtensions.isEnabled) {
-        popup.querySelector(".customize-context-moveToPanel").hidden = true;
-        popup.querySelector(
-          ".customize-context-removeFromToolbar"
-        ).hidden = true;
+      popup.querySelector(".customize-context-moveToPanel").hidden = true;
+      popup.querySelector(".customize-context-removeFromToolbar").hidden = true;
 
-        if (pinToToolbar) {
-          let widgetId = this._getWidgetId(popup);
-          if (widgetId) {
-            let area = CustomizableUI.getPlacementOfWidget(widgetId).area;
-            let inToolbar = area != CustomizableUI.AREA_ADDONS;
-            pinToToolbar.setAttribute("checked", inToolbar);
-          }
+      if (pinToToolbar) {
+        let widgetId = this._getWidgetId(popup);
+        if (widgetId) {
+          let area = CustomizableUI.getPlacementOfWidget(widgetId).area;
+          let inToolbar = area != CustomizableUI.AREA_ADDONS;
+          pinToToolbar.setAttribute("checked", inToolbar);
         }
       }
 

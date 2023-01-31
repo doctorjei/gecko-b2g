@@ -375,7 +375,7 @@ bool nsIFrame::IsVisibleConsideringAncestors(uint32_t aFlags) const {
   const nsIFrame* frame = this;
   while (frame) {
     nsView* view = frame->GetView();
-    if (view && view->GetVisibility() == nsViewVisibility_kHide) {
+    if (view && view->GetVisibility() == ViewVisibility::Hide) {
       return false;
     }
 
@@ -1556,8 +1556,8 @@ void nsIFrame::SyncFrameViewProperties(nsView* aView) {
     // See if the view should be hidden or visible
     ComputedStyle* sc = Style();
     vm->SetViewVisibility(aView, sc->StyleVisibility()->IsVisible()
-                                     ? nsViewVisibility_kShow
-                                     : nsViewVisibility_kHide);
+                                     ? ViewVisibility::Show
+                                     : ViewVisibility::Hide);
   }
 
   const auto zIndex = ZIndex();
@@ -2407,6 +2407,16 @@ already_AddRefed<ComputedStyle> nsIFrame::ComputeSelectionStyle(
   }
   return PresContext()->StyleSet()->ProbePseudoElementStyle(
       *element, PseudoStyleType::selection, Style());
+}
+
+already_AddRefed<ComputedStyle> nsIFrame::ComputeHighlightSelectionStyle(
+    const nsAtom* aHighlightName) {
+  Element* element = FindElementAncestorForMozSelection(GetContent());
+  if (!element) {
+    return nullptr;
+  }
+  return PresContext()->StyleSet()->ProbeHighlightPseudoElementStyle(
+      *element, aHighlightName, Style());
 }
 
 template <typename SizeOrMaxSize>
@@ -4814,6 +4824,7 @@ nsresult nsIFrame::MoveCaretToEventPoint(nsPresContext* aPresContext,
             curDetail->mSelectionType != SelectionType::eFind &&
             curDetail->mSelectionType != SelectionType::eURLSecondary &&
             curDetail->mSelectionType != SelectionType::eURLStrikeout &&
+            curDetail->mSelectionType != SelectionType::eHighlight &&
             curDetail->mStart <= offsets.StartOffset() &&
             offsets.EndOffset() <= curDetail->mEnd) {
           inSelection = true;
@@ -7729,6 +7740,19 @@ static nsRect ComputeEffectsRect(nsIFrame* aFrame, const nsRect& aOverflowRect,
   }
 
   return r;
+}
+
+void nsIFrame::SetPosition(const nsPoint& aPt) {
+  if (mRect.TopLeft() == aPt) {
+    return;
+  }
+  mRect.MoveTo(aPt);
+  MarkNeedsDisplayItemRebuild();
+#ifdef ACCESSIBILITY
+  if (nsAccessibilityService* accService = GetAccService()) {
+    accService->NotifyOfPossibleBoundsChange(PresShell(), mContent);
+  }
+#endif
 }
 
 void nsIFrame::MovePositionBy(const nsPoint& aTranslation) {
@@ -11676,7 +11700,7 @@ CompositorHitTestInfo nsIFrame::GetCompositorHitTestInfo(
     if (touchAction == StyleTouchAction::AUTO) {
       // nothing to do
     } else if (touchAction & StyleTouchAction::MANIPULATION) {
-      result += CompositorHitTestFlags::eTouchActionDoubleTapZoomDisabled;
+      result += CompositorHitTestFlags::eTouchActionAnimatingZoomDisabled;
     } else {
       // This path handles the cases none | [pan-x || pan-y || pinch-zoom] so
       // double-tap is disabled in here.
@@ -11684,7 +11708,7 @@ CompositorHitTestInfo nsIFrame::GetCompositorHitTestInfo(
         result += CompositorHitTestFlags::eTouchActionPinchZoomDisabled;
       }
 
-      result += CompositorHitTestFlags::eTouchActionDoubleTapZoomDisabled;
+      result += CompositorHitTestFlags::eTouchActionAnimatingZoomDisabled;
 
       if (!(touchAction & StyleTouchAction::PAN_X)) {
         result += CompositorHitTestFlags::eTouchActionPanXDisabled;

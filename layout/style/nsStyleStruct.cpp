@@ -3249,7 +3249,15 @@ nsStyleUIReset::nsStyleUIReset(const Document& aDocument)
       mAnimationIterationCountCount(1),
       mAnimationCompositionCount(1),
       mAnimationTimelineCount(1),
-      mScrollTimelineAxis(StyleScrollAxis::Block) {
+      mScrollTimelines(
+          nsStyleAutoArray<StyleScrollTimeline>::WITH_SINGLE_INITIAL_ELEMENT),
+      mScrollTimelineNameCount(1),
+      mScrollTimelineAxisCount(1),
+      mViewTimelines(
+          nsStyleAutoArray<StyleViewTimeline>::WITH_SINGLE_INITIAL_ELEMENT),
+      mViewTimelineNameCount(1),
+      mViewTimelineAxisCount(1),
+      mViewTimelineInsetCount(1) {
   MOZ_COUNT_CTOR(nsStyleUIReset);
   mTransitions[0].SetInitialValues();
   mAnimations[0].SetInitialValues();
@@ -3283,8 +3291,13 @@ nsStyleUIReset::nsStyleUIReset(const nsStyleUIReset& aSource)
       mAnimationIterationCountCount(aSource.mAnimationIterationCountCount),
       mAnimationCompositionCount(aSource.mAnimationCompositionCount),
       mAnimationTimelineCount(aSource.mAnimationTimelineCount),
-      mScrollTimelineName(aSource.mScrollTimelineName),
-      mScrollTimelineAxis(aSource.mScrollTimelineAxis) {
+      mScrollTimelines(aSource.mScrollTimelines.Clone()),
+      mScrollTimelineNameCount(aSource.mScrollTimelineNameCount),
+      mScrollTimelineAxisCount(aSource.mScrollTimelineAxisCount),
+      mViewTimelines(aSource.mViewTimelines.Clone()),
+      mViewTimelineNameCount(aSource.mViewTimelineNameCount),
+      mViewTimelineAxisCount(aSource.mViewTimelineAxisCount),
+      mViewTimelineInsetCount(aSource.mViewTimelineInsetCount) {
   MOZ_COUNT_CTOR(nsStyleUIReset);
 }
 
@@ -3344,8 +3357,13 @@ nsChangeHint nsStyleUIReset::CalcDifference(
        mWindowOpacity != aNewData.mWindowOpacity ||
        mMozWindowInputRegionMargin != aNewData.mMozWindowInputRegionMargin ||
        mMozWindowTransform != aNewData.mMozWindowTransform ||
-       mScrollTimelineName != aNewData.mScrollTimelineName ||
-       mScrollTimelineAxis != aNewData.mScrollTimelineAxis)) {
+       mScrollTimelines != aNewData.mScrollTimelines ||
+       mScrollTimelineNameCount != aNewData.mScrollTimelineNameCount ||
+       mScrollTimelineAxisCount != aNewData.mScrollTimelineAxisCount ||
+       mViewTimelines != aNewData.mViewTimelines ||
+       mViewTimelineNameCount != aNewData.mViewTimelineNameCount ||
+       mViewTimelineAxisCount != aNewData.mViewTimelineAxisCount ||
+       mViewTimelineInsetCount != aNewData.mViewTimelineInsetCount)) {
     hint |= nsChangeHint_NeutralChange;
   }
 

@@ -365,10 +365,15 @@ RawId WebGPUChild::DeviceCreateBuffer(RawId aSelfId,
 
 RawId WebGPUChild::DeviceCreateTexture(RawId aSelfId,
                                        const dom::GPUTextureDescriptor& aDesc) {
-  ffi::WGPUTextureDescriptor desc = {};
+  // Somehow cbindgen does not successfully rename this into
+  // WGPUTextureDescriptor. See wgpu_bindings/cbindgen.toml.
+  ffi::WGPUTextureDescriptor______nsACString__FfiSlice_TextureFormat desc = {};
 
   webgpu::StringHelper label(aDesc.mLabel);
   desc.label = label.Get();
+
+  // TODO: bug 1773723
+  desc.view_formats = {nullptr, 0};
 
   if (aDesc.mSize.IsRangeEnforcedUnsignedLongSequence()) {
     const auto& seq = aDesc.mSize.GetAsRangeEnforcedUnsignedLongSequence();
@@ -729,14 +734,14 @@ RawId WebGPUChild::DeviceCreateComputePipelineImpl(
   ffi::WGPUComputePipelineDescriptor desc = {};
   nsCString label, entryPoint;
   if (aDesc.mLabel.WasPassed()) {
-    LossyCopyUTF16toASCII(aDesc.mLabel.Value(), label);
+    CopyUTF16toUTF8(aDesc.mLabel.Value(), label);
     desc.label = label.get();
   }
   if (aDesc.mLayout.WasPassed()) {
     desc.layout = aDesc.mLayout.Value().mId;
   }
   desc.stage.module = aDesc.mCompute.mModule->mId;
-  LossyCopyUTF16toASCII(aDesc.mCompute.mEntryPoint, entryPoint);
+  CopyUTF16toUTF8(aDesc.mCompute.mEntryPoint, entryPoint);
   desc.stage.entry_point = entryPoint.get();
 
   RawId implicit_bgl_ids[WGPUMAX_BIND_GROUPS] = {};
@@ -851,7 +856,7 @@ RawId WebGPUChild::DeviceCreateRenderPipelineImpl(
   {
     const auto& stage = aDesc.mVertex;
     vertexState.stage.module = stage.mModule->mId;
-    LossyCopyUTF16toASCII(stage.mEntryPoint, vsEntry);
+    CopyUTF16toUTF8(stage.mEntryPoint, vsEntry);
     vertexState.stage.entry_point = vsEntry.get();
 
     for (const auto& vertex_desc : stage.mBuffers) {
@@ -887,7 +892,7 @@ RawId WebGPUChild::DeviceCreateRenderPipelineImpl(
   if (aDesc.mFragment.WasPassed()) {
     const auto& stage = aDesc.mFragment.Value();
     fragmentState.stage.module = stage.mModule->mId;
-    LossyCopyUTF16toASCII(stage.mEntryPoint, fsEntry);
+    CopyUTF16toUTF8(stage.mEntryPoint, fsEntry);
     fragmentState.stage.entry_point = fsEntry.get();
 
     // Note: we pre-collect the blend states into a different array

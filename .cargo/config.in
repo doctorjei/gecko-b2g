@@ -12,7 +12,7 @@ replace-with = "vendored-sources"
 
 [source."https://github.com/FirefoxGraphics/wpf-gpu-raster"]
 git = "https://github.com/FirefoxGraphics/wpf-gpu-raster"
-rev = "e07e3741d1613b1b7ddb85a1120ed4071b3d6a56"
+rev = "a6514854d4518b02f2805719ff6cd74dae7dfde6"
 replace-with = "vendored-sources"
 
 [source."https://github.com/capyloon/b2ghald.git"]
@@ -24,14 +24,19 @@ git = "https://github.com/chris-zen/coremidi.git"
 rev = "fc68464b5445caf111e41f643a2e69ccce0b4f83"
 replace-with = "vendored-sources"
 
+[source."https://github.com/gfx-rs/d3d12-rs"]
+git = "https://github.com/gfx-rs/d3d12-rs"
+rev = "a990c93"
+replace-with = "vendored-sources"
+
 [source."https://github.com/gfx-rs/naga"]
 git = "https://github.com/gfx-rs/naga"
-rev = "e98bd92"
+rev = "1be8024"
 replace-with = "vendored-sources"
 
 [source."https://github.com/gfx-rs/wgpu"]
 git = "https://github.com/gfx-rs/wgpu"
-rev = "fac4731288117d951d0944d96cf0b00fa006dd6c"
+rev = "24a904256e225b20b11fb30f914ef53212a2909e"
 replace-with = "vendored-sources"
 
 [source."https://github.com/glandium/warp"]
@@ -76,7 +81,7 @@ replace-with = "vendored-sources"
 
 [source."https://github.com/mozilla/application-services"]
 git = "https://github.com/mozilla/application-services"
-rev = "51b984ecb21ba00694c3eee33364123a064a7cbb"
+rev = "c6370008f53328529e8bcf06aaa5014dffcd298b"
 replace-with = "vendored-sources"
 
 [source."https://github.com/mozilla/audioipc"]
@@ -101,7 +106,7 @@ replace-with = "vendored-sources"
 
 [source."https://github.com/mozilla/mp4parse-rust"]
 git = "https://github.com/mozilla/mp4parse-rust"
-rev = "3bfc47d9a571d0842676043ba60716318e946c06"
+rev = "eb0b625bd7e888d05ebcfc7685e2501b34c3b374"
 replace-with = "vendored-sources"
 
 [source."https://github.com/mozilla/neqo"]
@@ -121,7 +126,7 @@ replace-with = "vendored-sources"
 
 [source."https://github.com/servo/rust-cssparser"]
 git = "https://github.com/servo/rust-cssparser"
-rev = "722b30d2f1634714befab967ecae627813fa4cf0"
+rev = "d3670a89bae26ba3a8db4758eb7976616113987d"
 replace-with = "vendored-sources"
 
 [source."https://github.com/smol-rs/async-task"]

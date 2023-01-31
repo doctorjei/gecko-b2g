@@ -36,13 +36,7 @@ loader.lazyRequireGetter(
 
 loader.lazyRequireGetter(
   this,
-  "customFormatterHeader",
-  "resource://devtools/server/actors/utils/custom-formatters.js",
-  true
-);
-loader.lazyRequireGetter(
-  this,
-  "customFormatterBody",
+  ["customFormatterHeader", "customFormatterBody"],
   "resource://devtools/server/actors/utils/custom-formatters.js",
   true
 );
@@ -50,9 +44,19 @@ loader.lazyRequireGetter(
 // ContentDOMReference requires ChromeUtils, which isn't available in worker context.
 const lazy = {};
 if (!isWorker) {
-  ChromeUtils.defineESModuleGetters(lazy, {
-    ContentDOMReference: "resource://gre/modules/ContentDOMReference.sys.mjs",
-  });
+  loader.lazyGetter(
+    lazy,
+    "ContentDOMReference",
+    () =>
+      ChromeUtils.importESModule(
+        "resource://gre/modules/ContentDOMReference.sys.mjs",
+        {
+          // ContentDOMReference needs to be retrieved from the shared global
+          // since it is a shared singleton.
+          loadInDevToolsLoader: false,
+        }
+      ).ContentDOMReference
+  );
 }
 
 const {
@@ -94,6 +98,8 @@ const proto = {
       getGripDepth,
       incrementGripDepth,
       decrementGripDepth,
+      customFormatterObjectTagDepth,
+      customFormatterConfig,
     },
     conn
   ) {
@@ -112,6 +118,8 @@ const proto = {
       getGripDepth,
       incrementGripDepth,
       decrementGripDepth,
+      customFormatterObjectTagDepth,
+      customFormatterConfig,
     };
   },
 
@@ -160,7 +168,7 @@ const proto = {
 
     // Only process custom formatters if the feature is enabled.
     if (this.thread?._parent?.customFormatters) {
-      const header = customFormatterHeader(this.rawValue());
+      const header = customFormatterHeader(this);
       if (header) {
         return {
           ...g,
@@ -210,7 +218,7 @@ const proto = {
   },
 
   customFormatterBody(customFormatterIndex) {
-    return customFormatterBody(this.rawValue(), customFormatterIndex);
+    return customFormatterBody(this, customFormatterIndex);
   },
 
   _getOwnPropertyLength() {
@@ -782,7 +790,11 @@ const proto = {
    * Release the actor, when it isn't needed anymore.
    * Protocol.js uses this release method to call the destroy method.
    */
-  release() {},
+  release() {
+    if (this.hooks) {
+      this.hooks.customFormatterConfig = null;
+    }
+  },
 };
 
 exports.ObjectActor = protocol.ActorClassWithSpec(objectSpec, proto);

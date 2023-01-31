@@ -1285,6 +1285,28 @@
   mirror: always
   rust: true
 
+# font-family names for which we'll override use_document_fonts=0, and always
+# use the specified font.
+# This is to support ligature-icon fonts, which render literal strings like
+# "arrow_drop_down" with an icon, even when use_document_fonts is disabled.
+# If an author provides & uses such a font, and we decline to use it, we'll end
+# up rendering these literal strings where the author intended an icon, which
+# can cause all sorts of overlapping/unreadable content.
+- name: browser.display.use_document_fonts.icon_font_allowlist
+  type: String
+  value: >-
+    Material Icons,
+    Material Icons Outlined,
+    Material Icons Round,
+    Material Icons Sharp,
+    Material Icons Two Tone,
+    Google Material Icons,
+    Material Symbols Outlined,
+    Material Symbols Round,
+    Material Symbols Rounded,
+    Material Symbols Sharp
+  mirror: never
+
 - name: browser.display.use_focus_colors
   type: bool
   value: false
@@ -2317,6 +2339,13 @@
   type: bool
   value: false
   mirror: always
+
+# Disable custom highlight API; implementation pending.
+- name: dom.customHighlightAPI.enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+  rust: true
 
 # Allow control characters appear in composition string.
 # When this is false, control characters except
@@ -3926,6 +3955,13 @@
 # pref controls `identity` credential UI for testing. When true, UI is not shown and
 # the first option in the account and provider lists are chosen
 - name: dom.security.credentialmanagement.identity.select_first_in_ui_lists
+  type: bool
+  value: false
+  mirror: always
+
+# pref controls `identity` credential platform behavior for testing. When true,
+# the .well-known file check is not performed.
+- name: dom.security.credentialmanagement.identity.test_ignore_well_known
   type: bool
   value: false
   mirror: always
@@ -6461,11 +6497,6 @@
   value: false
   mirror: once
 
-- name: gfx.use-ahardwarebuffer-content
-  type: bool
-  value: false
-  mirror: once
-
 # Use SurfaceTextures as preferred backend for TextureClient/Host.
 - name: gfx.use-surfacetexture-textures
   type: bool
@@ -7245,6 +7276,19 @@
 - name: image.avif.use-dav1d
   type: RelaxedAtomicBool
   value: true
+  mirror: always
+
+# Whether to allow decoding of animated AVIF sequences.
+- name: image.avif.sequence.enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
+# Whether AVIF files containing sequences should be animated even when the
+# major brand is set to 'avif'.
+- name: image.avif.sequence.animate_avif_major_branded_images
+  type: RelaxedAtomicBool
+  value: false
   mirror: always
 
 # Whether we attempt to decode JXL images or not.
@@ -11285,7 +11329,7 @@
 
 - name: network.cookie.sameSite.laxByDefault
   type: RelaxedAtomicBool
-  value: @IS_EARLY_BETA_OR_EARLIER@
+  value: false
   mirror: always
 
 # lax-by-default 2 minutes tollerance for unsafe methods. The value is in seconds.
@@ -11309,7 +11353,7 @@
 
 - name: network.cookie.sameSite.schemeful
   type: bool
-  value: true
+  value: false
   mirror: always
 
 - name: network.cookie.thirdparty.sessionOnly
@@ -11699,13 +11743,13 @@
 # Enable 103 Early Hint status code (RFC 8297)
 - name: network.early-hints.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: @IS_EARLY_BETA_OR_EARLIER@
   mirror: always
 
 # Enable `Link: rel=preconnect` in 103 Early Hint response.
 - name: network.early-hints.preconnect.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: @IS_EARLY_BETA_OR_EARLIER@
   mirror: always
 
 # How long we should wait for EarlyHintPreloader to be used.
@@ -11793,6 +11837,16 @@
 - name: network.dns.copy_string_before_call
   type: RelaxedAtomicBool
   value: true
+  mirror: always
+
+- name: network.dns.max_high_priority_threads
+  type: RelaxedAtomicUint32
+  value: 5
+  mirror: always
+
+- name: network.dns.max_any_priority_threads
+  type: RelaxedAtomicUint32
+  value: 3
   mirror: always
 
 # The proxy type. See nsIProtocolProxyService.idl
@@ -12785,12 +12839,6 @@
   value: false
   mirror: always
 
-# Whether the pages per sheet print setting is enabled.
-- name: print.pages_per_sheet.enabled
-  type: RelaxedAtomicBool
-  value: true
-  mirror: always
-
 # Whether we attempt to generate links in Save As PDF output.
 - name: print.save_as_pdf.links.enabled
   type: RelaxedAtomicBool
@@ -13039,6 +13087,7 @@
   type: RelaxedAtomicBool
   value: false
   mirror: always
+  do_not_use_directly: true
 
 # We automatically decline canvas permission requests if they are not initiated
 # from user input. Just in case that breaks something, we allow the user to
@@ -14723,11 +14772,6 @@
   value: true
   mirror: always
 
-- name: webgl.enable-ahardwarebuffer
-  type: RelaxedAtomicBool
-  value: false
-  mirror: always
-
 - name: webgl.enable-webgl2
   type: RelaxedAtomicBool
   value: true
@@ -14829,6 +14873,13 @@
   value: true
   mirror: always
 
+#if defined(MOZ_WIDGET_ANDROID)
+- name: webgl.out-of-process.enable-ahardwarebuffer
+  type: bool
+  value: false
+  mirror: once
+#endif
+
 # Override the blocklist to assume that GL is threadsafe.
 - name: webgl.threadsafe-gl.force-enabled
   type: bool
@@ -14843,7 +14894,7 @@
 
 - name: webgl.use-canvas-render-thread
   type: bool
-  value: @IS_NOT_ANDROID@
+  value: true
   mirror: once
 
 - name: webgl.override-unmasked-renderer

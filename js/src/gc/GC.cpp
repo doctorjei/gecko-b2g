@@ -1069,6 +1069,11 @@ bool GCRuntime::setParameter(JSGCParamKey key, uint32_t value,
       updateHelperThreadCount();
       updateMarkersVector();
       break;
+    case JSGC_MARKING_THREAD_COUNT: {
+      markingThreadCount = value;
+      updateMarkersVector();
+      break;
+    }
     case JSGC_MIN_EMPTY_CHUNK_COUNT:
       setMinEmptyChunkCount(value, lock);
       break;
@@ -1136,6 +1141,11 @@ void GCRuntime::resetParameter(JSGCParamKey key, AutoLockGC& lock) {
       updateHelperThreadCount();
       updateMarkersVector();
       break;
+    case JSGC_MARKING_THREAD_COUNT: {
+      markingThreadCount = 0;
+      updateMarkersVector();
+      break;
+    }
     case JSGC_MIN_EMPTY_CHUNK_COUNT:
       setMinEmptyChunkCount(TuningDefaults::MinEmptyChunkCount, lock);
       break;
@@ -1310,8 +1320,12 @@ size_t GCRuntime::markingWorkerCount() const {
     return 1;
   }
 
+  if (markingThreadCount) {
+    return markingThreadCount;
+  }
+
   // Limit parallel marking to use at most two threads initially.
-  return std::min(GetHelperThreadCount(), size_t(2));
+  return 2;
 }
 
 #ifdef DEBUG
@@ -1329,7 +1343,10 @@ bool GCRuntime::updateMarkersVector() {
   MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
   assertNoMarkingWork();
 
-  size_t targetCount = markingWorkerCount();
+  // Limit worker count to number of GC parallel tasks that can run
+  // concurrently, otherwise one thread can deadlock waiting on another.
+  size_t targetCount = std::min(markingWorkerCount(),
+                                HelperThreadState().getGCParallelThreadCount());
 
   if (markers.length() > targetCount) {
     return markers.resize(targetCount);
@@ -2918,6 +2935,17 @@ void GCRuntime::updateSchedulingStateOnGCStart() {
   }
 }
 
+inline bool GCRuntime::canMarkInParallel() const {
+#if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
+  // OOM testing limits the engine to using a single helper thread.
+  if (oom::simulator.targetThread() == THREAD_TYPE_GCPARALLEL) {
+    return false;
+  }
+#endif
+
+  return markers.length() > 1;
+}
+
 IncrementalProgress GCRuntime::markUntilBudgetExhausted(
     SliceBudget& sliceBudget, ParallelMarking allowParallelMarking,
     ShouldReportMarkTime reportTime) {
@@ -2929,7 +2957,8 @@ IncrementalProgress GCRuntime::markUntilBudgetExhausted(
     return NotFinished;
   }
 
-  if (allowParallelMarking && parallelMarkingEnabled) {
+  if (allowParallelMarking && canMarkInParallel()) {
+    MOZ_ASSERT(parallelMarkingEnabled);
     MOZ_ASSERT(reportTime);
     MOZ_ASSERT(!isBackgroundMarking());
 
@@ -3496,9 +3525,11 @@ void GCRuntime::incrementalSlice(SliceBudget& budget, JS::GCReason reason,
 #endif
 
 #ifdef DEBUG
-  stats().log("Incremental: %d, lastMarkSlice: %d, useZeal: %d, budget: %s",
-              bool(isIncremental), bool(lastMarkSlice), bool(useZeal),
-              DescribeBudget(budget));
+  stats().log(
+      "Incremental: %d, lastMarkSlice: %d, useZeal: %d, budget: %s, "
+      "budgetWasIncreased: %d",
+      bool(isIncremental), bool(lastMarkSlice), bool(useZeal),
+      DescribeBudget(budget), budgetWasIncreased);
 #endif
 
   if (useZeal && hasIncrementalTwoSliceZealMode()) {
@@ -3895,11 +3926,18 @@ bool GCRuntime::maybeIncreaseSliceBudget(SliceBudget& budget) {
   return wasIncreasedForLongCollections || wasIncreasedForUgentCollections;
 }
 
-static void ExtendBudget(SliceBudget& budget, double newDuration) {
+// Return true if the budget is actually extended after rounding.
+static bool ExtendBudget(SliceBudget& budget, double newDuration) {
+  long newDurationMS = lround(newDuration);
+  if (newDurationMS <= budget.timeBudget()) {
+    return false;
+  }
+
   bool idleTriggered = budget.idle;
   budget = SliceBudget(TimeBudget(newDuration), nullptr);  // Uninterruptible.
   budget.idle = idleTriggered;
   budget.extended = true;
+  return true;
 }
 
 bool GCRuntime::maybeIncreaseSliceBudgetForLongCollections(
@@ -3921,12 +3959,7 @@ bool GCRuntime::maybeIncreaseSliceBudgetForLongCollections(
       LinearInterpolate(totalTime, MinBudgetStart.time, MinBudgetStart.budget,
                         MinBudgetEnd.time, MinBudgetEnd.budget);
 
-  if (budget.timeBudget() >= minBudget) {
-    return false;
-  }
-
-  ExtendBudget(budget, minBudget);
-  return true;
+  return ExtendBudget(budget, minBudget);
 }
 
 bool GCRuntime::maybeIncreaseSliceBudgetForUrgentCollections(
@@ -3954,10 +3987,7 @@ bool GCRuntime::maybeIncreaseSliceBudgetForUrgentCollections(
     double fractionRemaining =
         double(minBytesRemaining) / double(tunables.urgentThresholdBytes());
     double minBudget = double(defaultSliceBudgetMS()) / fractionRemaining;
-    if (budget.timeBudget() < minBudget) {
-      ExtendBudget(budget, minBudget);
-      return true;
-    }
+    return ExtendBudget(budget, minBudget);
   }
 
   return false;

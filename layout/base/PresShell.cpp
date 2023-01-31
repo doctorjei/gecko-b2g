@@ -5515,8 +5515,9 @@ PresShell::CanvasBackground PresShell::ComputeCanvasBackground() const {
 
 nscolor PresShell::ComputeBackstopColor(nsView* aDisplayRoot) {
   nsIWidget* widget = aDisplayRoot->GetWidget();
-  if (widget && (widget->GetTransparencyMode() != eTransparencyOpaque ||
-                 widget->WidgetPaintsBackground())) {
+  if (widget &&
+      (widget->GetTransparencyMode() != widget::TransparencyMode::Opaque ||
+       widget->WidgetPaintsBackground())) {
     // Within a transparent widget, so the backstop color must be
     // totally transparent.
     return NS_RGBA(0, 0, 0, 0);
@@ -5687,7 +5688,7 @@ static nsView* FindViewContaining(nsView* aRelativeToView,
                                   nsView* aView, nsPoint aPt) {
   MOZ_ASSERT(aRelativeToView->GetFrame());
 
-  if (aView->GetVisibility() == nsViewVisibility_kHide) {
+  if (aView->GetVisibility() == ViewVisibility::Hide) {
     return nullptr;
   }
 
@@ -8694,7 +8695,8 @@ nsresult PresShell::EventHandler::DispatchEventToDOM(
     }
   }
   if (eventTarget) {
-    if (aEvent->IsBlockedForFingerprintingResistance()) {
+    if (eventTarget->OwnerDoc()->ShouldResistFingerprinting() &&
+        aEvent->IsBlockedForFingerprintingResistance()) {
       aEvent->mFlags.mOnlySystemGroupDispatchInContent = true;
     } else if (aEvent->mMessage == eKeyPress) {
       // If eKeyPress event is marked as not dispatched in the default event
@@ -8912,7 +8914,7 @@ bool PresShell::EventHandler::AdjustContextMenuKeyEvent(
   // if a menu is open, open the context menu relative to the active item on the
   // menu.
   if (nsXULPopupManager* pm = nsXULPopupManager::GetInstance()) {
-    nsIFrame* popupFrame = pm->GetTopPopup(ePopupTypeMenu);
+    nsIFrame* popupFrame = pm->GetTopPopup(widget::PopupType::Menu);
     if (popupFrame) {
       nsIFrame* itemFrame = (static_cast<nsMenuPopupFrame*>(popupFrame))
                                 ->GetCurrentMenuItemFrame();

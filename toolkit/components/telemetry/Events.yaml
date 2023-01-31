@@ -474,11 +474,11 @@ blocklist:
         This field is documented in more detail in the definition of the blocklist.mlbf_source scalar.
         Possible values are "dump_match", "cache_match", "remote_match", "dump_fallback", "cache_fallback", "unknown".
     notification_emails: ["addons-dev-internal@mozilla.com", "rwu@mozilla.com"]
-    expiry_version: "112"
+    expiry_version: "122"
     products:
       - "firefox"
     record_in_processes: ["main"]
-    bug_numbers: [1662857, 1730037, 1763529]
+    bug_numbers: [1662857, 1730037, 1763529, 1811159]
     release_channel_collection: opt-out
 
 downloads:
@@ -573,7 +573,7 @@ address:
                   `filled`, `not_filled`, `user_filled` or `unavailable`
         'filled_modified': Recorded when a field is autofilled and then modified by the user.
                            Using field_name to record the field that triggers this event.
-        'submitted': Recorded when a form is submitted. Possible values are `autofilled`, `user_filled` or `unavailable`
+        'submitted': Recorded when a form is submitted. Possible values are `autofilled`, `not_filled`, `user_filled` or `unavailable`
         'cleared' Recorded when a form is cleared . Using field_name to record the field that triggers this event
     objects: ["address_form"]
     methods: ["detected", "popup_shown", "filled", "filled_modified", "submitted", "cleared"]
@@ -755,9 +755,9 @@ extensions.data:
       the value of this event is the addon id.
   storageLocalError:
     objects: ["get", "set", "remove", "clear"]
-    bug_numbers: [1606903, 1649948, 1689255, 1730038, 1763523]
+    bug_numbers: [1606903, 1649948, 1689255, 1730038, 1763523, 1811148]
     notification_emails: ["addons-dev-internal@mozilla.com"]
-    expiry_version: "112"
+    expiry_version: "122"
     products:
       - "firefox"
     record_in_processes: ["main", "content"]

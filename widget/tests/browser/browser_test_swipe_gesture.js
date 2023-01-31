@@ -1,6 +1,5 @@
 /* -*- Mode: indent-tabs-mode: nil; js-indent-level: 2 -*- */
 /* vim: set sts=2 sw=2 et tw=80: */
-/* import-globals-from ../../..//gfx/layers/apz/test/mochitest/apz_test_native_event_utils.js */
 
 "use strict";
 
@@ -582,7 +581,14 @@ add_task(async () => {
   let transitionPromise = new Promise(resolve => {
     gHistorySwipeAnimation._prevBox.addEventListener(
       "transitionstart",
-      resolve,
+      event => {
+        if (
+          event.propertyName == "opacity" &&
+          event.target == gHistorySwipeAnimation._prevBox
+        ) {
+          resolve();
+        }
+      },
       { once: true }
     );
   });
@@ -601,6 +607,50 @@ add_task(async () => {
     return (
       gHistorySwipeAnimation._prevBox == null &&
       gHistorySwipeAnimation._nextBox == null
+    );
+  });
+
+  // Navigate forward and check the forward navigation icon box state.
+  startLoadingPromise = BrowserTestUtils.browserStarted(
+    tab.linkedBrowser,
+    secondPage
+  );
+  stoppedLoadingPromise = BrowserTestUtils.browserStopped(
+    tab.linkedBrowser,
+    secondPage
+  );
+
+  await panRightToLeftBegin(tab.linkedBrowser, 100, 100, 100);
+
+  ok(gHistorySwipeAnimation._nextBox != null, "should have nextbox");
+  transitionPromise = new Promise(resolve => {
+    gHistorySwipeAnimation._nextBox.addEventListener(
+      "transitionstart",
+      event => {
+        if (
+          event.propertyName == "opacity" &&
+          event.target == gHistorySwipeAnimation._nextBox
+        ) {
+          resolve();
+        }
+      }
+    );
+  });
+
+  await panRightToLeftUpdate(tab.linkedBrowser, 100, 100, 100);
+  await panRightToLeftEnd(tab.linkedBrowser, 100, 100, 100);
+
+  // Make sure the gesture triggered going forward to the next page.
+  await Promise.all([startLoadingPromise, stoppedLoadingPromise]);
+
+  ok(gBrowser.webNavigation.canGoBack);
+
+  await transitionPromise;
+
+  await TestUtils.waitForCondition(() => {
+    return (
+      gHistorySwipeAnimation._nextBox == null &&
+      gHistorySwipeAnimation._prevBox == null
     );
   });
 
@@ -830,7 +880,7 @@ add_task(async () => {
   await SpecialPowers.pushPrefEnv({
     set: [
       ["browser.gesture.swipe.left", "Browser:BackOrBackDuplicate"],
-      ["browser.gesture.swipe.eight", "Browser:ForwardOrForwardDuplicate"],
+      ["browser.gesture.swipe.right", "Browser:ForwardOrForwardDuplicate"],
       ["widget.disable-swipe-tracker", false],
       ["widget.swipe.velocity-twitch-tolerance", 0.0000001],
       ["widget.swipe.success-velocity-contribution", 0.5],
@@ -885,6 +935,90 @@ add_task(async () => {
   );
 
   ok(!isOverscrolled, "The root scroller should not have overscrolled");
+
+  await panLeftToRightEnd(tab.linkedBrowser, 100, 100, 0);
+
+  BrowserTestUtils.removeTab(tab);
+  await SpecialPowers.popPrefEnv();
+});
+
+add_task(async () => {
+  await SpecialPowers.pushPrefEnv({
+    set: [
+      ["browser.gesture.swipe.left", "Browser:BackOrBackDuplicate"],
+      ["browser.gesture.swipe.right", "Browser:ForwardOrForwardDuplicate"],
+      ["widget.disable-swipe-tracker", false],
+      ["widget.swipe.velocity-twitch-tolerance", 0.0000001],
+      ["widget.swipe.success-velocity-contribution", 0.5],
+    ],
+  });
+
+  // Load three pages and go to the second page so that it can be navigated
+  // to both back and forward.
+  const tab = await BrowserTestUtils.openNewForegroundTab(
+    gBrowser,
+    "about:about",
+    true /* waitForLoad */
+  );
+
+  BrowserTestUtils.loadURIString(tab.linkedBrowser, "about:mozilla");
+  await BrowserTestUtils.browserLoaded(
+    tab.linkedBrowser,
+    false /* includeSubFrames */,
+    "about:mozilla"
+  );
+
+  BrowserTestUtils.loadURIString(tab.linkedBrowser, "about:home");
+  await BrowserTestUtils.browserLoaded(
+    tab.linkedBrowser,
+    false /* includeSubFrames */,
+    "about:home"
+  );
+
+  gBrowser.goBack();
+  await BrowserTestUtils.browserLoaded(
+    tab.linkedBrowser,
+    false /* includeSubFrames */,
+    "about:mozilla"
+  );
+
+  // Make sure we can go back and go forward.
+  ok(gBrowser.webNavigation.canGoBack);
+  ok(gBrowser.webNavigation.canGoForward);
+
+  // Start a history back pan gesture but keep touching.
+  await panLeftToRightBegin(tab.linkedBrowser, 100, 100, 1);
+
+  ok(
+    !gHistorySwipeAnimation._prevBox.collapsed,
+    "The icon box for the previous navigation should NOT be collapsed"
+  );
+  ok(
+    gHistorySwipeAnimation._nextBox.collapsed,
+    "The icon box for the next navigation should be collapsed"
+  );
+
+  // Pan back to the opposite direction so that the gesture should be cancelled.
+  // eslint-disable-next-line no-undef
+  await NativePanHandler.promiseNativePanEvent(
+    tab.linkedBrowser,
+    100,
+    100,
+    // eslint-disable-next-line no-undef
+    NativePanHandler.delta,
+    0,
+    // eslint-disable-next-line no-undef
+    NativePanHandler.updatePhase
+  );
+
+  ok(
+    gHistorySwipeAnimation._prevBox.collapsed,
+    "The icon box for the previous navigation should be collapsed"
+  );
+  ok(
+    gHistorySwipeAnimation._nextBox.collapsed,
+    "The icon box for the next navigation should be collapsed"
+  );
 
   await panLeftToRightEnd(tab.linkedBrowser, 100, 100, 0);
 

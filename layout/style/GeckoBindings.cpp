@@ -1132,12 +1132,22 @@ static void EnsureStyleAutoArrayLength(StyleType* aArray, size_t aLen) {
 }
 
 void Gecko_EnsureStyleAnimationArrayLength(void* aArray, size_t aLen) {
-  auto base = static_cast<nsStyleAutoArray<StyleAnimation>*>(aArray);
+  auto* base = static_cast<nsStyleAutoArray<StyleAnimation>*>(aArray);
   EnsureStyleAutoArrayLength(base, aLen);
 }
 
 void Gecko_EnsureStyleTransitionArrayLength(void* aArray, size_t aLen) {
-  auto base = reinterpret_cast<nsStyleAutoArray<StyleTransition>*>(aArray);
+  auto* base = reinterpret_cast<nsStyleAutoArray<StyleTransition>*>(aArray);
+  EnsureStyleAutoArrayLength(base, aLen);
+}
+
+void Gecko_EnsureStyleScrollTimelineArrayLength(void* aArray, size_t aLen) {
+  auto* base = static_cast<nsStyleAutoArray<StyleScrollTimeline>*>(aArray);
+  EnsureStyleAutoArrayLength(base, aLen);
+}
+
+void Gecko_EnsureStyleViewTimelineArrayLength(void* aArray, size_t aLen) {
+  auto* base = static_cast<nsStyleAutoArray<StyleViewTimeline>*>(aArray);
   EnsureStyleAutoArrayLength(base, aLen);
 }
 
@@ -1706,6 +1716,10 @@ bool Gecko_IsFontFormatSupported(StyleFontFaceSourceFormatKeyword aFormat) {
 bool Gecko_IsFontTechSupported(StyleFontFaceSourceTechFlags aFlag) {
   return gfxPlatform::GetPlatform()->IsFontFormatSupported(
       StyleFontFaceSourceFormatKeyword::None, aFlag);
+}
+
+bool Gecko_IsKnownIconFontFamily(const nsAtom* aFamilyName) {
+  return gfxPlatform::GetPlatform()->IsKnownIconFontFamily(aFamilyName);
 }
 
 bool Gecko_IsInServoTraversal() { return ServoStyleSet::IsInServoTraversal(); }
