@@ -410,12 +410,12 @@ version = "1.1.0"
 
 [[package]]
 name = "b2ghald"
-version = "0.1.0"
-source = "git+https://github.com/capyloon/b2ghald.git#81cc33f16a8505c26032f513fdb1c6a754869c63"
+version = "0.1.1"
+source = "git+https://github.com/capyloon/b2ghald.git#d40ecba1d578d34f1b9af9f984bd68d587117d22"
 dependencies = [
  "bincode",
  "clap",
- "env_logger 0.9.3",
+ "env_logger 0.9.999",
  "log",
  "nix 0.25.1",
  "serde",
