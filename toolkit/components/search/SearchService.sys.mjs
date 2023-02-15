@@ -1356,11 +1356,9 @@ export class SearchService {
    * called from init(). Any subsequent updates to the remote settings are
    * handled via a sync listener.
    *
-   * For desktop, the initial remote settings are obtained from dumps in
+   * Dumps of remote settings should be available locally to avoid waiting
+   * for the network on startup. For desktop, the dumps are located in
    * `services/settings/dumps/main/`.
-   *
-   * When enabling for Android, be aware the dumps are not shipped there, and
-   * hence the `get` may take a while to return.
    */
   async #setupRemoteSettings() {
     // Now we have the values, listen for future updates.
@@ -1434,10 +1432,7 @@ export class SearchService {
     if (this.#loadPathIgnoreList.includes(engine._loadPath)) {
       return true;
     }
-    let url = engine
-      ._getURLOfType("text/html")
-      .getSubmission("dummy", engine)
-      .uri.spec.toLowerCase();
+    let url = engine.searchURLWithNoTerms.spec.toLowerCase();
     if (
       this.#submissionURLIgnoreList.some(code =>
         url.includes(code.toLowerCase())
@@ -1774,6 +1769,11 @@ export class SearchService {
 
     for (let engine of oldEngineList) {
       if (!engine.isAppProvided) {
+        if (engine instanceof lazy.AddonSearchEngine) {
+          // If this is an add-on search engine, check to see if it needs
+          // an update.
+          await engine.update();
+        }
         continue;
       }
 
@@ -2502,7 +2502,7 @@ export class SearchService {
     for (let elem of this._engines) {
       engine = elem[1];
       if (engine instanceof lazy.OpenSearchEngine) {
-        searchURI = engine.getSubmission("").uri;
+        searchURI = engine.searchURLWithNoTerms;
         updateURI = engine._updateURI;
 
         if (lazy.SearchUtils.isSecureURIForOpenSearch(searchURI)) {
@@ -2511,8 +2511,6 @@ export class SearchService {
           totalInsecure++;
         }
 
-        // Note: there is a possibility that an OpenSearch engine doesn't have
-        // an updateURI at all, hence the else if clause below
         if (updateURI && lazy.SearchUtils.isSecureURIForOpenSearch(updateURI)) {
           totalWithSecureUpdates++;
         } else if (updateURI) {
@@ -2981,17 +2979,13 @@ export class SearchService {
 
     if (!sendSubmissionURL) {
       // ... or engines that are the same domain as a default engine.
-      let engineHost = engine._getURLOfType(lazy.SearchUtils.URL_TYPE.SEARCH)
-        .templateHost;
+      let engineHost = engine.getResultDomain();
       for (let innerEngine of this._engines.values()) {
         if (!innerEngine.isAppProvided) {
           continue;
         }
 
-        let innerEngineURL = innerEngine._getURLOfType(
-          lazy.SearchUtils.URL_TYPE.SEARCH
-        );
-        if (innerEngineURL.templateHost == engineHost) {
+        if (innerEngine.getResultDomain() == engineHost) {
           sendSubmissionURL = true;
           break;
         }
@@ -3009,9 +3003,7 @@ export class SearchService {
     }
 
     if (sendSubmissionURL) {
-      let uri = engine
-        ._getURLOfType("text/html")
-        .getSubmission("", engine, "searchbar").uri;
+      let uri = engine.searchURLWithNoTerms;
       uri = uri
         .mutate()
         .setUserPass("") // Avoid reporting a username or password.

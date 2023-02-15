@@ -214,7 +214,7 @@ impl super::Device {
             profiling::scope!("naga::back::hlsl::write");
             writer
                 .write(module, &stage.module.naga.info)
-                .map_err(|e| crate::PipelineError::Linkage(stage_bit, format!("HLSL: {:?}", e)))?
+                .map_err(|e| crate::PipelineError::Linkage(stage_bit, format!("HLSL: {e:?}")))?
         };
 
         let full_stage = format!(
@@ -231,7 +231,7 @@ impl super::Device {
 
         let raw_ep = reflection_info.entry_point_names[ep_index]
             .as_ref()
-            .map_err(|e| crate::PipelineError::Linkage(stage_bit, format!("{}", e)))?;
+            .map_err(|e| crate::PipelineError::Linkage(stage_bit, format!("{e}")))?;
 
         let source_name = stage
             .module
@@ -1070,6 +1070,7 @@ impl crate::Device<super::Api> for super::Device {
                 fake_missing_bindings: false,
                 special_constants_binding,
                 push_constants_target,
+                zero_initialize_workgroup_memory: true,
             },
         })
     }

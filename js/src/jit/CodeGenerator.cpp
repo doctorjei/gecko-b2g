@@ -348,6 +348,7 @@ void CodeGenerator::callVMInternal(VMFunctionId id, LInstruction* ins) {
   // when returning from the call.  Failures are handled with exceptions based
   // on the return value of the C functions.  To guard the outcome of the
   // returned value, use another LIR instruction.
+  ensureOsiSpace();
   uint32_t callOffset = masm.callJit(code);
   markSafepointAt(callOffset, ins);
 
@@ -4888,17 +4889,27 @@ static void EmitPostWriteBarrier(MacroAssembler& masm, CompileRuntime* runtime,
   Label callVM;
   Label exit;
 
+  Register temp = regs.takeAny();
+
   // We already have a fast path to check whether a global is in the store
   // buffer.
-  if (!isGlobal && maybeConstant) {
-    EmitStoreBufferCheckForConstant(masm, &maybeConstant->asTenured(), regs,
-                                    &exit, &callVM);
+  if (!isGlobal) {
+    if (maybeConstant) {
+      // Check store buffer bitmap directly for known object.
+      EmitStoreBufferCheckForConstant(masm, &maybeConstant->asTenured(), regs,
+                                      &exit, &callVM);
+    } else {
+      // Check one element cache to avoid VM call.
+      masm.loadPtr(AbsoluteAddress(runtime->addressOfLastBufferedWholeCell()),
+                   temp);
+      masm.branchPtr(Assembler::Equal, temp, objreg, &exit);
+    }
   }
 
   // Call into the VM to barrier the write.
   masm.bind(&callVM);
 
-  Register runtimereg = regs.takeAny();
+  Register runtimereg = temp;
   masm.mov(ImmPtr(runtime), runtimereg);
 
   masm.setupAlignedABICall();
@@ -5221,6 +5232,7 @@ void CodeGenerator::visitCallNative(LCallNative* call) {
       native = jitInfo->ignoresReturnValueMethod;
     }
   }
+  ensureOsiSpace();
   masm.callWithABI(DynamicFunction<JSNative>(native), MoveOp::GENERAL,
                    CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
@@ -5367,6 +5379,7 @@ void CodeGenerator::visitCallDOMNative(LCallDOMNative* call) {
   masm.passABIArg(argObj);
   masm.passABIArg(argPrivate);
   masm.passABIArg(argArgs);
+  ensureOsiSpace();
   masm.callWithABI(DynamicFunction<JSJitMethodOp>(target->jitInfo()->method),
                    MoveOp::GENERAL,
                    CheckUnsafeCallWithABI::DontCheckHasExitFrame);
@@ -5520,6 +5533,7 @@ void CodeGenerator::visitCallGeneric(LCallGeneric* call) {
 
   // Finally call the function in objreg.
   masm.bind(&makeCall);
+  ensureOsiSpace();
   uint32_t callOffset = masm.callJit(objreg);
   markSafepointAt(callOffset, call);
 
@@ -5604,6 +5618,7 @@ void CodeGenerator::visitCallKnown(LCallKnown* call) {
   masm.PushFrameDescriptorForJitCall(FrameType::IonJS, call->numActualArgs());
 
   // Finally call the function in objreg.
+  ensureOsiSpace();
   uint32_t callOffset = masm.callJit(objreg);
   markSafepointAt(callOffset, call);
 
@@ -6085,6 +6100,7 @@ void CodeGenerator::emitApplyGeneric(T* apply) {
 
     // Finally call the function in objreg, as assigned by one of the paths
     // above.
+    ensureOsiSpace();
     uint32_t callOffset = masm.callJit(objreg);
     markSafepointAt(callOffset, apply);
 
@@ -13304,10 +13320,6 @@ bool CodeGenerator::link(JSContext* cx, const WarpSnapshot* snapshot) {
     return false;
   }
 
-  // Check to make sure we didn't have a mid-build invalidation. If so, we
-  // will trickle to jit::Compile() and return Method_Skipped.
-  uint32_t warmUpCount = script->getWarmUpCount();
-
   IonCompilationId compilationId =
       cx->runtime()->jitRuntime()->nextCompilationId();
   JitZone* jitZone = cx->zone()->jitZone();
@@ -13327,14 +13339,6 @@ bool CodeGenerator::link(JSContext* cx, const WarpSnapshot* snapshot) {
   }
   if (!isValid) {
     return true;
-  }
-
-  // IonMonkey could have inferred better type information during
-  // compilation. Since adding the new information to the actual type
-  // information can reset the usecount, increase it back to what it was
-  // before.
-  if (warmUpCount > script->getWarmUpCount()) {
-    script->incWarmUpCounter(warmUpCount - script->getWarmUpCount());
   }
 
   uint32_t argumentSlots = (gen->outerInfo().nargs() + 1) * sizeof(Value);
@@ -15608,6 +15612,7 @@ void CodeGenerator::visitGetDOMProperty(LGetDOMProperty* ins) {
   masm.passABIArg(ObjectReg);
   masm.passABIArg(PrivateReg);
   masm.passABIArg(ValueReg);
+  ensureOsiSpace();
   masm.callWithABI(DynamicFunction<JSJitGetterOp>(ins->mir()->fun()),
                    MoveOp::GENERAL,
                    CheckUnsafeCallWithABI::DontCheckHasExitFrame);
@@ -15728,6 +15733,7 @@ void CodeGenerator::visitSetDOMProperty(LSetDOMProperty* ins) {
   masm.passABIArg(ObjectReg);
   masm.passABIArg(PrivateReg);
   masm.passABIArg(ValueReg);
+  ensureOsiSpace();
   masm.callWithABI(DynamicFunction<JSJitSetterOp>(ins->mir()->fun()),
                    MoveOp::GENERAL,
                    CheckUnsafeCallWithABI::DontCheckHasExitFrame);
@@ -17926,6 +17932,7 @@ void CodeGenerator::emitIonToWasmCallBase(LIonToWasmCallBase<NumDefs>* lir) {
   Register scratch = ToRegister(lir->temp());
 
   uint32_t callOffset;
+  ensureOsiSpace();
   GenerateDirectCallFromJit(masm, funcExport, instObj->instance(), stackArgs,
                             scratch, &callOffset);
 

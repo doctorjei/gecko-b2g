@@ -145,9 +145,6 @@ const nsIID kDEBUGWorkerEventTargetIID = {
 
 #endif
 
-// The number of nested timeouts before we start clamping. HTML says 5.
-const uint32_t kClampTimeoutNestingLevel = 5u;
-
 template <class T>
 class UniquePtrComparator {
   using A = UniquePtr<T>;
@@ -1032,17 +1029,19 @@ struct WorkerPrivate::TimeoutInfo {
   }
 
   void AccumulateNestingLevel(const uint32_t& aBaseLevel) {
-    if (aBaseLevel < kClampTimeoutNestingLevel) {
+    if (aBaseLevel < StaticPrefs::dom_clamp_timeout_nesting_level_AtStartup()) {
       mNestingLevel = aBaseLevel + 1;
       return;
     }
-    mNestingLevel = kClampTimeoutNestingLevel;
+    mNestingLevel = StaticPrefs::dom_clamp_timeout_nesting_level_AtStartup();
   }
 
   void CalculateTargetTime() {
     auto target = mInterval;
     // Don't clamp timeout for chrome workers
-    if (mNestingLevel >= kClampTimeoutNestingLevel && !mOnChromeWorker) {
+    if (mNestingLevel >=
+            StaticPrefs::dom_clamp_timeout_nesting_level_AtStartup() &&
+        !mOnChromeWorker) {
       target = TimeDuration::Max(
           mInterval,
           TimeDuration::FromMilliseconds(StaticPrefs::dom_min_timeout_value()));
@@ -2591,9 +2590,9 @@ already_AddRefed<WorkerPrivate> WorkerPrivate::Constructor(
   if (!aLoadInfo) {
     stackLoadInfo.emplace();
 
-    nsresult rv =
-        GetLoadInfo(aCx, nullptr, parent, aScriptURL, aIsChromeWorker,
-                    InheritLoadGroup, aWorkerKind, stackLoadInfo.ptr());
+    nsresult rv = GetLoadInfo(
+        aCx, nullptr, parent, aScriptURL, aWorkerType, aRequestCredentials,
+        aIsChromeWorker, InheritLoadGroup, aWorkerKind, stackLoadInfo.ptr());
     aRv.MightThrowJSException();
     if (NS_FAILED(rv)) {
       workerinternals::ReportLoadError(aRv, rv, aScriptURL);
@@ -2715,13 +2714,12 @@ nsresult WorkerPrivate::SetIsDebuggerReady(bool aReady) {
 }
 
 // static
-nsresult WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
-                                    WorkerPrivate* aParent,
-                                    const nsAString& aScriptURL,
-                                    bool aIsChromeWorker,
-                                    LoadGroupBehavior aLoadGroupBehavior,
-                                    WorkerKind aWorkerKind,
-                                    WorkerLoadInfo* aLoadInfo) {
+nsresult WorkerPrivate::GetLoadInfo(
+    JSContext* aCx, nsPIDOMWindowInner* aWindow, WorkerPrivate* aParent,
+    const nsAString& aScriptURL, const enum WorkerType& aWorkerType,
+    const RequestCredentials& aCredentials, bool aIsChromeWorker,
+    LoadGroupBehavior aLoadGroupBehavior, WorkerKind aWorkerKind,
+    WorkerLoadInfo* aLoadInfo) {
   using namespace mozilla::dom::workerinternals;
 
   MOZ_ASSERT(aCx);
@@ -2751,7 +2749,8 @@ nsresult WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
 
     // Passing a pointer to our stack loadInfo is safe here because this
     // method uses a sync runnable to get the channel from the main thread.
-    rv = ChannelFromScriptURLWorkerThread(aCx, aParent, aScriptURL, loadInfo);
+    rv = ChannelFromScriptURLWorkerThread(aCx, aParent, aScriptURL, aWorkerType,
+                                          aCredentials, loadInfo);
     if (NS_FAILED(rv)) {
       MOZ_ALWAYS_TRUE(loadInfo.ProxyReleaseMainThreadObjects(aParent));
       return rv;
@@ -3023,8 +3022,9 @@ nsresult WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
 
     rv = ChannelFromScriptURLMainThread(
         loadInfo.mLoadingPrincipal, document, loadInfo.mLoadGroup, url,
-        clientInfo, ContentPolicyType(aWorkerKind), loadInfo.mCookieJarSettings,
-        loadInfo.mReferrerInfo, getter_AddRefs(loadInfo.mChannel));
+        aWorkerType, aCredentials, clientInfo, ContentPolicyType(aWorkerKind),
+        loadInfo.mCookieJarSettings, loadInfo.mReferrerInfo,
+        getter_AddRefs(loadInfo.mChannel));
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = NS_GetFinalChannelURI(loadInfo.mChannel,
@@ -4450,8 +4450,6 @@ void WorkerPrivate::DispatchCancelingRunnable() {
 void WorkerPrivate::ReportUseCounters() {
   AssertIsOnWorkerThread();
 
-  static const bool kDebugUseCounters = false;
-
   if (mReportedUseCounters) {
     return;
   }
@@ -4477,13 +4475,15 @@ void WorkerPrivate::ReportUseCounters() {
       return;
   }
 
-  if (kDebugUseCounters) {
+  Maybe<nsCString> workerPathForLogging;
+  const bool dumpCounters = StaticPrefs::dom_use_counters_dump_worker();
+  if (dumpCounters) {
     nsAutoCString path(Domain());
     path.AppendLiteral("(");
     NS_ConvertUTF16toUTF8 script(ScriptURL());
     path.Append(script);
-    path.AppendPrintf(", 0x%p)", static_cast<void*>(this));
-    printf("-- Worker use counters for %s --\n", path.get());
+    path.AppendPrintf(", 0x%p)", this);
+    workerPathForLogging.emplace(std::move(path));
   }
 
   static_assert(
@@ -4499,18 +4499,19 @@ void WorkerPrivate::ReportUseCounters() {
   for (size_t c = 0; c < count; ++c) {
     // Histograms for worker use counters use the same order as the worker kinds
     // , so we can use the worker kind to index to corresponding histogram.
-    Telemetry::HistogramID id = static_cast<Telemetry::HistogramID>(
+    auto id = static_cast<Telemetry::HistogramID>(
         Telemetry::HistogramFirstUseCounterWorker + c * factor + kind);
     MOZ_ASSERT(id <= Telemetry::HistogramLastUseCounterWorker);
 
-    if (bool value = GetUseCounter(static_cast<UseCounterWorker>(c))) {
-      Telemetry::Accumulate(id, 1);
-
-      if (kDebugUseCounters) {
-        const char* name = Telemetry::GetHistogramName(id);
-        printf("  %s  #%d: %d\n", name, id, value);
-      }
+    if (!GetUseCounter(static_cast<UseCounterWorker>(c))) {
+      continue;
     }
+    if (dumpCounters) {
+      printf_stderr("USE_COUNTER_WORKER: %s - %s\n",
+                    Telemetry::GetHistogramName(id),
+                    workerPathForLogging->get());
+    }
+    Telemetry::Accumulate(id, 1);
   }
 }
 

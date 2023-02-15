@@ -268,6 +268,7 @@ RefPtr<U2FSignPromise> CTAPHIDTokenManager::Sign(
   appIds.AppendElement(rpIdHash.InfallibleClone());
 
   Maybe<nsTArray<uint8_t>> appIdHashExt = Nothing();
+  nsCString appId;
 
   if (aInfo.Extra().isSome()) {
     const auto& extra = aInfo.Extra().ref();
@@ -281,6 +282,8 @@ RefPtr<U2FSignPromise> CTAPHIDTokenManager::Sign(
     // Process extensions.
     for (const WebAuthnExtension& ext : extra.Extensions()) {
       if (ext.type() == WebAuthnExtension::TWebAuthnExtensionAppId) {
+        appId = NS_ConvertUTF16toUTF8(
+            ext.get_WebAuthnExtensionAppId().appIdentifier());
         appIdHashExt = Some(ext.get_WebAuthnExtensionAppId().AppId().Clone());
         appIds.AppendElement(appIdHashExt->Clone());
       }
@@ -302,7 +305,7 @@ RefPtr<U2FSignPromise> CTAPHIDTokenManager::Sign(
     };
     tid = rust_ctap2_mgr_sign(
         mCTAPManager, (uint64_t)aInfo.TimeoutMS(), ctap2_sign_callback,
-        status_callback, challenge, rpId.get(),
+        status_callback, challenge, rpId.get(), appId.get(),
         NS_ConvertUTF16toUTF8(aInfo.Origin()).get(),
         Ctap2PubKeyCredentialDescriptor(aInfo.AllowList()).Get(), options,
         nullptr);
@@ -414,6 +417,18 @@ void CTAPHIDTokenManager::HandleRegisterResultCtap2(
     return;
   }
 
+  nsTArray<uint8_t> credentialId;
+  if (!aResult->Ctap2CopyCredentialId(credentialId)) {
+    mRegisterPromise.Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
+    return;
+  }
+
+  CryptoBuffer keyHandle;
+  if (!keyHandle.Assign(credentialId)) {
+    mRegisterPromise.Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
+    return;
+  }
+
   // We would have a copy of the client data stored inside mTransaction,
   // but we need the one from authenticator-rs, as that data is part of
   // the signed payload. If we reorder the JSON-values (e.g. by sorting the
@@ -429,7 +444,7 @@ void CTAPHIDTokenManager::HandleRegisterResultCtap2(
 
   // Dummy-values. Not used with CTAP2.
   nsTArray<WebAuthnExtensionResult> extensions;
-  CryptoBuffer regData, keyHandle;
+  CryptoBuffer regData;
   WebAuthnMakeCredentialResult result(clientData, attObj, keyHandle, regData,
                                       extensions);
   mRegisterPromise.Resolve(std::move(result), __func__);
@@ -620,7 +635,18 @@ CTAPHIDTokenManager::HandleSelectedSignResultCtap2(
     return mozilla::Nothing();
   }
 
+  nsTArray<uint8_t> effectiveRpIdHash;
+  if (!aResult->Ctap2CopyRpIdHash(effectiveRpIdHash, index)) {
+    mSignPromise.Reject(NS_ERROR_DOM_UNKNOWN_ERR, __func__);
+    return mozilla::Nothing();
+  }
+
   nsTArray<WebAuthnExtensionResult> extensions;
+  if (mTransaction.ref().mAppIdHash.isSome()) {
+    bool usedAppId = (effectiveRpIdHash == mTransaction.ref().mAppIdHash.ref());
+    extensions.AppendElement(WebAuthnExtensionResultAppId(usedAppId));
+  }
+
   WebAuthnGetAssertionResult assertion(clientData, pubKeyCred, signatureBuf,
                                        authData, extensions, signature, userID);
   mozilla::Maybe<nsCString> username;

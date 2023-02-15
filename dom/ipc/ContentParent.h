@@ -393,6 +393,9 @@ class ContentParent final : public PContentParent,
   bool IsSignaledImpendingShutdown() const {
     return mIsSignaledImpendingShutdown;
   }
+  bool IsShuttingDown() const {
+    return IsDead() || IsSignaledImpendingShutdown();
+  }
   bool IsDead() const { return mLifecycleState == LifecycleState::DEAD; }
 
   bool IsForBrowser() const { return mIsForBrowser; }
@@ -570,6 +573,9 @@ class ContentParent final : public PContentParent,
   // Use the PHangMonitor channel to ask the child to repaint a tab.
   void PaintTabWhileInterruptingJS(BrowserParent* aBrowserParent,
                                    const layers::LayersObserverEpoch& aEpoch);
+
+  void UnloadLayersWhileInterruptingJS(
+      BrowserParent* aBrowserParent, const layers::LayersObserverEpoch& aEpoch);
 
   void CancelContentJSExecutionIfRunning(
       BrowserParent* aBrowserParent,

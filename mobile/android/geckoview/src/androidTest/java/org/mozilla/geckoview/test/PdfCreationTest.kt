@@ -12,8 +12,10 @@ import android.os.ParcelFileDescriptor
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import org.hamcrest.Matchers.equalTo
 import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeThat
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -138,6 +140,22 @@ class PdfCreationTest : BaseSessionTest() {
                 assertTrue("PDF File exists.", file.exists())
                 assertTrue("PDF File is not empty.", file.length() > 0L)
                 file.delete()
+            }
+        }
+    }
+
+    @NullDelegate(Autofill.Delegate::class)
+    @Test
+    fun saveAPdfDocument() {
+        assumeThat(sessionRule.env.isNightly, equalTo(true))
+
+        activityRule.scenario.onActivity {
+            mainSession.loadTestPath(HELLO_PDF_WORLD_PDF_PATH)
+            mainSession.waitForPageStop()
+            val pdfInputStream = mainSession.saveAsPdf()
+            val originalBytes = getTestBytes(HELLO_PDF_WORLD_PDF_PATH)
+            sessionRule.waitForResult(pdfInputStream).let {
+                assertThat("The PDF File must the same as the original one.", it!!.readBytes(), equalTo(originalBytes))
             }
         }
     }

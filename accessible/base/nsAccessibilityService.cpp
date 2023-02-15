@@ -75,7 +75,6 @@
 #include "mozilla/ProfilerMarkers.h"
 #include "mozilla/Services.h"
 #include "mozilla/StaticPrefs_accessibility.h"
-#include "mozilla/SVGGeometryFrame.h"
 
 #include "XULAlertAccessible.h"
 #include "XULComboboxAccessible.h"
@@ -107,7 +106,25 @@ using namespace mozilla::dom;
  * Return true if the element must be accessible.
  */
 static bool MustBeAccessible(nsIContent* aContent, DocAccessible* aDocument) {
-  if (aContent->GetPrimaryFrame()->IsFocusable()) return true;
+  nsIFrame* frame = aContent->GetPrimaryFrame();
+  MOZ_ASSERT(frame);
+  if (frame->IsFocusable()) {
+    return true;
+  }
+
+  // If the frame has been transformed, and the content has any children, we
+  // should create an Accessible so that we can account for the transform when
+  // calculating the Accessible's bounds using the parent process cache.
+  // Ditto for content which is position: fixed or sticky.
+  // However, don't do this for XUL widgets, as this breaks XUL a11y code
+  // expectations in some cases. XUL widgets are only used in the parent
+  // process and can't be cached anyway.
+  if (aContent->HasChildren() && !aContent->IsXULElement() &&
+      (frame->IsTransformed() || frame->IsStickyPositioned() ||
+       (frame->StyleDisplay()->mPosition == StylePositionProperty::Fixed &&
+        nsLayoutUtils::IsReallyFixedPos(frame)))) {
+    return true;
+  }
 
   if (aContent->IsElement()) {
     uint32_t attrCount = aContent->AsElement()->GetAttrCount();
@@ -406,7 +423,7 @@ void nsAccessibilityService::NotifyOfPossibleBoundsChange(
     mozilla::PresShell* aPresShell, nsIContent* aContent) {
   if (IPCAccessibilityActive() &&
       StaticPrefs::accessibility_cache_enabled_AtStartup()) {
-    DocAccessible* document = GetDocAccessible(aPresShell);
+    DocAccessible* document = aPresShell->GetDocAccessible();
     if (document) {
       // DocAccessible::GetAccessible() won't return the document if a root
       // element like body is passed.
@@ -422,28 +439,40 @@ void nsAccessibilityService::NotifyOfPossibleBoundsChange(
 
 void nsAccessibilityService::NotifyOfComputedStyleChange(
     mozilla::PresShell* aPresShell, nsIContent* aContent) {
-  if (!IPCAccessibilityActive() ||
-      !StaticPrefs::accessibility_cache_enabled_AtStartup()) {
+  DocAccessible* document = aPresShell->GetDocAccessible();
+  if (!document) {
     return;
   }
 
-  DocAccessible* document = GetDocAccessible(aPresShell);
-  if (document) {
-    // DocAccessible::GetAccessible() won't return the document if a root
-    // element like body is passed.
-    LocalAccessible* accessible = aContent == document->GetContent()
-                                      ? document
-                                      : document->GetAccessible(aContent);
-    if (accessible) {
-      accessible->MaybeQueueCacheUpdateForStyleChanges();
+  // DocAccessible::GetAccessible() won't return the document if a root
+  // element like body is passed.
+  LocalAccessible* accessible = aContent == document->GetContent()
+                                    ? document
+                                    : document->GetAccessible(aContent);
+  if (!accessible && aContent && aContent->HasChildren()) {
+    // If the content has children and its frame has a transform, create an
+    // Accessible so that we can account for the transform when calculating
+    // the Accessible's bounds using the parent process cache. Ditto for
+    // position: fixed/sticky content.
+    const nsIFrame* frame = aContent->GetPrimaryFrame();
+    const ComputedStyle* newStyle = frame ? frame->Style() : nullptr;
+    if (newStyle &&
+        (newStyle->StyleDisplay()->HasTransform(frame) ||
+         newStyle->StyleDisplay()->mPosition == StylePositionProperty::Fixed ||
+         newStyle->StyleDisplay()->mPosition ==
+             StylePositionProperty::Sticky)) {
+      document->ContentInserted(aContent, aContent->GetNextSibling());
     }
+  } else if (accessible && IPCAccessibilityActive() &&
+             StaticPrefs::accessibility_cache_enabled_AtStartup()) {
+    accessible->MaybeQueueCacheUpdateForStyleChanges();
   }
 }
 
 void nsAccessibilityService::NotifyOfResolutionChange(
     mozilla::PresShell* aPresShell, float aResolution) {
   if (StaticPrefs::accessibility_cache_enabled_AtStartup()) {
-    DocAccessible* document = GetDocAccessible(aPresShell);
+    DocAccessible* document = aPresShell->GetDocAccessible();
     if (document && document->IPCDoc()) {
       AutoTArray<mozilla::a11y::CacheData, 1> data;
       RefPtr<AccAttributes> fields = new AccAttributes();
@@ -457,7 +486,7 @@ void nsAccessibilityService::NotifyOfResolutionChange(
 void nsAccessibilityService::NotifyOfDevPixelRatioChange(
     mozilla::PresShell* aPresShell, int32_t aAppUnitsPerDevPixel) {
   if (StaticPrefs::accessibility_cache_enabled_AtStartup()) {
-    DocAccessible* document = GetDocAccessible(aPresShell);
+    DocAccessible* document = aPresShell->GetDocAccessible();
     if (document && document->IPCDoc()) {
       AutoTArray<mozilla::a11y::CacheData, 1> data;
       RefPtr<AccAttributes> fields = new AccAttributes();
@@ -1206,12 +1235,14 @@ LocalAccessible* nsAccessibilityService::CreateAccessible(
 
   if (!newAcc) {
     if (content->IsSVGElement()) {
-      SVGGeometryFrame* geometryFrame = do_QueryFrame(frame);
-      if (geometryFrame && MustSVGElementBeAccessible(content)) {
-        // A graphic elements: rect, circle, ellipse, line, path, polygon,
-        // polyline and image. A 'use' and 'text' graphic elements require
+      if (content->IsNodeOfType(nsINode::eSHAPE) ||
+          content->IsSVGElement(nsGkAtoms::image)) {
+        // Shape elements: rect, circle, ellipse, line, path, polygon,
+        // and polyline. 'use' and 'text' graphic elements require
         // special support.
-        newAcc = new EnumRoleAccessible<roles::GRAPHIC>(content, document);
+        if (MustSVGElementBeAccessible(content)) {
+          newAcc = new EnumRoleAccessible<roles::GRAPHIC>(content, document);
+        }
       } else if (content->IsSVGElement(nsGkAtoms::text)) {
         newAcc = new HyperTextAccessibleWrap(content->AsElement(), document);
       } else if (content->IsSVGElement(nsGkAtoms::svg)) {

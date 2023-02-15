@@ -290,7 +290,7 @@ export function validateProfilerWebChannelUrl(targetUrl) {
 
 XPCOMUtils.defineLazyGetter(lazy, "ProfilerPopupBackground", function() {
   return ChromeUtils.import(
-    "resource://devtools/client/performance-new/popup/background.jsm.js"
+    "resource://devtools/client/performance-new/shared/background.jsm.js"
   );
 });
 
@@ -441,7 +441,10 @@ DevToolsStartup.prototype = {
    * top-level window.
    */
   onWindowReady(window) {
-    if (this.isDisabledByPolicy()) {
+    if (
+      this.isDisabledByPolicy() ||
+      AppConstants.MOZ_APP_NAME == "thunderbird"
+    ) {
       return;
     }
 

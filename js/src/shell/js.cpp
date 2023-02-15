@@ -1112,7 +1112,8 @@ static bool MaybeRunFinalizationRegistryCleanupTasks(JSContext* cx) {
   for (JSFunction* f : callbacks) {
     callback = f;
 
-    AutoRealm ar(cx, f);
+    JS::ExposeObjectToActiveJS(callback);
+    AutoRealm ar(cx, callback);
 
     {
       AutoReportException are(cx);
@@ -2335,12 +2336,18 @@ static bool Evaluate(JSContext* cx, unsigned argc, Value* vp) {
             cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
             "\"envChainObject\" passed to evaluate()", "not an object");
         return false;
-      } else if (v.toObject().is<GlobalObject>()) {
+      }
+
+      JSObject* obj = &v.toObject();
+      if (obj->isUnqualifiedVarObj()) {
         JS_ReportErrorASCII(
             cx,
-            "\"envChainObject\" passed to evaluate() should not be a global");
+            "\"envChainObject\" passed to evaluate() should not be an "
+            "unqualified variables object");
         return false;
-      } else if (!envChain.append(&v.toObject())) {
+      }
+
+      if (!envChain.append(obj)) {
         return false;
       }
     }
@@ -3266,8 +3273,16 @@ static bool DisassembleToString(JSContext* cx, unsigned argc, Value* vp) {
     return false;
   }
 
-  JS::ConstUTF8CharsZ utf8chars(sprinter.string(), strlen(sprinter.string()));
-  JSString* str = JS_NewStringCopyUTF8Z(cx, utf8chars);
+  const char* chars = sprinter.string();
+  size_t len;
+  JS::UniqueTwoByteChars buf(
+      JS::LossyUTF8CharsToNewTwoByteCharsZ(
+          cx, JS::UTF8Chars(chars, strlen(chars)), &len, js::MallocArena)
+          .get());
+  if (!buf) {
+    return false;
+  }
+  JSString* str = JS_NewUCStringCopyN(cx, buf.get(), len);
   if (!str) {
     return false;
   }
@@ -5034,7 +5049,7 @@ static bool InstantiateModuleStencil(JSContext* cx, uint32_t argc, Value* vp) {
   AutoReportFrontendContext fc(cx);
   Rooted<frontend::CompilationInput> input(cx,
                                            frontend::CompilationInput(options));
-  if (!input.get().initForModule(cx, &fc)) {
+  if (!input.get().initForModule(&fc)) {
     return false;
   }
 
@@ -5093,7 +5108,7 @@ static bool InstantiateModuleStencilXDR(JSContext* cx, uint32_t argc,
   AutoReportFrontendContext fc(cx);
   Rooted<frontend::CompilationInput> input(cx,
                                            frontend::CompilationInput(options));
-  if (!input.get().initForModule(cx, &fc)) {
+  if (!input.get().initForModule(&fc)) {
     return false;
   }
   frontend::CompilationStencil stencil(nullptr);
@@ -5363,7 +5378,7 @@ static bool DumpAST(JSContext* cx, const JS::ReadOnlyCompileOptions& options,
 
   AutoReportFrontendContext fc(cx);
   Parser<FullParseHandler, Unit> parser(
-      cx, &fc, cx->stackLimitForCurrentPrincipal(), options, units, length,
+      &fc, cx->stackLimitForCurrentPrincipal(), options, units, length,
       /* foldConstants = */ false, compilationState,
       /* syntaxParser = */ nullptr);
   if (!parser.checkOptions()) {
@@ -5384,7 +5399,7 @@ static bool DumpAST(JSContext* cx, const JS::ReadOnlyCompileOptions& options,
     ModuleBuilder builder(cx, &fc, &parser);
 
     SourceExtent extent = SourceExtent::makeGlobalExtent(length);
-    ModuleSharedContext modulesc(cx, &fc, options, builder, extent);
+    ModuleSharedContext modulesc(&fc, options, builder, extent);
     pn = parser.moduleBody(&modulesc);
   }
 
@@ -5643,19 +5658,19 @@ static bool FrontendTest(JSContext* cx, unsigned argc, Value* vp,
   Rooted<frontend::CompilationInput> input(cx,
                                            frontend::CompilationInput(options));
   if (goal == frontend::ParseGoal::Script) {
-    if (!input.get().initForGlobal(cx, &fc)) {
+    if (!input.get().initForGlobal(&fc)) {
       return false;
     }
   } else {
-    if (!input.get().initForModule(cx, &fc)) {
+    if (!input.get().initForModule(&fc)) {
       return false;
     }
   }
 
   LifoAllocScope allocScope(&cx->tempLifoAlloc());
   frontend::NoScopeBindingCache scopeCache;
-  frontend::CompilationState compilationState(cx, &fc, allocScope, input.get());
-  if (!compilationState.init(cx, &fc, &scopeCache)) {
+  frontend::CompilationState compilationState(&fc, allocScope, input.get());
+  if (!compilationState.init(&fc, &scopeCache)) {
     return false;
   }
 
@@ -5725,19 +5740,19 @@ static bool SyntaxParse(JSContext* cx, unsigned argc, Value* vp) {
   AutoReportFrontendContext fc(cx);
   Rooted<frontend::CompilationInput> input(cx,
                                            frontend::CompilationInput(options));
-  if (!input.get().initForGlobal(cx, &fc)) {
+  if (!input.get().initForGlobal(&fc)) {
     return false;
   }
 
   LifoAllocScope allocScope(&cx->tempLifoAlloc());
   frontend::NoScopeBindingCache scopeCache;
-  frontend::CompilationState compilationState(cx, &fc, allocScope, input.get());
-  if (!compilationState.init(cx, &fc, &scopeCache)) {
+  frontend::CompilationState compilationState(&fc, allocScope, input.get());
+  if (!compilationState.init(&fc, &scopeCache)) {
     return false;
   }
 
   Parser<frontend::SyntaxParseHandler, char16_t> parser(
-      cx, &fc, cx->stackLimitForCurrentPrincipal(), options, chars, length,
+      &fc, cx->stackLimitForCurrentPrincipal(), options, chars, length,
       /* foldConstants = */ false, compilationState,
       /* syntaxParser = */ nullptr);
   if (!parser.checkOptions()) {
@@ -8260,49 +8275,6 @@ static bool WasmTextToBinary(JSContext* cx, unsigned argc, Value* vp) {
   return true;
 }
 
-static bool WasmCodeOffsets(JSContext* cx, unsigned argc, Value* vp) {
-  CallArgs args = CallArgsFromVp(argc, vp);
-  RootedObject callee(cx, &args.callee());
-
-  if (!args.requireAtLeast(cx, "wasmCodeOffsets", 1)) {
-    return false;
-  }
-
-  if (!args.get(0).isObject()) {
-    JS_ReportErrorASCII(cx, "argument is not an object");
-    return false;
-  }
-
-  SharedMem<uint8_t*> bytes;
-  size_t byteLength;
-
-  JSObject* bufferObject = &args[0].toObject();
-  JSObject* unwrappedBufferObject = CheckedUnwrapStatic(bufferObject);
-  if (!unwrappedBufferObject ||
-      !IsBufferSource(unwrappedBufferObject, &bytes, &byteLength)) {
-    JS_ReportErrorNumberUTF8(cx, GetErrorMessage, nullptr,
-                             JSMSG_WASM_BAD_BUF_ARG);
-    return false;
-  }
-
-  wasm::Uint32Vector offsets;
-  wasm::CodeOffsets(bytes.unwrap(), byteLength, &offsets);
-
-  RootedObject jsOffsets(cx, JS::NewArrayObject(cx, offsets.length()));
-  if (!jsOffsets) {
-    return false;
-  }
-  for (size_t i = 0; i < offsets.length(); i++) {
-    uint32_t offset = offsets[i];
-    RootedValue offsetVal(cx, NumberValue(offset));
-    if (!JS_SetElement(cx, jsOffsets, i, offsetVal)) {
-      return false;
-    }
-  }
-  args.rval().setObject(*jsOffsets);
-  return true;
-}
-
 #  ifndef __AFL_HAVE_MANUAL_CONTROL
 #    define __AFL_LOOP(x) true
 #  endif
@@ -9342,11 +9314,6 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
     JS_FN_HELP("wasmTextToBinary", WasmTextToBinary, 1, 0,
 "wasmTextToBinary(str)",
 "  Translates the given text wasm module into its binary encoding."),
-
-    JS_FN_HELP("wasmCodeOffsets", WasmCodeOffsets, 1, 0,
-"wasmCodeOffsets(binary)",
-"  Decodes the given wasm binary to find the offsets of every instruction in the"
-"  code section."),
 #endif // __wasi__
 
     JS_FN_HELP("transplantableObject", TransplantableObject, 0, 0,

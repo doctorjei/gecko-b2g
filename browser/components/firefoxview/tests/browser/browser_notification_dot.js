@@ -5,12 +5,8 @@ const tabsList1 = syncedTabsData1[0].tabs;
 const tabsList2 = syncedTabsData1[1].tabs;
 const BADGE_TOP_RIGHT = "75% 25%";
 
-const { SyncedTabs } = ChromeUtils.import(
-  "resource://services-sync/SyncedTabs.jsm"
-);
-
-const { FirefoxViewNotificationManager } = ChromeUtils.importESModule(
-  "resource:///modules/firefox-view-notification-manager.sys.mjs"
+const { SyncedTabs } = ChromeUtils.importESModule(
+  "resource://services-sync/SyncedTabs.sys.mjs"
 );
 
 function setupRecentDeviceListMocks() {

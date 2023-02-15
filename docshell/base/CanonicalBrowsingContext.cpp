@@ -1418,9 +1418,25 @@ void CanonicalBrowsingContext::UpdateMediaControlAction(
   });
 }
 
-void CanonicalBrowsingContext::LoadURI(const nsAString& aURI,
+void CanonicalBrowsingContext::LoadURI(nsIURI* aURI,
                                        const LoadURIOptions& aOptions,
                                        ErrorResult& aError) {
+  RefPtr<nsDocShellLoadState> loadState;
+  nsresult rv = nsDocShellLoadState::CreateFromLoadURIOptions(
+      this, aURI, aOptions, getter_AddRefs(loadState));
+  MOZ_ASSERT(rv != NS_ERROR_MALFORMED_URI);
+
+  if (NS_FAILED(rv)) {
+    aError.Throw(rv);
+    return;
+  }
+
+  LoadURI(loadState, true);
+}
+
+void CanonicalBrowsingContext::FixupAndLoadURIString(
+    const nsAString& aURI, const LoadURIOptions& aOptions,
+    ErrorResult& aError) {
   RefPtr<nsDocShellLoadState> loadState;
   nsresult rv = nsDocShellLoadState::CreateFromLoadURIOptions(
       this, aURI, aOptions, getter_AddRefs(loadState));
@@ -1611,7 +1627,7 @@ nsresult CanonicalBrowsingContext::PendingRemotenessChange::FinishTopContent() {
                         "non-remote iframes");
 
   // Abort if our ContentParent died while process switching.
-  if (mContentParent && NS_WARN_IF(mContentParent->IsDead())) {
+  if (mContentParent && NS_WARN_IF(mContentParent->IsShuttingDown())) {
     return NS_ERROR_FAILURE;
   }
 
@@ -1741,7 +1757,7 @@ nsresult CanonicalBrowsingContext::PendingRemotenessChange::FinishSubframe() {
   // If we're creating a new remote browser, and the host process is already
   // dead, abort the process switch.
   if (mContentParent != embedderBrowser->Manager() &&
-      NS_WARN_IF(mContentParent->IsDead())) {
+      NS_WARN_IF(mContentParent->IsShuttingDown())) {
     return NS_ERROR_FAILURE;
   }
 
@@ -2046,7 +2062,7 @@ CanonicalBrowsingContext::ChangeRemoteness(
   // process, and then putting our previous document in the BFCache, try to stay
   // in the same process to avoid creating new processes unnecessarily.
   RefPtr<ContentParent> existingProcess = GetContentParent();
-  if (existingProcess && existingProcess->IsAlive() &&
+  if (existingProcess && !existingProcess->IsShuttingDown() &&
       aOptions.mReplaceBrowsingContext &&
       aOptions.mRemoteType == existingProcess->GetRemoteType()) {
     change->mContentParent = existingProcess;

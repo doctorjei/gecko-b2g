@@ -9,10 +9,9 @@ const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
   L10nCache: "resource:///modules/UrlbarUtils.sys.mjs",
   UrlbarPrefs: "resource:///modules/UrlbarPrefs.sys.mjs",
-  UrlbarProviderQuickSuggest:
-    "resource:///modules/UrlbarProviderQuickSuggest.sys.mjs",
   UrlbarProviderTopSites: "resource:///modules/UrlbarProviderTopSites.sys.mjs",
   UrlbarProvidersManager: "resource:///modules/UrlbarProvidersManager.sys.mjs",
+  UrlbarProviderWeather: "resource:///modules/UrlbarProviderWeather.sys.mjs",
   UrlbarSearchOneOffs: "resource:///modules/UrlbarSearchOneOffs.sys.mjs",
   UrlbarTokenizer: "resource:///modules/UrlbarTokenizer.sys.mjs",
   UrlbarUtils: "resource:///modules/UrlbarUtils.sys.mjs",
@@ -205,6 +204,25 @@ export class UrlbarView {
     }
 
     return this.#selectedElement;
+  }
+
+  /**
+   * @returns {boolean}
+   *   Whether the SPACE key should activate the selected element (if any)
+   *   instead of adding to the input value.
+   */
+  shouldSpaceActivateSelectedElement() {
+    // We want SPACE to activate buttons only.
+    if (this.selectedElement?.getAttribute("role") != "button") {
+      return false;
+    }
+    // Make sure the input field is empty, otherwise the user might want to add
+    // a space to the current search string. As it stands, selecting a button
+    // should always clear the input field, so this is just an extra safeguard.
+    if (this.input.value) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -845,6 +863,9 @@ export class UrlbarView {
    *   {array} [classList]
    *     An optional list of classes.  Each class will be added to the element
    *     created for the object by calling element.classList.add().
+   *   {boolean} [overflowable]
+   *     If true, the element's overflow status will be tracked in order to
+   *     fade it out when needed.
    *   {string} [stylesheet]
    *     An optional stylesheet URL.  This property is valid only on the root
    *     object in the structure.  The stylesheet will be loaded in all browser
@@ -1163,12 +1184,12 @@ export class UrlbarView {
     item._elements.set("tailPrefixChar", tailPrefixChar);
 
     let title = this.#createElement("span");
-    title.className = "urlbarView-title";
+    title.classList.add("urlbarView-title", "urlbarView-overflowable");
     noWrap.appendChild(title);
     item._elements.set("title", title);
 
     let tagsContainer = this.#createElement("span");
-    tagsContainer.className = "urlbarView-tags";
+    tagsContainer.classList.add("urlbarView-tags", "urlbarView-overflowable");
     noWrap.appendChild(tagsContainer);
     item._elements.set("tagsContainer", tagsContainer);
 
@@ -1208,8 +1229,11 @@ export class UrlbarView {
 
   #buildViewForDynamicType(type, parentNode, elementsByName, template) {
     // Add classes to parentNode's classList.
-    for (let className of template.classList || []) {
-      parentNode.classList.add(className);
+    if (template.classList) {
+      parentNode.classList.add(...template.classList);
+    }
+    if (template.overflowable) {
+      parentNode.classList.add("urlbarView-overflowable");
     }
     // Set attributes on parentNode.
     for (let [name, value] of Object.entries(template.attributes || {})) {
@@ -1262,7 +1286,7 @@ export class UrlbarView {
     item._elements.set("noWrap", noWrap);
 
     let title = this.#createElement("span");
-    title.className = "urlbarView-title";
+    title.classList.add("urlbarView-title", "urlbarView-overflowable");
     noWrap.appendChild(title);
     item._elements.set("title", title);
 
@@ -1359,7 +1383,7 @@ export class UrlbarView {
       provider.getViewTemplate ||
       oldResult.isBestMatch != result.isBestMatch ||
       (!lazy.UrlbarPrefs.get("resultMenu") &&
-        (!!result.payload.helpUrl != item._buttons.has("block") ||
+        (!!result.payload.helpUrl != item._buttons.has("help") ||
           !!result.payload.isBlockable != item._buttons.has("block"))) ||
       !!this.#getResultMenuCommands(result) != item._buttons.has("menu") ||
       !lazy.ObjectUtils.deepEqual(
@@ -1455,10 +1479,7 @@ export class UrlbarView {
       title.removeAttribute("aria-label");
     }
 
-    title._tooltip = result.title;
-    if (title.hasAttribute("overflow")) {
-      title.setAttribute("title", title._tooltip);
-    }
+    this.#updateOverflowTooltip(title, result.title);
 
     let tagsContainer = item._elements.get("tagsContainer");
     tagsContainer.textContent = "";
@@ -1598,14 +1619,11 @@ export class UrlbarView {
         result.payload.displayUrl,
         result.payloadHighlights.displayUrl || []
       );
-      url._tooltip = result.payload.displayUrl;
+      this.#updateOverflowTooltip(url, result.payload.displayUrl);
     } else {
       item.removeAttribute("has-url");
       url.textContent = "";
-      url._tooltip = "";
-    }
-    if (url.hasAttribute("overflow")) {
-      url.setAttribute("title", url._tooltip);
+      this.#updateOverflowTooltip(url, "");
     }
 
     if (isVisitAction) {
@@ -1736,12 +1754,7 @@ export class UrlbarView {
 
     let title = item._elements.get("title");
     this.#setResultTitle(result, title);
-    title._tooltip = result.title;
-    if (title.hasAttribute("overflow")) {
-      title.setAttribute("title", title._tooltip);
-    } else {
-      title.removeAttribute("title");
-    }
+    this.#updateOverflowTooltip(title, result.title);
 
     let url = item._elements.get("url");
     this.#addTextContentWithHighlights(
@@ -1749,12 +1762,7 @@ export class UrlbarView {
       result.payload.displayUrl,
       result.payloadHighlights.displayUrl || []
     );
-    url._tooltip = result.payload.displayUrl;
-    if (url.hasAttribute("overflow")) {
-      url.setAttribute("title", url._tooltip);
-    } else {
-      url.removeAttribute("title");
-    }
+    this.#updateOverflowTooltip(url, result.payload.displayUrl);
 
     let bottom = item._elements.get("bottom");
     if (result.payload.isSponsored) {
@@ -1888,21 +1896,19 @@ export class UrlbarView {
    *   returns an l10n object for the label's l10n string: `{ id, args }`
    */
   #rowLabel(row, currentLabel) {
-    if (!lazy.UrlbarPrefs.get("groupLabels.enabled") || row.result.heuristic) {
+    if (!lazy.UrlbarPrefs.get("groupLabels.enabled")) {
       return null;
     }
 
-    if (!this.#queryContext?.searchString) {
-      if (row.result.payload.isWeather) {
-        // Add top pick label for weather suggestion
-        return { id: "urlbar-group-best-match" };
-      }
-
-      return null;
-    }
-
-    if (row.result.isBestMatch) {
+    if (
+      row.result.isBestMatch ||
+      row.result.providerName == lazy.UrlbarProviderWeather.name
+    ) {
       return { id: "urlbar-group-best-match" };
+    }
+
+    if (!this.#queryContext?.searchString || row.result.heuristic) {
+      return null;
     }
 
     switch (row.result.type) {
@@ -2054,7 +2060,18 @@ export class UrlbarView {
    */
   #getClosestSelectableElement(element) {
     let closest = element.closest(SELECTABLE_ELEMENT_SELECTOR);
-    return closest && this.#isElementVisible(closest) ? closest : null;
+    if (closest && this.#isElementVisible(closest)) {
+      return closest;
+    }
+    // When clicking on a gap within a row or on its border or padding, treat
+    // this as if the main part was clicked.
+    if (
+      element.classList.contains("urlbarView-row") &&
+      element.hasAttribute("row-selectable")
+    ) {
+      return element._content;
+    }
+    return null;
   }
 
   /**
@@ -2198,7 +2215,7 @@ export class UrlbarView {
    *
    * @param {UrlbarResult} result
    *   The result for which the title is being set.
-   * @param {Node} titleNode
+   * @param {Element} titleNode
    *   The DOM node for the result's tile.
    */
   #setResultTitle(result, titleNode) {
@@ -2238,7 +2255,7 @@ export class UrlbarView {
    * Adds text content to a node, placing substrings that should be highlighted
    * inside <em> nodes.
    *
-   * @param {Node} parentNode
+   * @param {Element} parentNode
    *   The text content will be added to this node.
    * @param {string} textContent
    *   The text content to give the node.
@@ -2275,7 +2292,7 @@ export class UrlbarView {
   /**
    * Adds markup for a tail suggestion prefix to a row.
    *
-   * @param {Node} item
+   * @param {Element} item
    *   The node for the result row.
    * @param {UrlbarResult} result
    *   A UrlbarResult representing a tail suggestion.
@@ -2300,9 +2317,50 @@ export class UrlbarView {
     }
   }
 
+  /**
+   * @param {Element} element
+   *   The element
+   * @returns {boolean}
+   *   Whether we track this element's overflow status in order to fade it out
+   *   and add a tooltip when needed.
+   */
+  #canElementOverflow(element) {
+    let { classList } = element;
+    return (
+      classList.contains("urlbarView-overflowable") ||
+      classList.contains("urlbarView-url")
+    );
+  }
+
+  /**
+   * Marks an element as overflowing or not overflowing.
+   *
+   * @param {Element} element
+   *   The element
+   * @param {boolean} overflowing
+   *   Whether the element is overflowing
+   */
   #setElementOverflowing(element, overflowing) {
     element.toggleAttribute("overflow", overflowing);
-    if (overflowing) {
+    this.#updateOverflowTooltip(element);
+  }
+
+  /**
+   * Sets an overflowing element's tooltip, or removes the tooltip if the
+   * element isn't overflowing. Also optionally updates the string that should
+   * be used as the tooltip in case of overflow.
+   *
+   * @param {Element} element
+   *   The element
+   * @param {string} [tooltip]
+   *   The string that should be used in the tooltip. This will be stored and
+   *   re-used next time the element overflows.
+   */
+  #updateOverflowTooltip(element, tooltip) {
+    if (typeof tooltip == "string") {
+      element._tooltip = tooltip;
+    }
+    if (element.hasAttribute("overflow") && element._tooltip) {
       element.setAttribute("title", element._tooltip);
     } else {
       element.removeAttribute("title");
@@ -2533,18 +2591,18 @@ export class UrlbarView {
 
     Services.telemetry.scalarAdd(ZERO_PREFIX_SCALAR_EXPOSURE, 1);
 
-    // Some quick suggest telemetry needs to be recorded when the zero-prefix
+    // Weather suggestion telemetry needs to be recorded when the zero-prefix
     // view is shown. Ideally this logic would be general to all providers.
     // Relying on `visibleResults` here means we assume `onQueryFinished()` has
     // been called by this point and `visibleResults` accurately reflects the
     // visible rows at the end of the zero-prefix query.
-    let quickSuggestResults = this.visibleResults.filter(
-      r => r.providerName == lazy.UrlbarProviderQuickSuggest.name
+    let weatherResults = this.visibleResults.filter(
+      r => r.providerName == lazy.UrlbarProviderWeather.name
     );
-    if (quickSuggestResults.length) {
-      lazy.UrlbarProviderQuickSuggest.onResultsShown(
+    if (weatherResults.length) {
+      lazy.UrlbarProviderWeather.onResultsShown(
         this.#queryContext,
-        quickSuggestResults
+        weatherResults
       );
     }
   }
@@ -2569,6 +2627,9 @@ export class UrlbarView {
     ) {
       commands.set(RESULT_MENU_COMMANDS.BLOCK, {
         l10n: { id: "urlbar-result-menu-remove-from-history" },
+      });
+      commands.set(RESULT_MENU_COMMANDS.LEARN_MORE, {
+        l10n: { id: "urlbar-result-menu-learn-more" },
       });
     }
     if (result.payload.isBlockable) {
@@ -2845,10 +2906,8 @@ export class UrlbarView {
 
   on_overflow(event) {
     if (
-      event.detail == 1 &&
-      (event.target.classList.contains("urlbarView-url") ||
-        event.target.classList.contains("urlbarView-title") ||
-        event.target.classList.contains("urlbarView-tags"))
+      event.detail == 1 /* horizontal overflow */ &&
+      this.#canElementOverflow(event.target)
     ) {
       this.#setElementOverflowing(event.target, true);
     }
@@ -2856,10 +2915,8 @@ export class UrlbarView {
 
   on_underflow(event) {
     if (
-      event.detail == 1 &&
-      (event.target.classList.contains("urlbarView-url") ||
-        event.target.classList.contains("urlbarView-title") ||
-        event.target.classList.contains("urlbarView-tags"))
+      event.detail == 1 /* horizontal underflow */ &&
+      this.#canElementOverflow(event.target)
     ) {
       this.#setElementOverflowing(event.target, false);
     }
@@ -2879,7 +2936,12 @@ export class UrlbarView {
           this.controller.handleDeleteEntry(null, result);
           break;
         case RESULT_MENU_COMMANDS.LEARN_MORE:
-          this.window.openTrustedLinkIn(result.payload.helpUrl, "tab");
+          this.window.openTrustedLinkIn(
+            result.payload.helpUrl ||
+              Services.urlFormatter.formatURLPref("app.support.baseURL") +
+                "awesome-bar-result-menu",
+            "tab"
+          );
           break;
       }
     }

@@ -428,11 +428,11 @@ class RemoteAccessibleBase : public Accessible, public HyperTextAccessibleBase {
  protected:
   void SetParent(Derived* aParent);
   Maybe<nsRect> RetrieveCachedBounds() const;
-  bool ApplyTransform(nsRect& aCumulativeBounds,
-                      const nsRect& aParentRelativeBounds) const;
+  bool ApplyTransform(nsRect& aCumulativeBounds) const;
   void ApplyScrollOffset(nsRect& aBounds) const;
   void ApplyCrossDocOffset(nsRect& aBounds) const;
   LayoutDeviceIntRect BoundsWithOffset(Maybe<nsRect> aOffset) const;
+  bool IsFixedPos() const;
 
   virtual void ARIAGroupPosition(int32_t* aLevel, int32_t* aSetSize,
                                  int32_t* aPosInSet) const override;

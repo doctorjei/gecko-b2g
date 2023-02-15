@@ -678,9 +678,14 @@ nsresult nsAppShellService::JustCreateTopWindow(
   widgetInitData.mScreenId = mScreenId;
 #endif
 
+  // Enforce the Private Browsing autoStart pref first.
+  bool isPrivateBrowsingWindow =
+      StaticPrefs::browser_privatebrowsing_autostart();
   if (aChromeMask & nsIWebBrowserChrome::CHROME_PRIVATE_WINDOW) {
-    widgetInitData.mIsPrivate = true;
+    // Caller requested a private window
+    isPrivateBrowsingWindow = true;
   }
+  widgetInitData.mIsPrivate = isPrivateBrowsingWindow;
 
   nsresult rv =
       window->Initialize(parent, center ? aParent : nullptr, aInitialWidth,
@@ -688,14 +693,6 @@ nsresult nsAppShellService::JustCreateTopWindow(
 
   NS_ENSURE_SUCCESS(rv, rv);
 
-  // Enforce the Private Browsing autoStart pref first.
-  bool isPrivateBrowsingWindow =
-      StaticPrefs::browser_privatebrowsing_autostart();
-
-  if (aChromeMask & nsIWebBrowserChrome::CHROME_PRIVATE_WINDOW) {
-    // Caller requested a private window
-    isPrivateBrowsingWindow = true;
-  }
   nsCOMPtr<mozIDOMWindowProxy> domWin = do_GetInterface(aParent);
   nsCOMPtr<nsIWebNavigation> webNav = do_GetInterface(domWin);
   nsCOMPtr<nsILoadContext> parentContext = do_QueryInterface(webNav);

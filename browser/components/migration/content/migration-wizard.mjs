@@ -19,6 +19,7 @@ export class MigrationWizard extends HTMLElement {
   #browserProfileSelector = null;
   #resourceTypeList = null;
   #shadowRoot = null;
+  #importButton = null;
 
   static get markup() {
     return `
@@ -30,48 +31,59 @@ export class MigrationWizard extends HTMLElement {
             <h3 data-l10n-id="migration-wizard-selection-header"></h3>
             <select id="browser-profile-selector">
             </select>
-            <fieldset id="resource-type-list">
-              <label id="bookmarks">
-                <input type="checkbox"/><span data-l10n-id="migration-bookmarks-option-label"></span>
-              </label>
-              <label id="logins-and-passwords">
-                <input type="checkbox"/><span data-l10n-id="migration-logins-and-passwords-option-label"></span>
-              </label>
-              <label id="history">
-                <input type="checkbox"/><span data-l10n-id="migration-history-option-label"></span>
-              </label>
-              <label id="form-autofill">
-                <input type="checkbox"/><span data-l10n-id="migration-form-autofill-option-label"></span>
-              </label>
-            </fieldset>
+            <details class="resource-selection-details" open="true">
+              <summary>
+                <div data-l10n-id="migration-all-available-data-label"></div>
+                <div data-l10n-id="migration-available-data-label"></div>
+                <span class="dropdown-icon" role="img"></span>
+              </summary>
+              <fieldset id="resource-type-list">
+                <label id="select-all">
+                  <input type="checkbox" class="select-all-checkbox"/><span data-l10n-id="migration-select-all-option-label"></span>
+                </label>
+                <label id="bookmarks" data-resource-type="BOOKMARKS"/>
+                  <input type="checkbox"/><span data-l10n-id="migration-bookmarks-option-label"></span>
+                </label>
+                <label id="logins-and-passwords" data-resource-type="PASSWORDS">
+                  <input type="checkbox"/><span data-l10n-id="migration-logins-and-passwords-option-label"></span>
+                </label>
+                <label id="history" data-resource-type="HISTORY">
+                  <input type="checkbox"/><span data-l10n-id="migration-history-option-label"></span>
+                </label>
+                <label id="form-autofill" data-resource-type="FORMDATA">
+                  <input type="checkbox"/><span data-l10n-id="migration-form-autofill-option-label"></span>
+                </label>
+              </fieldset>
+            </details>
+
             <moz-button-group class="buttons">
               <button class="cancel-close" data-l10n-id="migration-cancel-button-label"></button>
-              <button class="primary" data-l10n-id="migration-import-button-label"></button>
+              <button id="import" class="primary" data-l10n-id="migration-import-button-label"></button>
             </moz-button-group>
           </div>
 
           <div name="page-progress">
             <h3 id="progress-header" data-l10n-id="migration-wizard-progress-header"></h3>
             <div class="resource-progress">
-              <div data-resource-type="bookmarks" class="resource-progress-group">
+              <div data-resource-type="BOOKMARKS" class="resource-progress-group">
                 <span class="progress-icon-parent"><span class="progress-icon" role="img"></span></span>
                 <span data-l10n-id="migration-bookmarks-option-label"></span>
                 <span class="success-text">&nbsp;</span>
               </div>
 
-              <div data-resource-type="logins-and-passwords" class="resource-progress-group">
+              <div data-resource-type="PASSWORDS" class="resource-progress-group">
                 <span class="progress-icon-parent"><span class="progress-icon" role="img"></span></span>
                 <span data-l10n-id="migration-logins-and-passwords-option-label"></span>
                 <span class="success-text">&nbsp;</span>
               </div>
 
-              <div data-resource-type="history" class="resource-progress-group">
+              <div data-resource-type="HISTORY" class="resource-progress-group">
                 <span class="progress-icon-parent"><span class="progress-icon" role="img"></span></span>
                 <span data-l10n-id="migration-history-option-label"></span>
                 <span class="success-text">&nbsp;</span>
               </div>
 
-              <div data-resource-type="form-autofill" class="resource-progress-group">
+              <div data-resource-type="FORMDATA" class="resource-progress-group">
                 <span class="progress-icon-parent"><span class="progress-icon" role="img"></span></span>
                 <span data-l10n-id="migration-form-autofill-option-label"></span>
                 <span class="success-text">&nbsp;</span>
@@ -129,8 +141,15 @@ export class MigrationWizard extends HTMLElement {
       button.addEventListener("click", this);
     }
 
+    this.#importButton = shadow.querySelector("#import");
+    this.#importButton.addEventListener("click", this);
+
     this.#browserProfileSelector.addEventListener("change", this);
     this.#resourceTypeList = shadow.querySelector("#resource-type-list");
+
+    let selectAllCheckbox = shadow.querySelector("#select-all").control;
+    selectAllCheckbox.addEventListener("change", this);
+
     this.#shadowRoot = shadow;
   }
 
@@ -180,10 +199,8 @@ export class MigrationWizard extends HTMLElement {
     }
 
     for (let resourceType of resourceTypes) {
-      let resourceID =
-        MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES[resourceType];
       let resourceLabel = this.#resourceTypeList.querySelector(
-        `#${resourceID}`
+        `label[data-resource-type="${resourceType}"]`
       );
       if (resourceLabel) {
         resourceLabel.hidden = false;
@@ -202,6 +219,11 @@ export class MigrationWizard extends HTMLElement {
    */
   #onShowingSelection(state) {
     this.#browserProfileSelector.textContent = "";
+
+    let selectionPage = this.#shadowRoot.querySelector(
+      "div[name='page-selection']"
+    );
+    selectionPage.toggleAttribute("show-import-all", state.showImportAll);
 
     for (let migrator of state.migrators) {
       let opt = document.createElement("option");
@@ -324,10 +346,45 @@ export class MigrationWizard extends HTMLElement {
     });
   }
 
+  /**
+   * Takes the current state of the selections page and bundles them
+   * up into a MigrationWizard:BeginMigration event that can be handled
+   * externally to perform the actual migration.
+   */
+  #doImport() {
+    let option = this.#browserProfileSelector.options[
+      this.#browserProfileSelector.selectedIndex
+    ];
+    let key = option.value;
+    let profile = option.profile;
+    let resourceTypeFields = this.#resourceTypeList.querySelectorAll(
+      "label[data-resource-type]"
+    );
+    let resourceTypes = [];
+    for (let resourceTypeField of resourceTypeFields) {
+      if (resourceTypeField.control.checked) {
+        resourceTypes.push(resourceTypeField.dataset.resourceType);
+      }
+    }
+
+    this.dispatchEvent(
+      new CustomEvent("MigrationWizard:BeginMigration", {
+        bubbles: true,
+        detail: {
+          key,
+          profile,
+          resourceTypes,
+        },
+      })
+    );
+  }
+
   handleEvent(event) {
     switch (event.type) {
       case "click": {
-        if (event.target.classList.contains("cancel-close")) {
+        if (event.target == this.#importButton) {
+          this.#doImport();
+        } else if (event.target.classList.contains("cancel-close")) {
           this.dispatchEvent(
             new CustomEvent("MigrationWizard:Close", { bubbles: true })
           );
@@ -337,6 +394,13 @@ export class MigrationWizard extends HTMLElement {
       case "change": {
         if (event.target == this.#browserProfileSelector) {
           this.#onBrowserProfileSelectionChanged();
+        } else if (event.target.classList.contains("select-all-checkbox")) {
+          let checkboxes = this.#shadowRoot.querySelectorAll(
+            'label[data-resource-type] > input[type="checkbox"]'
+          );
+          for (let checkbox of checkboxes) {
+            checkbox.checked = event.target.checked;
+          }
         }
         break;
       }

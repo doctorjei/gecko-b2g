@@ -67,8 +67,6 @@ class GeneralPattern;
 #define SVG_HIT_TEST_STROKE 0x02
 #define SVG_HIT_TEST_CHECK_MRECT 0x04
 
-bool NS_SVGDisplayListHitTestingEnabled();
-bool NS_SVGDisplayListPaintingEnabled();
 bool NS_SVGNewGetBBoxEnabled();
 
 namespace mozilla {
@@ -269,6 +267,13 @@ class SVGUtils final {
    * For regular frames, we just return an identity matrix.
    */
   static gfxMatrix GetCanvasTM(nsIFrame* aFrame);
+
+  /*
+   * Returns whether the frame is transformed and what those transforms are.
+   */
+  static bool IsSVGTransformed(const nsIFrame* aFrame,
+                               gfx::Matrix* aOwnTransform,
+                               gfx::Matrix* aFromParentTransform);
 
   /**
    * Notify the descendants of aFrame of a change to one of their ancestors

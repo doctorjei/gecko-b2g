@@ -480,7 +480,7 @@ var PlacesCommandHook = {
    */
   async bookmarkPage() {
     let browser = gBrowser.selectedBrowser;
-    let url = new URL(browser.currentURI.spec);
+    let url = URL.fromURI(browser.currentURI);
     let info = await PlacesUtils.bookmarks.fetch({ url });
     let isNewBookmark = !info;
     let showEditUI = !isNewBookmark || StarUI.showForNewBookmarks;
@@ -1379,7 +1379,7 @@ var PlacesToolbarHelper = {
     }
 
     addData(PlacesUtils.TYPE_X_MOZ_URL, 0);
-    addData(PlacesUtils.TYPE_UNICODE, 0);
+    addData(PlacesUtils.TYPE_PLAINTEXT, 0);
     addData(PlacesUtils.TYPE_HTML, 0);
   },
 };
@@ -1599,7 +1599,10 @@ var BookmarkingUI = {
     // If the bookmarks are here but it's early in startup, show the message.
     // It'll get made visibility: hidden early in startup anyway - it's just
     // to ensure the toolbar has height.
-    if (!this.toolbar.hasAttribute("initialized")) {
+    //
+    // If we're customizing, we might have visible children anyways, even if we
+    // haven't really initialized the toolbar, so go through the usual path.
+    if (!this._isCustomizing && !this.toolbar.hasAttribute("initialized")) {
       emptyMsg.hidden = false;
       emptyMsg.setAttribute("nowidth", "");
       return;

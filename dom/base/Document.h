@@ -292,7 +292,6 @@ class XPathNSResolver;
 class XPathResult;
 class BrowsingContext;
 
-class nsDocumentOnStack;
 class nsUnblockOnloadEvent;
 
 template <typename, typename>
@@ -3695,10 +3694,6 @@ class Document : public nsINode,
   bool UserHasInteracted() { return mUserHasInteracted; }
   void ResetUserInteractionTimer();
 
-  // This method would return current autoplay policy, it would be "allowed"
-  // , "allowed-muted" or "disallowed".
-  DocumentAutoplayPolicy AutoplayPolicy() const;
-
   // This should be called when this document receives events which are likely
   // to be user interaction with the document, rather than the byproduct of
   // interaction with the browser (i.e. a keypress to scroll the view port,
@@ -4386,17 +4381,6 @@ class Document : public nsINode,
   UniquePtr<ServoStyleSet> mStyleSet;
 
  protected:
-  friend class nsDocumentOnStack;
-
-  void IncreaseStackRefCnt() { ++mStackRefCnt; }
-
-  void DecreaseStackRefCnt() {
-    if (--mStackRefCnt == 0 && mNeedsReleaseAfterStackRefCntRelease) {
-      mNeedsReleaseAfterStackRefCntRelease = false;
-      NS_RELEASE_THIS();
-    }
-  }
-
   // Never ever call this. Only call GetWindow!
   nsPIDOMWindowOuter* GetWindowInternal() const;
 
@@ -4753,8 +4737,6 @@ class Document : public nsINode,
   bool mIsGoingAway : 1;
 
   bool mInXBLUpdate : 1;
-
-  bool mNeedsReleaseAfterStackRefCntRelease : 1;
 
   // Whether we have filled our style set with all the stylesheets.
   bool mStyleSetFilled : 1;
@@ -5117,8 +5099,6 @@ class Document : public nsINode,
   // If the document was created from the the prototype cache there will be a
   // reference to the prototype document to allow tracing.
   RefPtr<nsXULPrototypeDocument> mPrototypeDocument;
-
-  nsrefcnt mStackRefCnt;
 
   // Weak reference to our sink for in case we no longer have a parser.  This
   // will allow us to flush out any pending stuff from the sink even if

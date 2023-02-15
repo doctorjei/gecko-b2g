@@ -25,13 +25,12 @@
 #include "mozilla/Likely.h"
 #include "gfx2DGlue.h"
 #include "mozilla/gfx/Logging.h"  // for gfxCriticalError
+#include "mozilla/intl/String.h"
 #include "mozilla/intl/UnicodeProperties.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/Unused.h"
 #include "SharedFontList-impl.h"
 #include "TextDrawTarget.h"
-
-#include <unicode/unorm2.h>
 
 #ifdef XP_WIN
 #  include "gfxWindowsPlatform.h"
@@ -648,9 +647,56 @@ void gfxTextRun::Draw(const Range aRange, const gfx::Point aPt,
   gfxFloat advance = 0.0;
   gfx::Point pt = aPt;
 
+  layout::TextDrawTarget* textDrawer = aParams.context->GetTextDrawer();
   while (iter.NextRun()) {
     gfxFont* font = iter.GetGlyphRun()->mFont;
     Range runRange(iter.GetStringStart(), iter.GetStringEnd());
+
+    if (textDrawer && GlyphRunCount() > 1) {
+      // If we're using a TextDrawTarget, check if the run range intersects the
+      // current clip; if not, we don't need to draw it.
+      Metrics runMetrics = MeasureText(runRange, gfxFont::LOOSE_INK_EXTENTS,
+                                       params.dt, aParams.provider);
+
+      if (params.isVerticalRun) {
+        std::swap(runMetrics.mBoundingBox.x, runMetrics.mBoundingBox.y);
+        std::swap(runMetrics.mBoundingBox.width,
+                  runMetrics.mBoundingBox.height);
+      }
+
+      if (IsRightToLeft()) {
+        if (params.isVerticalRun) {
+          runMetrics.mBoundingBox.MoveBy(
+              gfxPoint(pt.x, pt.y - runMetrics.mAdvanceWidth));
+        } else {
+          runMetrics.mBoundingBox.MoveBy(
+              gfxPoint(pt.x - runMetrics.mAdvanceWidth, pt.y));
+        }
+      } else {
+        runMetrics.mBoundingBox.MoveBy(gfxPoint(pt.x, pt.y));
+      }
+
+      // MeasureText returns mBoundingBox as appUnits stored in a gfxRect;
+      // convert to layout device pixels to intersect with the clip.
+      runMetrics.mBoundingBox.RoundOut();
+      const auto bounds = LayoutDeviceRect::FromAppUnits(
+          nsRect(nscoord(runMetrics.mBoundingBox.x),
+                 nscoord(runMetrics.mBoundingBox.y),
+                 nscoord(runMetrics.mBoundingBox.width),
+                 nscoord(runMetrics.mBoundingBox.height)),
+          GetAppUnitsPerDevUnit());
+      if (!bounds.Intersects(textDrawer->GeckoClipRect())) {
+        // The run is entirely out of view; just update position, but don't
+        // bother trying to paint the glyphs.
+        if (params.isVerticalRun) {
+          pt.y += float(runMetrics.mAdvanceWidth * direction);
+        } else {
+          pt.x += float(runMetrics.mAdvanceWidth * direction);
+        }
+        advance += runMetrics.mAdvanceWidth;
+        continue;
+      }
+    }
 
     bool needToRestore = false;
     if (mayNeedBuffering && HasSyntheticBoldOrColor(font)) {
@@ -663,9 +709,8 @@ void gfxTextRun::Draw(const Range aRange, const gfx::Point aPt,
         // drawTarget's current clip, the skia backend fails to clip properly.
         // This means we may use a larger buffer than actually needed, but is
         // otherwise harmless.
-        metrics =
-            MeasureText(aRange, gfxFont::LOOSE_INK_EXTENTS,
-                        aParams.context->GetDrawTarget(), aParams.provider);
+        metrics = MeasureText(aRange, gfxFont::LOOSE_INK_EXTENTS, params.dt,
+                              aParams.provider);
         if (IsRightToLeft()) {
           metrics.mBoundingBox.MoveBy(
               gfxPoint(aPt.x - metrics.mAdvanceWidth, aPt.y));
@@ -2246,13 +2291,17 @@ already_AddRefed<gfxFont> gfxFontGroup::GetDefaultFont() {
       if (pfl->SharedFontList()->GetGeneration() != oldGeneration) {
         return GetDefaultFont();
       }
-    } else {
-      gfxFontEntry* fe = pfl->GetDefaultFontEntry();
-      if (fe) {
-        RefPtr<gfxFont> f = fe->FindOrMakeFont(&mStyle);
-        if (f) {
-          return f.forget();
-        }
+    }
+  }
+
+  if (!mDefaultFont) {
+    // We must have failed to find anything usable in our font-family list,
+    // or it's badly broken. One more last-ditch effort to make a font:
+    gfxFontEntry* fe = pfl->GetDefaultFontEntry();
+    if (fe) {
+      RefPtr<gfxFont> f = fe->FindOrMakeFont(&mStyle);
+      if (f) {
+        return f.forget();
       }
     }
   }
@@ -3080,12 +3129,9 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
     if (aPrevMatchedFont->HasCharacter(aCh) || IsDefaultIgnorable(aCh)) {
       return do_AddRef(aPrevMatchedFont);
     }
-    // Get the singleton NFC normalizer; this does not need to be deleted.
-    static UErrorCode err = U_ZERO_ERROR;
-    static const UNormalizer2* nfc = unorm2_getNFCInstance(&err);
     // Check if this char and preceding char can compose; if so, is the
     // combination supported by the current font.
-    int32_t composed = unorm2_composePair(nfc, aPrevCh, aCh);
+    uint32_t composed = intl::String::ComposePairNFC(aPrevCh, aCh);
     if (composed > 0 && aPrevMatchedFont->HasCharacter(composed)) {
       return do_AddRef(aPrevMatchedFont);
     }
@@ -3254,6 +3300,15 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
     // If the provided glyph matches the preference, accept the font.
     if (hasColorGlyph == PrefersColor(presentation)) {
       *aMatchType = t;
+      return true;
+    }
+    // If the character was a TextDefault char, but the next char is VS16,
+    // and the font is a COLR font that supports both these codepoints, then
+    // we'll assume it knows what it is doing (eg Twemoji Mozilla keycap
+    // sequences).
+    // TODO: reconsider all this as part of any fix for bug 543200.
+    if (aNextCh == kVariationSelector16 && emojiPresentation == TextDefault &&
+        f->HasCharacter(aNextCh) && f->GetFontEntry()->TryGetColorGlyphs()) {
       return true;
     }
     // Otherwise, remember the first potential fallback, but keep searching.

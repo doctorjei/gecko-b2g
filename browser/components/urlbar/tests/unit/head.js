@@ -34,8 +34,8 @@ ChromeUtils.defineESModuleGetters(this, {
 XPCOMUtils.defineLazyModuleGetters(this, {
   AddonTestUtils: "resource://testing-common/AddonTestUtils.jsm",
   HttpServer: "resource://testing-common/httpd.js",
+  sinon: "resource://testing-common/Sinon.jsm",
 });
-const { sinon } = ChromeUtils.import("resource://testing-common/Sinon.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "QuickSuggestTestUtils", () => {
   const { QuickSuggestTestUtils: module } = ChromeUtils.importESModule(
@@ -51,6 +51,12 @@ XPCOMUtils.defineLazyGetter(this, "MerinoTestUtils", () => {
   );
   module.init(this);
   return module;
+});
+
+XPCOMUtils.defineLazyGetter(this, "PlacesFrecencyRecalculator", () => {
+  return Cc["@mozilla.org/places/frecency-recalculator;1"].getService(
+    Ci.nsIObserver
+  ).wrappedJSObject;
 });
 
 SearchTestUtils.init(this);
@@ -506,17 +512,22 @@ function makeOmniboxResult(
   queryContext,
   { content, description, keyword, heuristic = false }
 ) {
+  let payload = {
+    title: [description, UrlbarUtils.HIGHLIGHT.TYPED],
+    content: [content, UrlbarUtils.HIGHLIGHT.TYPED],
+    keyword: [keyword, UrlbarUtils.HIGHLIGHT.TYPED],
+    icon: [UrlbarUtils.ICON.EXTENSION],
+  };
+  if (!heuristic) {
+    payload.blockL10n = { id: "urlbar-result-menu-dismiss-firefox-suggest" };
+  }
   let result = new UrlbarResult(
     UrlbarUtils.RESULT_TYPE.OMNIBOX,
     UrlbarUtils.RESULT_SOURCE.ADDON,
-    ...UrlbarResult.payloadAndSimpleHighlights(queryContext.tokens, {
-      title: [description, UrlbarUtils.HIGHLIGHT.TYPED],
-      content: [content, UrlbarUtils.HIGHLIGHT.TYPED],
-      keyword: [keyword, UrlbarUtils.HIGHLIGHT.TYPED],
-      icon: [UrlbarUtils.ICON.EXTENSION],
-    })
+    ...UrlbarResult.payloadAndSimpleHighlights(queryContext.tokens, payload)
   );
   result.heuristic = heuristic;
+
   return result;
 }
 
@@ -1024,6 +1035,13 @@ async function check_results({
         actual.providerName,
         expected.providerName,
         `result.providerName at result index ${i}`
+      );
+    }
+    if (expected.hasOwnProperty("suggestedIndex")) {
+      Assert.equal(
+        actual.suggestedIndex,
+        expected.suggestedIndex,
+        `result.suggestedIndex at result index ${i}`
       );
     }
 

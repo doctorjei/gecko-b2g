@@ -21,12 +21,13 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/ContentIterator.h"
 #include "mozilla/EditorForwards.h"
-#include "mozilla/SelectionState.h"
 #include "mozilla/mozalloc.h"
+#include "mozilla/SelectionState.h"
 #include "mozilla/StaticPrefs_editor.h"
 #include "mozilla/dom/AncestorIterator.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/HTMLBRElement.h"
+#include "mozilla/dom/NameSpaceConstants.h"
 #include "mozilla/dom/Selection.h"
 #include "mozilla/dom/Text.h"
 
@@ -117,10 +118,14 @@ nsresult HTMLEditor::SetInlinePropertyAsAction(nsStaticAtom& aProperty,
   nsString value(aValue);
   if (attribute == nsGkAtoms::color || attribute == nsGkAtoms::bgcolor) {
     if (!IsCSSEnabled()) {
-      // We allow "transparent" value even in the HTML mode.  In the case,
-      // we need to apply the style with CSS.  For considering it in the
-      // style setter, we need to keep the keyword as-is.
-      if (!value.LowerCaseEqualsLiteral("transparent")) {
+      // We allow CSS style color value even in the HTML mode.  In the cases,
+      // we will apply the style with CSS.  For considering it in the value
+      // as-is if it's a known CSS keyboard, `rgb()` or `rgba()` style.
+      // NOTE: It may be later that we set the color into the DOM tree and at
+      // that time, IsCSSEnabled() may return true.  E.g., setting color value
+      // to collapsed selection, then, change the CSS enabled, finally, user
+      // types text there.
+      if (!HTMLEditUtils::MaybeCSSSpecificColorValue(value)) {
         HTMLEditUtils::GetNormalizedHTMLColorValue(value, value);
       }
     } else {
@@ -1142,19 +1147,25 @@ Result<CaretPoint, nsresult> HTMLEditor::AutoInlineStyleSetter::ApplyStyle(
   }
 
   auto ShouldUseCSS = [&]() {
-    return (aHTMLEditor.IsCSSEnabled() &&
-            aContent.GetAsElementOrParentElement() &&
-            IsCSSSettable(*aContent.GetAsElementOrParentElement())) ||
-           // bgcolor is always done using CSS
-           mAttribute == nsGkAtoms::bgcolor ||
-           // "transparent" keyword is allowed in both HTML and CSS modes.
-           // However, <font color="..."> cannot accept the value.  Therefore,
-           // we need to use <span style="color:transparent"> in this case.
-           (mAttribute == nsGkAtoms::color &&
-            mAttributeValue.LowerCaseEqualsLiteral("transparent")) ||
-           // called for removing parent style, we should use CSS with
-           // `<span>` element.
-           IsStyleToInvert();
+    if (aHTMLEditor.IsCSSEnabled() && aContent.GetAsElementOrParentElement() &&
+        IsCSSSettable(*aContent.GetAsElementOrParentElement())) {
+      return true;
+    }
+    // bgcolor is always done using CSS
+    if (mAttribute == nsGkAtoms::bgcolor) {
+      return true;
+    }
+    // called for removing parent style, we should use CSS with <span> element.
+    if (IsStyleToInvert()) {
+      return true;
+    }
+    // If we set color value, the value may be able to specified only with CSS.
+    // In that case, we need to use CSS even in the HTML mode.
+    if (mAttribute == nsGkAtoms::color) {
+      return mAttributeValue.First() != '#' &&
+             !HTMLEditUtils::CanConvertToHTMLColorValue(mAttributeValue);
+    }
+    return false;
   };
 
   if (ShouldUseCSS()) {
@@ -1218,6 +1229,14 @@ Result<CaretPoint, nsresult> HTMLEditor::AutoInlineStyleSetter::ApplyStyle(
     return CaretPoint(pointToPutCaret);
   }
 
+  nsAutoString attributeValue(mAttributeValue);
+  if (mAttribute == nsGkAtoms::color && mAttributeValue.First() != '#') {
+    // At here, all color values should be able to be parsed as a CSS color
+    // value.  Therefore, we need to convert it to normalized HTML color value.
+    HTMLEditUtils::ConvertToNormalizedHTMLColorValue(attributeValue,
+                                                     attributeValue);
+  }
+
   // is it already the right kind of node, but with wrong attribute?
   if (aContent.IsHTMLElement(&HTMLPropertyRef())) {
     if (NS_WARN_IF(!mAttribute)) {
@@ -1225,7 +1244,7 @@ Result<CaretPoint, nsresult> HTMLEditor::AutoInlineStyleSetter::ApplyStyle(
     }
     // Just set the attribute on it.
     nsresult rv = aHTMLEditor.SetAttributeWithTransaction(
-        MOZ_KnownLive(*aContent.AsElement()), *mAttribute, mAttributeValue);
+        MOZ_KnownLive(*aContent.AsElement()), *mAttribute, attributeValue);
     if (NS_WARN_IF(aHTMLEditor.Destroyed())) {
       return Err(NS_ERROR_EDITOR_DESTROYED);
     }
@@ -1241,7 +1260,17 @@ Result<CaretPoint, nsresult> HTMLEditor::AutoInlineStyleSetter::ApplyStyle(
   Result<CreateElementResult, nsresult> wrapWithNewElementToFormatResult =
       aHTMLEditor.InsertContainerWithTransaction(
           aContent, MOZ_KnownLive(HTMLPropertyRef()),
-          mAttribute ? *mAttribute : *nsGkAtoms::_empty, mAttributeValue);
+          !mAttribute ? HTMLEditor::DoNothingForNewElement
+                      // MOZ_CAN_RUN_SCRIPT_BOUNDARY due to bug 1758868
+                      : [&](HTMLEditor& aHTMLEditor, Element& aNewElement,
+                            const EditorDOMPoint&) MOZ_CAN_RUN_SCRIPT_BOUNDARY {
+                          nsresult rv =
+                              aNewElement.SetAttr(kNameSpaceID_None, mAttribute,
+                                                  attributeValue, false);
+                          NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
+                                               "Element::SetAttr() failed");
+                          return rv;
+                        });
   if (MOZ_UNLIKELY(wrapWithNewElementToFormatResult.isErr())) {
     NS_WARNING("HTMLEditor::InsertContainerWithTransaction() failed");
     return wrapWithNewElementToFormatResult.propagateErr();
@@ -1667,7 +1696,10 @@ EditorRawDOMPoint HTMLEditor::AutoInlineStyleSetter::
   MOZ_ASSERT(aStartPoint.IsSetAndValid());
 
   EditorRawDOMPoint startPoint = aStartPoint;
-  if (!startPoint.IsStartOfContainer()) {
+  // FIXME: This should handle ignore invisible white-spaces before the position
+  // if it's in a text node or invisible white-spaces.
+  if (!startPoint.IsStartOfContainer() ||
+      startPoint.GetContainer()->GetPreviousSibling()) {
     return startPoint;
   }
 
@@ -1709,7 +1741,10 @@ EditorRawDOMPoint HTMLEditor::AutoInlineStyleSetter::
   MOZ_ASSERT(aEndPoint.IsSetAndValid());
 
   EditorRawDOMPoint endPoint = aEndPoint;
-  if (!endPoint.IsEndOfContainer()) {
+  // FIXME: This should ignore invisible white-spaces after the position if it's
+  // in a text node, invisible <br> or following invisible text nodes.
+  if (!endPoint.IsEndOfContainer() ||
+      endPoint.GetContainer()->GetNextSibling()) {
     return endPoint;
   }
 
@@ -2373,11 +2408,14 @@ Result<EditorDOMPoint, nsresult> HTMLEditor::ClearStyleAt(
     }
   }
 
+  if (!unwrappedSplitResultAtStartOfNextNode.Handled()) {
+    return std::move(pointToPutCaret);
+  }
+
   // If there is no content, we should return here.
   // XXX Is this possible case without mutation event listener?
-  if (NS_WARN_IF(!unwrappedSplitResultAtStartOfNextNode.Handled()) ||
-      !unwrappedSplitResultAtStartOfNextNode.GetPreviousContent()) {
-    // XXX This is really odd, but we retrun this value...
+  if (!unwrappedSplitResultAtStartOfNextNode.GetPreviousContent()) {
+    // XXX This is really odd, but we return this value...
     const auto splitPoint =
         unwrappedSplitNodeResult.AtSplitPoint<EditorRawDOMPoint>();
     const auto splitPointAtStartOfNextNode =

@@ -6,11 +6,8 @@
 
 var EXPORTED_SYMBOLS = ["GeckoViewContent"];
 
-const { GeckoViewModule } = ChromeUtils.import(
-  "resource://gre/modules/GeckoViewModule.jsm"
-);
-const { XPCOMUtils } = ChromeUtils.importESModule(
-  "resource://gre/modules/XPCOMUtils.sys.mjs"
+const { GeckoViewModule } = ChromeUtils.importESModule(
+  "resource://gre/modules/GeckoViewModule.sys.mjs"
 );
 
 class GeckoViewContent extends GeckoViewModule {
@@ -29,6 +26,7 @@ class GeckoViewContent extends GeckoViewModule {
       "GeckoView:SetPriorityHint",
       "GeckoView:UpdateInitData",
       "GeckoView:ZoomToInput",
+      "GeckoView:IsPdfJs",
     ]);
   }
 
@@ -191,6 +189,9 @@ class GeckoViewContent extends GeckoViewModule {
         break;
       case "GeckoView:ContainsFormData":
         this._containsFormData(aCallback);
+        break;
+      case "GeckoView:IsPdfJs":
+        aCallback.onSuccess(this.isPdfJs);
         break;
     }
   }

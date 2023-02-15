@@ -105,7 +105,6 @@ const TEST_PROTON_CONTENT = [
 const TEST_PROTON_JSON = JSON.stringify(TEST_PROTON_CONTENT);
 
 async function openAboutWelcome() {
-  await pushPrefs([MR_TEMPLATE_PREF, false]);
   await setAboutWelcomePref(true);
   await setAboutWelcomeMultiStage(TEST_PROTON_JSON);
 
@@ -178,7 +177,7 @@ add_task(async function test_multistage_aboutwelcome_proton() {
   }
 
   Assert.ok(
-    clickCall.args[1].message_id === "DEFAULT_ABOUTWELCOME_PROTON_0_AW_STEP1",
+    clickCall.args[1].message_id === "MR_WELCOME_DEFAULT_0_AW_STEP1",
     "AboutWelcome proton message id joined with screen id"
   );
 
@@ -351,7 +350,7 @@ add_task(async function test_AWMultistage_Primary_Action() {
     );
     Assert.equal(
       impressionCall.args[1].message_id,
-      "DEFAULT_ABOUTWELCOME_PROTON_SITES",
+      "MR_WELCOME_DEFAULT_SITES",
       "SITES MessageId sent in impression event telemetry"
     );
     Assert.equal(
@@ -390,7 +389,7 @@ add_task(async function test_AWMultistage_Primary_Action() {
     );
     Assert.equal(
       performanceCall.args[1].message_id,
-      "DEFAULT_ABOUTWELCOME_PROTON",
+      "MR_WELCOME_DEFAULT",
       "MessageId sent in performance event telemetry"
     );
   }
@@ -412,7 +411,7 @@ add_task(async function test_AWMultistage_Primary_Action() {
   );
   Assert.equal(
     clickCall.args[1].message_id,
-    "DEFAULT_ABOUTWELCOME_PROTON_0_AW_STEP1",
+    "MR_WELCOME_DEFAULT_0_AW_STEP1",
     "MessageId sent in click event telemetry"
   );
 });

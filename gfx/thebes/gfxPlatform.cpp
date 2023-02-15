@@ -2474,7 +2474,7 @@ void gfxPlatform::InitAcceleration() {
         gfxPlatformGtk::GetPlatform()->InitVAAPIConfig(
             StaticPrefs::
                 media_hardware_video_decoding_force_enabled_AtStartup() ||
-            StaticPrefs::media_ffmpeg_vaapi_enabled());
+            StaticPrefs::media_ffmpeg_vaapi_enabled_AtStartup());
 #else
     if (
 #  ifdef XP_WIN
@@ -3014,16 +3014,17 @@ void gfxPlatform::InitWebGPUConfig() {
   }
 
   FeatureState& feature = gfxConfig::GetFeature(Feature::WEBGPU);
-  feature.SetDefaultFromPref("dom.webgpu.enabled", true, false);
-
-  if (StaticPrefs::gfx_webgpu_force_enabled_AtStartup()) {
-    feature.UserForceEnable("Force-enabled by pref");
-  }
+  feature.EnableByDefault();
 
   nsCString message;
   nsCString failureId;
   if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_WEBGPU, &message, failureId)) {
     feature.Disable(FeatureStatus::Blocklisted, message.get(), failureId);
+
+    if (StaticPrefs::gfx_webgpu_ignore_blocklist_AtStartup()) {
+      feature.UserForceEnable(
+          "Ignoring blocklist entry because of gfx.webgpu.force-enabled:true.");
+    }
   }
 
 #ifdef RELEASE_OR_BETA

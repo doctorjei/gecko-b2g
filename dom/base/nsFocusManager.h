@@ -269,18 +269,6 @@ class nsFocusManager final : public nsIFocusManager,
       const mozilla::dom::FocusOptions& aOptions);
 
   /**
-   * Returns the content node that focus will be redirected to if aContent was
-   * focused. This is used for the special case of certain XUL elements such
-   * as textboxes or input number which redirect focus to an anonymous child.
-   *
-   * aContent must be non-null.
-   *
-   * XXXndeakin this should be removed eventually but I want to do that as
-   * followup work.
-   */
-  static mozilla::dom::Element* GetRedirectedFocus(nsIContent* aContent);
-
-  /**
    * Returns an InputContextAction cause for aFlags.
    */
   static InputContextAction::Cause GetFocusMoveActionCause(uint32_t aFlags);
@@ -422,8 +410,8 @@ class nsFocusManager final : public nsIFocusManager,
   MOZ_CAN_RUN_SCRIPT bool Blur(
       mozilla::dom::BrowsingContext* aBrowsingContextToClear,
       mozilla::dom::BrowsingContext* aAncestorBrowsingContextToFocus,
-      bool aIsLeavingDocument, bool aAdjustWidget, uint64_t aActionId,
-      mozilla::dom::Element* aElementToFocus = nullptr);
+      bool aIsLeavingDocument, bool aAdjustWidget, bool aRemainActive,
+      uint64_t aActionId, mozilla::dom::Element* aElementToFocus = nullptr);
   MOZ_CAN_RUN_SCRIPT void BlurFromOtherProcess(
       mozilla::dom::BrowsingContext* aFocusedBrowsingContext,
       mozilla::dom::BrowsingContext* aBrowsingContextToClear,
@@ -432,7 +420,7 @@ class nsFocusManager final : public nsIFocusManager,
   MOZ_CAN_RUN_SCRIPT bool BlurImpl(
       mozilla::dom::BrowsingContext* aBrowsingContextToClear,
       mozilla::dom::BrowsingContext* aAncestorBrowsingContextToFocus,
-      bool aIsLeavingDocument, bool aAdjustWidget,
+      bool aIsLeavingDocument, bool aAdjustWidget, bool aRemainActive,
       mozilla::dom::Element* aElementToFocus, uint64_t aActionId);
 
   /**
@@ -864,6 +852,11 @@ class nsFocusManager final : public nsIFocusManager,
   uint64_t GetActionIdForFocusedBrowsingContextInChrome() const;
 
   static uint64_t GenerateFocusActionId();
+
+  // This function works very similar to
+  // https://html.spec.whatwg.org/#get-the-focusable-area
+  static mozilla::dom::Element* GetTheFocusableArea(
+      mozilla::dom::Element* aTarget, uint32_t aFlags);
 
  private:
   // In the chrome process, the currently active and front-most top-most

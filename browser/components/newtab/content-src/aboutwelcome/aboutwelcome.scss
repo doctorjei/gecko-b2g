@@ -143,6 +143,7 @@ html {
     justify-content: center;
     width: $main-section-width;
     flex-shrink: 0;
+    position: relative;
   }
 
   .main-content {
@@ -375,6 +376,7 @@ html {
       }
 
       .secondary-cta.top {
+        position: fixed;
         padding-inline-end: 0;
 
         button {
@@ -736,6 +738,10 @@ html {
             }
           }
 
+          .dismiss-button {
+            top: -$small-secondary-section-height;
+          }
+
           &:dir(rtl) {
             margin: 0 auto auto;
 
@@ -747,30 +753,25 @@ html {
 
       }
 
-      // Reposition the "Sign in" button on the welcome screen to move inside
-      // the screen when it would otherwise overlap the screen.
       @media only screen and (max-height: 650px) {
+        // Hide the "Sign in" button on the welcome screen when it would
+        // otherwise overlap the screen. We'd reposition it, but then it would
+        // overlap the dismiss button. We may change the alignment so they don't
+        // overlap in a future revision.
         @media (min-width: 800px) and (max-width: 990px) {
-          .section-main {
-            position: relative;
-
-            .secondary-cta.top {
-              padding: 0;
-              top: 20px;
-              inset-inline-end: 20px;
-            }
+          .section-main .secondary-cta.top {
+            display: none;
           }
         }
 
+        // Reposition the "Sign in" button on the welcome screen to move inside
+        // the screen when it would otherwise overlap the screen.
         @media (max-width: 590px) {
-          .section-main {
-            position: relative;
-
-            .secondary-cta.top {
-              padding: 0;
-              top: 0;
-              inset-inline-end: 0;
-            }
+          .section-main .secondary-cta.top {
+            position: absolute;
+            padding: 0;
+            top: 0;
+            inset-inline-end: 0;
           }
         }
       }
@@ -1180,20 +1181,31 @@ html {
   }
 
   .dismiss-button {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: auto;
+    right: 0;
+    box-sizing: border-box;
     padding: 0;
-    margin-block: 30px -45px;
-    margin-inline: 0 30px;
+    margin: 16px;
     display: block;
     float: inline-end;
-    background: url('chrome://global/skin/icons/close.svg') no-repeat center / cover;
-    height: 15px;
-    width: 15px;
+    background: url('chrome://global/skin/icons/close.svg') no-repeat center / 16px;
+    height: 32px;
+    width: 32px;
     align-self: end;
     // override default min-height and min-width for buttons
-    min-height: 15px;
-    min-width: 15px;
+    min-height: 32px;
+    min-width: 32px;
     -moz-context-properties: fill;
     fill: currentColor;
+    transition: var(--transition);
+
+    &:dir(rtl) {
+      left: 0;
+      right: auto;
+    }
   }
 
   @keyframes fadein {
@@ -1634,13 +1646,15 @@ html {
       }
 
       .attrib-text,
-      .secondary-cta.top {
+      .secondary-cta.top,
+      .dismiss-button {
         opacity: 0;
       }
     }
 
     .dialog-initial {
-      .main-content {
+      .main-content,
+      .dismiss-button {
         translate: 0 calc(-2 * var(--translate));
       }
 
@@ -1654,6 +1668,11 @@ html {
     .screen:not(.dialog-initial):not([pos='corner']) {
       .steps:not(.progress-bar) {
         opacity: 0.2;
+      }
+
+      .dismiss-button {
+        opacity: 0;
+        translate: 0 calc(-1 * var(--translate));
       }
     }
 
@@ -1686,7 +1705,8 @@ html {
         translate: 0 var(--translate);
       }
 
-      .main-content {
+      .main-content,
+      .dismiss-button {
         opacity: 0;
         translate: 0 var(--translate);
         transition-delay: 0.2s;
@@ -1727,7 +1747,8 @@ html {
       .checkbox-container,
       .secondary,
       .secondary-cta:not(.top),
-      .cta-link {
+      .cta-link,
+      .dismiss-button {
         opacity: 0;
         translate: 0 var(--translate);
         transition-delay: 0.3s;
@@ -1744,7 +1765,8 @@ html {
         transition-delay: 0s;
       }
 
-      .main-content {
+      .main-content,
+      .dismiss-button {
         opacity: 0;
         translate: 0 calc(2 * var(--translate));
         transition-delay: 0.4s;

@@ -30,6 +30,8 @@
 #include "nsPoint.h"
 #include "nsStubMutationObserver.h"
 
+#include <functional>
+
 class nsDocumentFragment;
 class nsFrameSelection;
 class nsHTMLDocument;
@@ -319,7 +321,7 @@ class HTMLEditor final : public EditorBase,
    */
   enum class SelectAllOfCurrentList { Yes, No };
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT nsresult MakeOrChangeListAsAction(
-      nsAtom& aListElementTagName, const nsAString& aBulletType,
+      const nsStaticAtom& aListElementTagName, const nsAString& aBulletType,
       SelectAllOfCurrentList aSelectAllOfCurrentList,
       nsIPrincipal* aPrincipal = nullptr);
 
@@ -1143,18 +1145,23 @@ class HTMLEditor final : public EditorBase,
                        const Element& aEditingHost);
 
   /**
-   * SplitParentInlineElementsAtRangeEdges() splits parent inline nodes at both
-   * start and end of aRangeItem.  If this splits at every point, this modifies
-   * aRangeItem to point each split point (typically, right node).
+   * Splits parent inline nodes at both start and end of aRangeItem.  If this
+   * splits at every point, this modifies aRangeItem to point each split point
+   * (typically, at right node).
    *
    * @param aRangeItem          [in/out] One or two DOM points where should be
    *                            split.  Will be modified to split point if
    *                            they're split.
+   * @param aEditingHost        [in] The editing host.
+   * @param aAncestorLimiter    [in/optional] If specified, this stops splitting
+   *                            ancestors when meets this node.
    * @return                    A suggest point to put caret if succeeded, but
    *                            it may be unset.
    */
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<EditorDOMPoint, nsresult>
-  SplitParentInlineElementsAtRangeEdges(RangeItem& aRangeItem);
+  SplitParentInlineElementsAtRangeBoundaries(
+      RangeItem& aRangeItem, const Element& aEditingHost,
+      const nsIContent* aAncestorLimiter = nullptr);
 
   /**
    * SplitElementsAtEveryBRElement() splits before all <br> elements in
@@ -1235,6 +1242,20 @@ class HTMLEditor final : public EditorBase,
       std::function<nsresult(HTMLEditor& aHTMLEditor, Element& aNewElement,
                              const EditorDOMPoint& aPointToInsert)>;
   static InitializeInsertingElement DoNothingForNewElement;
+  static InitializeInsertingElement InsertNewBRElement;
+
+  /**
+   * Helper methods to implement InitializeInsertingElement.
+   */
+  MOZ_CAN_RUN_SCRIPT static Result<CreateElementResult, nsresult>
+  AppendNewElementToInsertingElement(
+      HTMLEditor& aHTMLEditor, const nsStaticAtom& aTagName,
+      Element& aNewElement,
+      const InitializeInsertingElement& aInitializer = DoNothingForNewElement);
+  MOZ_CAN_RUN_SCRIPT static Result<CreateElementResult, nsresult>
+  AppendNewElementWithBRToInsertingElement(HTMLEditor& aHTMLEditor,
+                                           const nsStaticAtom& aTagName,
+                                           Element& aNewElement);
 
   /**
    * Create an element node whose name is aTag at before aPointToInsert.  When
@@ -1267,6 +1288,40 @@ class HTMLEditor final : public EditorBase,
       WithTransaction aWithTransaction, nsAtom& aTagName,
       const EditorDOMPoint& aPointToInsert,
       const InitializeInsertingElement& aInitializer = DoNothingForNewElement);
+
+  /**
+   * Callback of CopyAttributes().
+   *
+   * @param aHTMLEditor   The HTML editor.
+   * @param aSrcElement   The element which have the attribute.
+   * @param aDestElement  The element which will have the attribute.
+   * @param aAttr         [in] The attribute which will be copied.
+   * @param aValue        [in/out] The attribute value which will be copied.
+   *                      Once updated, the new value is used.
+   * @return              true if the attribute should be copied, otherwise,
+   *                      false.
+   */
+  using AttributeFilter = std::function<bool(
+      HTMLEditor& aHTMLEditor, Element& aSrcElement, Element& aDestElement,
+      const dom::Attr& aAttr, nsString& aValue)>;
+  static AttributeFilter CopyAllAttributes;
+  static AttributeFilter CopyAllAttributesExceptId;
+  static AttributeFilter CopyAllAttributesExceptDir;
+  static AttributeFilter CopyAllAttributesExceptIdAndDir;
+
+  /**
+   * Copy all attributes of aSrcElement to aDestElement as-is.  Different from
+   * EditorBase::CloneAttributesWithTransaction(), this does not use
+   * SetAttributeOrEquivalent() nor does not clear existing attributes of
+   * aDestElement.
+   *
+   * @param aWithTransaction    Whether recoding with transactions or not.
+   * @param aDestElement        The element will have attributes.
+   * @param aSrcElement         The element whose attributes will be copied.
+   */
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT nsresult CopyAttributes(
+      WithTransaction aWithTransaction, Element& aDestElement,
+      Element& aSrcElement, const AttributeFilter& = CopyAllAttributes);
 
   /**
    * MaybeSplitAncestorsForInsertWithTransaction() does nothing if container of
@@ -1579,37 +1634,7 @@ class HTMLEditor final : public EditorBase,
   ChangeListElementType(Element& aListElement, nsAtom& aListType,
                         nsAtom& aItemType);
 
-  /**
-   * ConvertContentAroundRangesToList() converts contents around aRanges to
-   * specified list element.  If there is different type of list elements, this
-   * method converts them to specified list items too.  Basically, each hard
-   * line will be wrapped with a list item element.  However, only when `<p>`
-   * element is selected, its child `<br>` elements won't be treated as
-   * hard line separators.  Perhaps, this is a bug.
-   *
-   * @param aRanges     [in/out] The ranges which will be converted to list.
-   *                    The instance must not have saved ranges because it'll
-   *                    be used in this method.
-   *                    If succeeded, this will have selection ranges which
-   *                    should be applied to `Selection`.
-   *                    If failed, this keeps storing original selection
-   *                    ranges.
-   * @param aListElementTagName         The new list element tag name.
-   * @param aListItemElementTagName     The new list item element tag name.
-   * @param aBulletType                 If this is not empty string, it's set
-   *                                    to `type` attribute of new list item
-   *                                    elements.  Otherwise, existing `type`
-   *                                    attributes will be removed.
-   * @param aSelectAllOfCurrentList     Yes if this should treat all of
-   *                                    ancestor list element at selection.
-   * @param aEditingHost                The editing host.
-   */
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<EditActionResult, nsresult>
-  ConvertContentAroundRangesToList(
-      AutoRangeArray& aRanges, nsAtom& aListElementTagName,
-      nsAtom& aListItemElementTagName, const nsAString& aBulletType,
-      SelectAllOfCurrentList aSelectAllOfCurrentList,
-      const Element& aEditingHost);
+  class AutoListElementCreator;
 
   /**
    * MakeOrChangeListAndListItemAsSubAction() handles create list commands with
@@ -1630,7 +1655,7 @@ class HTMLEditor final : public EditorBase,
    */
   [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<EditActionResult, nsresult>
   MakeOrChangeListAndListItemAsSubAction(
-      nsAtom& aListElementOrListItemElementTagName,
+      const nsStaticAtom& aListElementOrListItemElementTagName,
       const nsAString& aBulletType,
       SelectAllOfCurrentList aSelectAllOfCurrentList);
 
@@ -1763,33 +1788,13 @@ class HTMLEditor final : public EditorBase,
    * @param aWrapperTagName     Element name of new element which will wrap
    *                            aContent and be inserted into where aContent
    *                            was.
+   * @param aInitializer        A callback to initialize new element before
+   *                            inserting to the DOM tree.
    */
-  [[nodiscard]] inline MOZ_CAN_RUN_SCRIPT Result<CreateElementResult, nsresult>
-  InsertContainerWithTransaction(nsIContent& aContentToBeWrapped,
-                                 const nsAtom& aWrapperTagName);
-
-  /**
-   * InsertContainerWithTransaction() creates new element whose name is
-   * aWrapperTagName, sets its aAttribute to aAttributeValue, moves
-   * aContentToBeWrapped into the new element, then, inserts the new element
-   * into where aContentToBeWrapped was.
-   * NOTE: This method does not check if aContentToBeWrapped is valid child
-   * of the new element.  So, callers need to guarantee it.
-   *
-   * @param aContentToBeWrapped The content which will be wrapped with new
-   *                            element.
-   * @param aWrapperTagName     Element name of new element which will wrap
-   *                            aContent and be inserted into where aContent
-   *                            was.
-   * @param aAttribute          Attribute which should be set to the new
-   *                            element.
-   * @param aAttributeValue     Value to be set to aAttribute.
-   */
-  [[nodiscard]] inline MOZ_CAN_RUN_SCRIPT Result<CreateElementResult, nsresult>
-  InsertContainerWithTransaction(nsIContent& aContentToBeWrapped,
-                                 const nsAtom& aWrapperTagName,
-                                 const nsAtom& aAttribute,
-                                 const nsAString& aAttributeValue);
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CreateElementResult, nsresult>
+  InsertContainerWithTransaction(
+      nsIContent& aContentToBeWrapped, const nsAtom& aWrapperTagName,
+      const InitializeInsertingElement& aInitializer = DoNothingForNewElement);
 
   /**
    * MoveNodeWithTransaction() moves aContentToMove to aPointToInsert.
@@ -1937,45 +1942,6 @@ class HTMLEditor final : public EditorBase,
   void MoveInclusiveNextSiblings(nsIContent& aChild,
                                  const EditorRawDOMPoint& aPointToInsert,
                                  ErrorResult& aError);
-
-  /**
-   * MoveOneHardLineContentsWithTransaction() moves the content in a hard line
-   * which contains aPointInHardLine to aPointToInsert or end of
-   * aPointToInsert's container.
-   *
-   * @param aPointInHardLine            A point in a hard line.  All nodes in
-   *                                    same hard line will be moved.
-   * @param aPointToInsert              Point to insert contents of the hard
-   *                                    line.
-   * @param aEditingHost                The editing host.
-   * @param aMoveToEndOfContainer       If `Yes`, aPointToInsert.Offset() will
-   *                                    be ignored and instead, all contents
-   *                                    will be appended to the container of
-   *                                    aPointToInsert.  The result may be
-   *                                    different from setting this to `No`
-   *                                    and aPointToInsert points end of the
-   *                                    container because mutation event
-   *                                    listeners may modify children of the
-   *                                    container while we're moving nodes.
-   */
-  enum class MoveToEndOfContainer { Yes, No };
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<MoveNodeResult, nsresult>
-  MoveOneHardLineContentsWithTransaction(
-      const EditorDOMPoint& aPointInHardLine,
-      const EditorDOMPoint& aPointToInsert, const Element& aEditingHost,
-      MoveToEndOfContainer aMoveToEndOfContainer = MoveToEndOfContainer::No);
-
-  /**
-   * CanMoveOrDeleteSomethingInHardLine() returns true if there are some content
-   * nodes which can be moved to another place or deleted.  Note that if there
-   * is only a padding `<br>` element in empty block element, this returns
-   * false even though it may be deleted.
-   *
-   * @param aPointInHardLine    A point in a hard line.
-   */
-  Result<bool, nsresult> CanMoveOrDeleteSomethingInHardLine(
-      const EditorDOMPoint& aPointInHardLine,
-      const Element& aEditingHost) const;
 
   /**
    * SplitNodeWithTransaction() creates a transaction to create a new node
@@ -2195,6 +2161,7 @@ class HTMLEditor final : public EditorBase,
                         nsIEditor::EStripWrappers aStripWrappers) final;
 
   class AutoDeleteRangesHandler;
+  class AutoMoveOneLineHandler;
 
   /**
    * DeleteMostAncestorMailCiteElementIfEmpty() deletes most ancestor
@@ -3171,30 +3138,6 @@ class HTMLEditor final : public EditorBase,
                                           const nsAtom& aAttribute,
                                           const nsAString& aAttributeValue,
                                           bool aCloneAllAttributes);
-
-  /**
-   * InsertContainerWithTransactionInternal() creates new element whose name is
-   * aWrapperTagName, moves aContentToBeWrapped into the new element, then,
-   * inserts the new element into where aContent was.  If aAttribute is not
-   * nsGkAtoms::_empty, aAttribute of the new element will be set to
-   * aAttributeValue.
-   *
-   * @param aContentToBeWrapped The content which will be wrapped with new
-   *                            element.
-   * @param aWrapperTagName     Element name of new element which will wrap
-   *                            aContent and be inserted into where aContent
-   *                            was.
-   * @param aAttribute          Attribute which should be set to the new
-   *                            element.  If this is nsGkAtoms::_empty,
-   *                            this does not set any attributes to the new
-   *                            element.
-   * @param aAttributeValue     Value to be set to aAttribute.
-   */
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CreateElementResult, nsresult>
-  InsertContainerWithTransactionInternal(nsIContent& aContentToBeWrapped,
-                                         const nsAtom& aWrapperTagName,
-                                         const nsAtom& aAttribute,
-                                         const nsAString& aAttributeValue);
 
   /**
    * DeleteSelectionAndCreateElement() creates a element whose name is aTag.
@@ -4491,7 +4434,7 @@ class HTMLEditor final : public EditorBase,
   friend class AlignStateAtSelection;  // CollectEditableTargetNodes,
                                        // CollectNonEditableNodes
   friend class AutoRangeArray;  // RangeUpdaterRef, SplitNodeWithTransaction,
-                                // SplitParentInlineElementsAtRangeEdges
+                                // SplitParentInlineElementsAtRangeBoundaries
   friend class AutoSelectionSetterAfterTableEdit;  // SetSelectionAfterEdit
   friend class
       AutoSetTemporaryAncestorLimiter;  // InitializeSelectionAncestorLimit
@@ -4527,15 +4470,13 @@ class HTMLEditor final : public EditorBase,
   friend class TransactionManager;  // DidDoTransaction, DidRedoTransaction,
                                     // DidUndoTransaction
   friend class
-      WhiteSpaceVisibilityKeeper;  // CanMoveChildren,
-                                   // CanMoveOrDeleteSomethingInHardLine,
+      WhiteSpaceVisibilityKeeper;  // AutoMoveOneLineHandler
+                                   // CanMoveChildren,
                                    // ChangeListElementType,
                                    // DeleteNodeWithTransaction,
                                    // DeleteTextAndTextNodesWithTransaction,
                                    // JoinNearestEditableNodesWithTransaction,
                                    // MoveChildrenWithTransaction,
-                                   // MoveOneHardLineContentsWithTransaction,
-                                   // MoveToEndOfContainer,
                                    // SplitAncestorStyledInlineElementsAt,
                                    // TreatEmptyTextNodes
 };

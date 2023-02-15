@@ -6051,6 +6051,22 @@ bool BaseCompiler::emitTableFill() {
       });
 }
 
+bool BaseCompiler::emitMemDiscard() {
+  Nothing nothing;
+  if (!iter_.readMemDiscard(&nothing, &nothing)) {
+    return false;
+  }
+  if (deadCode_) {
+    return true;
+  }
+
+  pushHeapBase();
+  return emitInstanceCall(
+      usesSharedMemory()
+          ? (isMem32() ? SASigMemDiscardSharedM32 : SASigMemDiscardSharedM64)
+          : (isMem32() ? SASigMemDiscardM32 : SASigMemDiscardM64));
+}
+
 bool BaseCompiler::emitTableGet() {
   uint32_t tableIndex;
   Nothing nothing;
@@ -8796,17 +8812,19 @@ bool BaseCompiler::emitBody() {
     OpBytes op{};
     CHECK(iter_.readOp(&op));
 
-    // When compilerEnv_.debugEnabled(), every operator has a breakpoint site
-    // except Op::End.
-    if (compilerEnv_.debugEnabled() && op.b0 != (uint16_t)Op::End) {
-      // TODO sync only registers that can be clobbered by the exit
-      // prologue/epilogue or disable these registers for use in
-      // baseline compiler when compilerEnv_.debugEnabled() is set.
-      sync();
+    // When compilerEnv_.debugEnabled(), some operators get a breakpoint site.
+    if (compilerEnv_.debugEnabled() && op.shouldHaveBreakpoint()) {
+      if (previousBreakablePoint_ != masm.currentOffset()) {
+        // TODO sync only registers that can be clobbered by the exit
+        // prologue/epilogue or disable these registers for use in
+        // baseline compiler when compilerEnv_.debugEnabled() is set.
+        sync();
 
-      insertBreakablePoint(CallSiteDesc::Breakpoint);
-      if (!createStackMap("debug: per-insn breakpoint")) {
-        return false;
+        insertBreakablePoint(CallSiteDesc::Breakpoint);
+        if (!createStackMap("debug: per-insn breakpoint")) {
+          return false;
+        }
+        previousBreakablePoint_ = masm.currentOffset();
       }
     }
 
@@ -10225,6 +10243,14 @@ bool BaseCompiler::emitBody() {
             CHECK_NEXT(emitDataOrElemDrop(/*isData=*/true));
           case uint32_t(MiscOp::MemoryFill):
             CHECK_NEXT(emitMemFill());
+#ifdef ENABLE_WASM_MEMORY_CONTROL
+          case uint32_t(MiscOp::MemoryDiscard): {
+            if (!moduleEnv_.memoryControlEnabled()) {
+              return iter_.unrecognizedOpcode(&op);
+            }
+            CHECK_NEXT(emitMemDiscard());
+          }
+#endif
           case uint32_t(MiscOp::MemoryInit):
             CHECK_NEXT(emitMemInit());
           case uint32_t(MiscOp::TableCopy):
@@ -10655,6 +10681,7 @@ BaseCompiler::BaseCompiler(const ModuleEnvironment& moduleEnv,
       compilerEnv_(compilerEnv),
       func_(func),
       locals_(locals),
+      previousBreakablePoint_(UINT32_MAX),
       stkSource_(stkSource),
       // Output-only data structures
       alloc_(alloc->fallible()),

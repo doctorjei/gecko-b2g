@@ -3425,12 +3425,6 @@ class nsIFrame : public nsQueryFrame {
   bool IsImageFrameOrSubclass() const;
 
   /**
-   * Returns true if the frame is an instance of SVGGeometryFrame or one
-   * of its subclasses.
-   */
-  inline bool IsSVGGeometryFrameOrSubclass() const;
-
-  /**
    * Get this frame's CSS containing block.
    *
    * The algorithm is defined in
@@ -4149,8 +4143,6 @@ class nsIFrame : public nsQueryFrame {
   bool IsStackingContext(const nsStyleDisplay*, const nsStyleEffects*);
   bool IsStackingContext();
 
-  virtual bool HonorPrintBackgroundSettings() const { return true; }
-
   // Whether we should paint backgrounds or not.
   struct ShouldPaintBackground {
     bool mColor = false;
@@ -4311,9 +4303,12 @@ class nsIFrame : public nsQueryFrame {
    * focusable but removed from the tab order. This is the default on
    * Mac OS X, where fewer items are focusable.
    * @param  [in, optional] aWithMouse, is this focus query for mouse clicking
+   * @param  [in, optional] aCheckVisibility, whether to treat an invisible
+   *   frame as not focusable
    * @return whether the frame is focusable via mouse, kbd or script.
    */
-  [[nodiscard]] Focusable IsFocusable(bool aWithMouse = false);
+  [[nodiscard]] Focusable IsFocusable(bool aWithMouse = false,
+                                      bool aCheckVisibility = true);
 
   // BOX LAYOUT METHODS
   // These methods have been migrated from nsIBox and are in the process of

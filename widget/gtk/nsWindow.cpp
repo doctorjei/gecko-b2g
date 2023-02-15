@@ -96,6 +96,7 @@
 #include "nsViewManager.h"
 #include "nsXPLookAndFeel.h"
 #include "prlink.h"
+#include "Screen.h"
 #include "ScreenHelperGTK.h"
 #include "SystemTimeConverter.h"
 #include "WidgetUtilsGtk.h"
@@ -3572,10 +3573,15 @@ void nsWindow::CaptureRollupEvents(bool aDoCapture) {
     // not grabbing the pointer triggers rollup when the mouse enters the popup
     // and leaves the main window, see bug 1807482.
     //
+    // FVWM is also affected but less severely: the pointer can enter the
+    // popup, but if it briefly moves out of the popup and over the main window
+    // then we see a focus change and roll up the popup.
+    //
     // We don't do it for most common desktops, if only because it causes X11
     // crashes like bug 1607713.
     const auto& desktop = GetDesktopEnvironmentIdentifier();
-    return desktop.EqualsLiteral("twm") || desktop.EqualsLiteral("sawfish");
+    return desktop.EqualsLiteral("twm") || desktop.EqualsLiteral("sawfish") ||
+           StringBeginsWith(desktop, "fvwm"_ns);
   }();
 
   const bool grabPointer = [] {
@@ -4292,45 +4298,74 @@ void nsWindow::OnLeaveNotifyEvent(GdkEventCrossing* aEvent) {
   DispatchInputEvent(&event);
 }
 
-bool nsWindow::CheckResizerEdge(LayoutDeviceIntPoint aPoint,
-                                GdkWindowEdge& aOutEdge) {
-  // We only need to handle resizers for PIP window.
+Maybe<GdkWindowEdge> nsWindow::CheckResizerEdge(
+    const LayoutDeviceIntPoint& aPoint) {
+  const bool canResize = [&] {
+    // Don't allow resizing maximized/fullscreen windows.
+    if (mSizeMode != nsSizeMode_Normal) {
+      return false;
+    }
+    if (mIsPIPWindow) {
+      // Note that since we do show resizers on left/right sides on PIP windows,
+      // we still want the resizers there, even when tiled.
+      return true;
+    }
+    if (mDrawInTitlebar) {
+      // If we show top resizers on a (non-PIP) tiled window on GNOME, it
+      // doesn't really work, since the window is "stuck" to the top and
+      // bottom, so don't show them in that case.
+      return !mIsTiled;
+    }
+    // If we're not a PIP window nor drawing to the titlebar, we don't need to
+    // add resizers.
+    return false;
+  }();
+
+  if (!canResize) {
+    return {};
+  }
+
+  // If we're not in a PiP window, allow 1px resizer edge from the top edge,
+  // and nothing else.
+  // This is to allow resizes of tiled windows on KDE, see bug 1813554.
+  const int resizerSize = (mIsPIPWindow ? 15 : 1) * GdkCeiledScaleFactor();
+
+  const int topDist = aPoint.y;
+  const int leftDist = aPoint.x;
+  const int rightDist = mBounds.width - aPoint.x;
+  const int bottomDist = mBounds.height - aPoint.y;
+
+  if (topDist <= resizerSize) {
+    if (rightDist <= resizerSize) {
+      return Some(GDK_WINDOW_EDGE_NORTH_EAST);
+    }
+    if (leftDist <= resizerSize) {
+      return Some(GDK_WINDOW_EDGE_NORTH_WEST);
+    }
+    return Some(GDK_WINDOW_EDGE_NORTH);
+  }
+
   if (!mIsPIPWindow) {
-    return false;
+    return {};
   }
 
-  // Don't allow resizing maximized windows.
-  if (mSizeMode != nsSizeMode_Normal) {
-    return false;
+  if (bottomDist <= resizerSize) {
+    if (leftDist <= resizerSize) {
+      return Some(GDK_WINDOW_EDGE_SOUTH_WEST);
+    }
+    if (rightDist <= resizerSize) {
+      return Some(GDK_WINDOW_EDGE_SOUTH_EAST);
+    }
+    return Some(GDK_WINDOW_EDGE_SOUTH);
   }
 
-#define RESIZER_SIZE 15
-  int resizerSize = RESIZER_SIZE * GdkCeiledScaleFactor();
-  int topDist = aPoint.y;
-  int leftDist = aPoint.x;
-  int rightDist = mBounds.width - aPoint.x;
-  int bottomDist = mBounds.height - aPoint.y;
-
-  if (leftDist <= resizerSize && topDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_NORTH_WEST;
-  } else if (rightDist <= resizerSize && topDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_NORTH_EAST;
-  } else if (leftDist <= resizerSize && bottomDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_SOUTH_WEST;
-  } else if (rightDist <= resizerSize && bottomDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_SOUTH_EAST;
-  } else if (topDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_NORTH;
-  } else if (leftDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_WEST;
-  } else if (rightDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_EAST;
-  } else if (bottomDist <= resizerSize) {
-    aOutEdge = GDK_WINDOW_EDGE_SOUTH;
-  } else {
-    return false;
+  if (leftDist <= resizerSize) {
+    return Some(GDK_WINDOW_EDGE_WEST);
   }
-  return true;
+  if (rightDist <= resizerSize) {
+    return Some(GDK_WINDOW_EDGE_EAST);
+  }
+  return {};
 }
 
 template <typename Event>
@@ -4379,34 +4414,25 @@ void nsWindow::OnMotionNotifyEvent(GdkEventMotion* aEvent) {
     }
   }
 
-  GdkWindowEdge edge;
   const auto refPoint = GetRefPoint(this, aEvent);
-  if (CheckResizerEdge(refPoint, edge)) {
+  if (auto edge = CheckResizerEdge(refPoint)) {
     nsCursor cursor = eCursor_none;
-    switch (edge) {
+    switch (*edge) {
+      case GDK_WINDOW_EDGE_SOUTH:
       case GDK_WINDOW_EDGE_NORTH:
-        cursor = eCursor_n_resize;
-        break;
-      case GDK_WINDOW_EDGE_NORTH_WEST:
-        cursor = eCursor_nw_resize;
-        break;
-      case GDK_WINDOW_EDGE_NORTH_EAST:
-        cursor = eCursor_ne_resize;
+        cursor = eCursor_ns_resize;
         break;
       case GDK_WINDOW_EDGE_WEST:
-        cursor = eCursor_w_resize;
-        break;
       case GDK_WINDOW_EDGE_EAST:
-        cursor = eCursor_e_resize;
+        cursor = eCursor_ew_resize;
         break;
-      case GDK_WINDOW_EDGE_SOUTH:
-        cursor = eCursor_s_resize;
-        break;
-      case GDK_WINDOW_EDGE_SOUTH_WEST:
-        cursor = eCursor_sw_resize;
-        break;
+      case GDK_WINDOW_EDGE_NORTH_WEST:
       case GDK_WINDOW_EDGE_SOUTH_EAST:
-        cursor = eCursor_se_resize;
+        cursor = eCursor_nwse_resize;
+        break;
+      case GDK_WINDOW_EDGE_NORTH_EAST:
+      case GDK_WINDOW_EDGE_SOUTH_WEST:
+        cursor = eCursor_nesw_resize;
         break;
     }
     SetCursor(Cursor{cursor});
@@ -4587,9 +4613,8 @@ void nsWindow::OnButtonPressEvent(GdkEventButton* aEvent) {
   }
 
   // Check to see if the event is within our window's resize region
-  GdkWindowEdge edge;
-  if (CheckResizerEdge(refPoint, edge)) {
-    gdk_window_begin_resize_drag(gtk_widget_get_window(mShell), edge,
+  if (auto edge = CheckResizerEdge(refPoint)) {
+    gdk_window_begin_resize_drag(gtk_widget_get_window(mShell), *edge,
                                  aEvent->button, aEvent->x_root, aEvent->y_root,
                                  aEvent->time);
     return;
@@ -6017,8 +6042,8 @@ nsresult nsWindow::Create(nsIWidget* aParent, nsNativeWidget aNativeParent,
       GtkWindow* parentWidget = GTK_WINDOW(parentnsWindow->GetGtkWidget());
       GtkWindowSetTransientFor(GTK_WINDOW(mShell), parentWidget);
 
-      // If popup parent is modal, we need to make popup modal on Wayland too.
-      if (GdkIsWaylandDisplay() && mPopupHint != PopupType::Tooltip &&
+      // If popup parent is modal, we need to make popup modal too.
+      if (mPopupHint != PopupType::Tooltip &&
           gtk_window_get_modal(parentWidget)) {
         gtk_window_set_modal(GTK_WINDOW(mShell), true);
       }
@@ -7261,29 +7286,20 @@ void nsWindow::PerformFullscreenTransition(FullscreenTransitionStage aStage,
                      nullptr);
 }
 
-already_AddRefed<nsIScreen> nsWindow::GetWidgetScreen() {
+already_AddRefed<widget::Screen> nsWindow::GetWidgetScreen() {
   // Wayland can read screen directly
   if (GdkIsWaylandDisplay()) {
-    RefPtr<nsIScreen> screen = ScreenHelperGTK::GetScreenForWindow(this);
-    if (screen) {
+    if (RefPtr<Screen> screen = ScreenHelperGTK::GetScreenForWindow(this)) {
       return screen.forget();
     }
   }
 
-  nsCOMPtr<nsIScreenManager> screenManager;
-  screenManager = do_GetService("@mozilla.org/gfx/screenmanager;1");
-  if (!screenManager) {
-    return nullptr;
-  }
-
   // GetScreenBounds() is slow for the GTK port so we override and use
   // mBounds directly.
+  ScreenManager& screenManager = ScreenManager::GetSingleton();
   LayoutDeviceIntRect bounds = mBounds;
   DesktopIntRect deskBounds = RoundedToInt(bounds / GetDesktopToDeviceScale());
-  nsCOMPtr<nsIScreen> screen;
-  screenManager->ScreenForRect(deskBounds.x, deskBounds.y, deskBounds.width,
-                               deskBounds.height, getter_AddRefs(screen));
-  return screen.forget();
+  return screenManager.ScreenForRect(deskBounds);
 }
 
 RefPtr<VsyncDispatcher> nsWindow::GetVsyncDispatcher() {

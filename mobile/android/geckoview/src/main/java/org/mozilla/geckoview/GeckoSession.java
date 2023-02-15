@@ -137,6 +137,7 @@ public class GeckoSession {
   private final SessionTextInput mTextInput = new SessionTextInput(this, mNativeQueue);
   private SessionAccessibility mAccessibility;
   private SessionFinder mFinder;
+  private SessionPdfFileSaver mPdfFileSaver;
 
   /** {@code SessionMagnifier} handles magnifying glass. */
   /* package */ interface SessionMagnifier {
@@ -2325,6 +2326,54 @@ public class GeckoSession {
       mFinder = new SessionFinder(getEventDispatcher());
     }
     return mFinder;
+  }
+
+  /**
+   * Get the SessionPdfFileSaver instance for this session, to save a pdf document.
+   *
+   * @return SessionPdfFileSaver instance.
+   */
+  @AnyThread
+  public @NonNull SessionPdfFileSaver getPdfFileSaver() {
+    if (mPdfFileSaver == null) {
+      mPdfFileSaver = new SessionPdfFileSaver(getEventDispatcher());
+    }
+    return mPdfFileSaver;
+  }
+
+  /** Represent the result of a save-pdf operation. */
+  @AnyThread
+  public static class PdfSaveResult {
+    /** Binary data representing a PDF. */
+    @NonNull public final byte[] bytes;
+
+    /** PDF file name. */
+    @NonNull public final String filename;
+
+    public final boolean isPrivate;
+
+    /* package */ PdfSaveResult(@NonNull final GeckoBundle bundle) {
+      filename = bundle.getString("filename");
+      isPrivate = bundle.getBoolean("isPrivate");
+      bytes = bundle.getByteArray("bytes");
+    }
+
+    /** Empty constructor for tests */
+    protected PdfSaveResult() {
+      filename = "";
+      isPrivate = false;
+      bytes = new byte[0];
+    }
+  }
+
+  /**
+   * Check if the document being viewed is a pdf.
+   *
+   * @return Result of the check operation as a {@link GeckoResult} object.
+   */
+  @AnyThread
+  public @NonNull GeckoResult<Boolean> isPdfJs() {
+    return mEventDispatcher.queryBoolean("GeckoView:IsPdfJs");
   }
 
   /**
@@ -6703,7 +6752,24 @@ public class GeckoSession {
   @AnyThread
   public @NonNull GeckoResult<InputStream> saveAsPdf() {
     final GeckoResult<InputStream> geckoResult = new GeckoResult<>();
-    this.mWindow.printToPdf(geckoResult);
+    final GeckoSession self = this;
+    this.isPdfJs()
+        .then(
+            new GeckoResult.OnValueListener<Boolean, Void>() {
+              @Override
+              public GeckoResult<Void> onValue(final Boolean isPdfJs) {
+                if (!isPdfJs) {
+                  self.mWindow.printToPdf(geckoResult);
+                } else {
+                  geckoResult.completeFrom(
+                      self.getPdfFileSaver()
+                          .save()
+                          .map(result -> new ByteArrayInputStream(result.bytes)));
+                }
+                return null;
+              }
+            });
+
     return geckoResult;
   }
 

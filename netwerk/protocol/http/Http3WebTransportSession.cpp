@@ -328,10 +328,12 @@ void Http3WebTransportSession::Close(nsresult aResult) {
     mTransaction = nullptr;
   }
   mRecvState = RECV_DONE;
+
+  mSession->CloseWebTransportConn();
 }
 
 void Http3WebTransportSession::OnSessionClosed(uint32_t aStatus,
-                                               nsACString& aReason) {
+                                               const nsACString& aReason) {
   if (mTransaction) {
     mTransaction->Close(NS_BASE_STREAM_CLOSED);
     mTransaction = nullptr;
@@ -341,10 +343,12 @@ void Http3WebTransportSession::OnSessionClosed(uint32_t aStatus,
     mListener = nullptr;
   }
   mRecvState = RECV_DONE;
+
+  mSession->CloseWebTransportConn();
 }
 
 void Http3WebTransportSession::CloseSession(uint32_t aStatus,
-                                            nsACString& aReason) {
+                                            const nsACString& aReason) {
   if ((mRecvState != CLOSE_PENDING) && (mRecvState != RECV_DONE)) {
     mStatus = aStatus;
     mReason = aReason;

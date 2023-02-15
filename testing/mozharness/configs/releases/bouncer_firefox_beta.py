@@ -104,6 +104,26 @@ config = {
                 "win64-aarch64",
             ],
         },
+        "langpack": {
+            "product-name": "Firefox-%(version)s-langpack-SSL",
+            "platforms": [
+                "linux",
+                "linux64",
+                "osx",
+                "win",
+                "win64",
+            ],
+        },
+        "langpack-latest": {
+            "product-name": "Firefox-beta-langpack-latest-SSL",
+            "platforms": [
+                "linux",
+                "linux64",
+                "osx",
+                "win",
+                "win64",
+            ],
+        },
         "complete-mar": {
             "product-name": "Firefox-%(version)s-Complete",
             "platforms": [

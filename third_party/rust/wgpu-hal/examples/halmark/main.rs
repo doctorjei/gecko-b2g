@@ -139,6 +139,7 @@ impl<A: hal::Api> Example<A> {
                 depth_or_array_layers: 1,
             },
             usage: hal::TextureUses::COLOR_TARGET,
+            view_formats: vec![],
         };
         unsafe {
             surface.configure(&device, &surface_config).unwrap();
@@ -150,7 +151,7 @@ impl<A: hal::Api> Example<A> {
                 .join("halmark")
                 .join("shader.wgsl");
             let source = std::fs::read_to_string(shader_file).unwrap();
-            let module = naga::front::wgsl::Parser::new().parse(&source).unwrap();
+            let module = naga::front::wgsl::Frontend::new().parse(&source).unwrap();
             let info = naga::valid::Validator::new(
                 naga::valid::ValidationFlags::all(),
                 naga::valid::Capabilities::empty(),
@@ -299,7 +300,7 @@ impl<A: hal::Api> Example<A> {
             format: wgt::TextureFormat::Rgba8UnormSrgb,
             usage: hal::TextureUses::COPY_DST | hal::TextureUses::RESOURCE,
             memory_flags: hal::MemoryFlags::empty(),
-            allow_different_view_format: false,
+            view_formats: vec![],
         };
         let texture = unsafe { device.create_texture(&texture_desc).unwrap() };
 

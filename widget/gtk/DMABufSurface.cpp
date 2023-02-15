@@ -340,12 +340,19 @@ bool DMABufSurfaceRGBA::OpenFileDescriptorForPlane(
   if (mDmabufFds[aPlane] >= 0) {
     return true;
   }
+  gbm_bo* bo = mGbmBufferObject[0];
+  if (NS_WARN_IF(!bo)) {
+    LOGDMABUF(
+        ("DMABufSurfaceRGBA::OpenFileDescriptorForPlane: Missing "
+         "mGbmBufferObject object!"));
+    return false;
+  }
+
   if (mBufferPlaneCount == 1) {
     MOZ_ASSERT(aPlane == 0, "DMABuf: wrong surface plane!");
-    mDmabufFds[0] = nsGbmLib::GetFd(mGbmBufferObject[0]);
+    mDmabufFds[0] = nsGbmLib::GetFd(bo);
   } else {
-    uint32_t handle =
-        nsGbmLib::GetHandleForPlane(mGbmBufferObject[0], aPlane).u32;
+    uint32_t handle = nsGbmLib::GetHandleForPlane(bo, aPlane).u32;
     int ret = nsGbmLib::DrmPrimeHandleToFD(GetDMABufDevice()->GetDRMFd(),
                                            handle, 0, &mDmabufFds[aPlane]);
     if (ret < 0) {
@@ -465,6 +472,17 @@ bool DMABufSurfaceRGBA::Create(mozilla::gl::GLContext* aGLContext,
   if (!egl->fExportDMABUFImage(mEGLImage, mDmabufFds, mStrides, mOffsets)) {
     LOGDMABUF(("  ExportDMABUFImageMESA failed, quit\n"));
     return false;
+  }
+
+  // A broken driver can return dmabuf without valid file descriptors
+  // which leads to fails later so quit now.
+  for (int i = 0; i < mBufferPlaneCount; i++) {
+    if (mDmabufFds[i] < 0) {
+      LOGDMABUF(
+          ("  ExportDMABUFImageMESA failed, mDmabufFds[%d] is invalid, quit",
+           i));
+      return false;
+    }
   }
 
   LOGDMABUF(("  imported size %d x %d format %x planes %d modifiers %" PRIx64,
@@ -909,7 +927,18 @@ already_AddRefed<DMABufSurfaceYUV> DMABufSurfaceYUV::CreateYUVSurface(
   RefPtr<DMABufSurfaceYUV> surf = new DMABufSurfaceYUV();
   LOGDMABUF(("DMABufSurfaceYUV::CreateYUVSurface() UID %d from desc\n",
              surf->GetUID()));
-  if (!surf->UpdateYUVData(aDesc, aWidth, aHeight, false)) {
+  if (!surf->UpdateYUVData(aDesc, aWidth, aHeight, /* aCopy */ false)) {
+    return nullptr;
+  }
+  return surf.forget();
+}
+
+already_AddRefed<DMABufSurfaceYUV> DMABufSurfaceYUV::CopyYUVSurface(
+    const VADRMPRIMESurfaceDescriptor& aDesc, int aWidth, int aHeight) {
+  RefPtr<DMABufSurfaceYUV> surf = new DMABufSurfaceYUV();
+  LOGDMABUF(("DMABufSurfaceYUV::CreateYUVSurfaceCopy() UID %d from desc\n",
+             surf->GetUID()));
+  if (!surf->UpdateYUVData(aDesc, aWidth, aHeight, /* aCopy */ true)) {
     return nullptr;
   }
   return surf.forget();
@@ -1021,13 +1050,22 @@ bool DMABufSurfaceYUV::MoveYUVDataImpl(const VADRMPRIMESurfaceDescriptor& aDesc,
   }
   for (unsigned int i = 0; i < aDesc.num_layers; i++) {
     unsigned int object = aDesc.layers[i].object_index[0];
-    // Intel exports VA-API surfaces in one object,planes have the same FD.
-    // AMD exports surfaces in two objects with different FDs.
-    int fd = aDesc.objects[object].fd;
-    bool dupFD = (object != i);
-    mDmabufFds[i] = dupFD ? dup(fd) : fd;
+    // Keep VADRMPRIMESurfaceDescriptor untouched and dup() dmabuf
+    // file descriptors.
+    mDmabufFds[i] = dup(aDesc.objects[object].fd);
   }
   return true;
+}
+
+void DMABufSurfaceYUV::ReleaseVADRMPRIMESurfaceDescriptor(
+    VADRMPRIMESurfaceDescriptor& aDesc) {
+  for (unsigned int i = 0; i < aDesc.num_layers; i++) {
+    unsigned int object = aDesc.layers[i].object_index[0];
+    if (aDesc.objects[object].fd != -1) {
+      close(aDesc.objects[object].fd);
+      aDesc.objects[object].fd = -1;
+    }
+  }
 }
 
 bool DMABufSurfaceYUV::CreateYUVPlane(int aPlane) {
@@ -1039,15 +1077,20 @@ bool DMABufSurfaceYUV::CreateYUVPlane(int aPlane) {
     return false;
   }
 
+  MOZ_DIAGNOSTIC_ASSERT(mGbmBufferObject[aPlane] == nullptr);
   bool useModifiers = (mBufferModifiers[aPlane] != DRM_FORMAT_MOD_INVALID);
   if (useModifiers) {
+    LOGDMABUF(("    Creating with modifiers"));
     mGbmBufferObject[aPlane] = nsGbmLib::CreateWithModifiers(
         GetDMABufDevice()->GetGbmDevice(), mWidth[aPlane], mHeight[aPlane],
         mDrmFormats[aPlane], mBufferModifiers + aPlane, 1);
-  } else {
+  }
+  if (!mGbmBufferObject[aPlane]) {
+    LOGDMABUF(("    Creating without modifiers"));
     mGbmBufferObject[aPlane] = nsGbmLib::Create(
         GetDMABufDevice()->GetGbmDevice(), mWidth[aPlane], mHeight[aPlane],
         mDrmFormats[aPlane], GBM_BO_USE_RENDERING);
+    mBufferModifiers[aPlane] = DRM_FORMAT_MOD_INVALID;
   }
   if (!mGbmBufferObject[aPlane]) {
     LOGDMABUF(("    Failed to create GbmBufferObject: %s", strerror(errno)));

@@ -2358,7 +2358,7 @@ bool nsContentUtils::ShouldResistFingerprinting_dangerous(
 
   if (StaticPrefs::privacy_resistFingerprinting_testGranularityMask() &
       sWebExtensionExemptMask) {
-    if (aURI->SchemeIs("web-extension")) {
+    if (aURI->SchemeIs("moz-extension")) {
       return false;
     }
   }
@@ -7838,9 +7838,7 @@ void nsContentUtils::CallOnAllRemoteChildren(
 bool nsContentUtils::IPCDataTransferItemHasKnownFlavor(
     const IPCDataTransferItem& aItem) {
   // Unknown types are converted to kCustomTypesMime.
-  // FIXME(bug 1776879) text/plain is converted to text/unicode still.
-  if (aItem.flavor().EqualsASCII(kCustomTypesMime) ||
-      aItem.flavor().EqualsASCII(kUnicodeMime)) {
+  if (aItem.flavor().EqualsASCII(kCustomTypesMime)) {
     return true;
   }
 
@@ -10007,15 +10005,11 @@ bool nsContentUtils::QueryTriggeringPrincipal(
   }
 
   nsCString binary;
-  nsresult rv = Base64Decode(NS_ConvertUTF16toUTF8(loadingStr), binary);
-  if (NS_SUCCEEDED(rv)) {
-    nsCOMPtr<nsIPrincipal> serializedPrin = BasePrincipal::FromJSON(binary);
-    if (serializedPrin) {
-      result = true;
-      serializedPrin.forget(aTriggeringPrincipal);
-    }
-  } else {
-    MOZ_ASSERT(false, "Unable to deserialize base64 principal");
+  nsCOMPtr<nsIPrincipal> serializedPrin =
+      BasePrincipal::FromJSON(NS_ConvertUTF16toUTF8(loadingStr));
+  if (serializedPrin) {
+    result = true;
+    serializedPrin.forget(aTriggeringPrincipal);
   }
 
   if (!result) {

@@ -62,6 +62,7 @@ class nsAVIFDecoder final : public Decoder {
     AlphaYSizeMismatch,
     AlphaYColorDepthMismatch,
     MetadataImageSizeMismatch,
+    RenderSizeMismatch,
     InvalidCICP,
     NoSamples,
   };
@@ -76,7 +77,7 @@ class nsAVIFDecoder final : public Decoder {
   void RecordDecodeResultTelemetry(const DecodeResult& aResult);
 
   Vector<uint8_t> mBufferedData;
-  UniquePtr<AVIFDecoderStream> mBufferStream;
+  RefPtr<AVIFDecoderStream> mBufferStream;
 
   /// Pointer to the next place to read from mBufferedData
   const uint8_t* mReadCursor = nullptr;
@@ -173,7 +174,7 @@ class OwnedAOMImage {
 
 struct AVIFDecodedData : layers::PlanarYCbCrData {
  public:
-  OrientedIntRect mRenderRect = {};
+  Maybe<OrientedIntSize> mRenderSize = Nothing();
   gfx::CICP::ColourPrimaries mColourPrimaries = gfx::CICP::CP_UNSPECIFIED;
   gfx::CICP::TransferCharacteristics mTransferCharacteristics =
       gfx::CICP::TC_UNSPECIFIED;
@@ -258,7 +259,7 @@ class AVIFDecoderInterface {
   virtual ~AVIFDecoderInterface() = default;
 
   // Set the mDecodedData if Decode() succeeds
-  virtual DecodeResult Decode(bool aIsMetadataDecode,
+  virtual DecodeResult Decode(bool aShouldSendTelemetry,
                               const Mp4parseAvifInfo& aAVIFInfo,
                               const AVIFImage& aSamples) = 0;
   // Must be called only once after Decode() succeeds

@@ -590,7 +590,7 @@ toolbar:not(#TabsToolbar) > #personal-bookmarks {
 #urlbar,
 #searchbar {
   /* Setting a width and min-width to let the location & search bars maintain
-     a constant width in case they haven't be resized manually. (bug 965772) */
+     a constant width in case they haven't been resized manually. (bug 965772) */
   width: 1px;
   min-width: 1px;
 }
@@ -1675,6 +1675,10 @@ toolbar[keyNav=true]:not([collapsed=true], [customizing=true]) toolbartabstop {
 .dialogOverlay[topmost="true"],
 #window-modal-dialog::backdrop {
   background-color: rgba(28, 27, 34, 0.45);
+}
+
+.dialogOverlay[hideContent="true"][topmost="true"] {
+  background-color: var(--tabpanel-background-color);
 }
 
 /* For the window-modal dialog, the background is supplied by the HTML dialog

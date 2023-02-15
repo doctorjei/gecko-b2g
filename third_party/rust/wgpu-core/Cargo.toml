@@ -1,6 +1,6 @@
 [package]
 name = "wgpu-core"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["wgpu developers"]
 edition = "2021"
 description = "WebGPU core logic on wgpu-hal"
@@ -12,6 +12,12 @@ license = "MIT OR Apache-2.0"
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+    "wasm32-unknown-unknown",
+]
 
 [lib]
 
@@ -67,17 +73,19 @@ thiserror = "1"
 
 [dependencies.naga]
 git = "https://github.com/gfx-rs/naga"
-rev = "1be8024"
-version = "0.10"
+rev = "4b796b157cb2b67b0ab166a2238fe4e9473bfd52"
+version = "0.11.0"
 features = ["clone", "span", "validate"]
 
 [dependencies.wgt]
 package = "wgpu-types"
 path = "../wgpu-types"
+version = "0.15"
 
 [dependencies.hal]
 package = "wgpu-hal"
 path = "../wgpu-hal"
+version = "0.15"
 
 [target.'cfg(all(target_arch = "wasm32", not(target_os = "emscripten")))'.dependencies]
 web-sys = { version = "0.3.60", features = ["HtmlCanvasElement", "OffscreenCanvas"] }

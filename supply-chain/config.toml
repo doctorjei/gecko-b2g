@@ -4,12 +4,11 @@
 [imports.bytecodealliance]
 url = "https://raw.githubusercontent.com/bytecodealliance/wasmtime/main/supply-chain/audits.toml"
 
+[imports.chromeos]
+url = "https://chromium.googlesource.com/chromiumos/third_party/rust_crates/+/main/cargo-vet/audits.toml?format=TEXT"
+
 [imports.embark]
 url = "https://raw.githubusercontent.com/EmbarkStudios/rust-ecosystem/main/audits.toml"
-
-[policy.async-task]
-audit-as-crates-io = true
-notes = "This is the upstream code plus an extra fix that hasn't been released yet, see bug 1746533."
 
 [policy.audioipc-client]
 criteria = []
@@ -162,10 +161,6 @@ notes = "This is a first-party crate which is entirely unrelated to the crates.i
 audit-as-crates-io = false
 notes = "This is a first-party crate, maintained by the appservices team, which is entirely unrelated to the crates.io package of the same name."
 
-[policy.uniffi_bindgen]
-audit-as-crates-io = false
-notes = "This is a first-party crate, normally vendored, but currently patched in-tree until next update."
-
 [policy.viaduct]
 audit-as-crates-io = false
 notes = "This is a first-party crate, maintained by the appservices team, which is entirely unrelated to the crates.io package of the same name."
@@ -213,10 +208,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.android_log-sys]]
 version = "0.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.arrayref]]
-version = "0.3.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.ash]]
@@ -297,10 +288,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.cargo-platform]]
 version = "0.1.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.cargo_metadata]]
-version = "0.14.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.cexpr]]
@@ -631,10 +618,6 @@ criteria = "safe-to-deploy"
 version = "0.1.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.h2]]
-version = "0.3.13"
-criteria = "safe-to-run"
-
 [[exemptions.hashlink]]
 version = "0.7.0"
 criteria = "safe-to-deploy"
@@ -655,24 +638,8 @@ criteria = "safe-to-deploy"
 version = "0.2.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.http]]
-version = "0.2.8"
-criteria = "safe-to-run"
-
-[[exemptions.http-body]]
-version = "0.4.5"
-criteria = "safe-to-run"
-
 [[exemptions.httparse]]
 version = "1.7.1"
-criteria = "safe-to-run"
-
-[[exemptions.httpdate]]
-version = "1.0.2"
-criteria = "safe-to-run"
-
-[[exemptions.hyper]]
-version = "0.14.19"
 criteria = "safe-to-run"
 
 [[exemptions.ident_case]]
@@ -777,10 +744,6 @@ criteria = "safe-to-deploy"
 version = "0.0.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.marionette]]
-version = "0.2.0"
-criteria = "safe-to-run"
-
 [[exemptions.memalloc]]
 version = "0.1.0"
 criteria = "safe-to-deploy"
@@ -840,10 +803,6 @@ criteria = "safe-to-deploy"
 [[exemptions.moz_cbor]]
 version = "0.1.2"
 criteria = "safe-to-deploy"
-
-[[exemptions.mozdevice]]
-version = "0.5.0"
-criteria = "safe-to-run"
 
 [[exemptions.murmurhash3]]
 version = "0.0.5"
@@ -940,14 +899,6 @@ criteria = "safe-to-deploy"
 [[exemptions.phf_shared]]
 version = "0.10.0"
 criteria = "safe-to-deploy"
-
-[[exemptions.pin-project]]
-version = "1.0.10"
-criteria = "safe-to-run"
-
-[[exemptions.pin-project-internal]]
-version = "1.0.10"
-criteria = "safe-to-run"
 
 [[exemptions.pin-project-lite]]
 version = "0.2.9"
@@ -1129,10 +1080,6 @@ criteria = "safe-to-deploy"
 version = "0.1.8"
 criteria = "safe-to-run"
 
-[[exemptions.serde_urlencoded]]
-version = "0.7.1"
-criteria = "safe-to-run"
-
 [[exemptions.serde_with]]
 version = "1.14.0"
 criteria = "safe-to-deploy"
@@ -1261,29 +1208,9 @@ criteria = "safe-to-run"
 version = "0.5.9"
 criteria = "safe-to-deploy"
 
-[[exemptions.tower-service]]
-version = "0.3.1"
-criteria = "safe-to-run"
-
-[[exemptions.tracing]]
-version = "0.1.35"
-criteria = "safe-to-run"
-
-[[exemptions.tracing-attributes]]
-version = "0.1.21"
-criteria = "safe-to-run"
-
-[[exemptions.tracing-core]]
-version = "0.1.27"
-criteria = "safe-to-run"
-
 [[exemptions.triple_buffer]]
 version = "5.0.6"
 criteria = "safe-to-deploy"
-
-[[exemptions.try-lock]]
-version = "0.2.3"
-criteria = "safe-to-run"
 
 [[exemptions.type-map]]
 version = "0.4.0"
@@ -1332,10 +1259,6 @@ criteria = "safe-to-deploy"
 [[exemptions.walkdir]]
 version = "2.3.2"
 criteria = "safe-to-deploy"
-
-[[exemptions.want]]
-version = "0.3.0"
-criteria = "safe-to-run"
 
 [[exemptions.warp]]
 version = "0.3.2"

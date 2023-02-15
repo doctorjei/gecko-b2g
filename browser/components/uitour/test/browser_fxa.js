@@ -3,11 +3,10 @@
 
 "use strict";
 
-const { UIState } = ChromeUtils.import("resource://services-sync/UIState.jsm");
-
-const { XPCOMUtils } = ChromeUtils.importESModule(
-  "resource://gre/modules/XPCOMUtils.sys.mjs"
+const { UIState } = ChromeUtils.importESModule(
+  "resource://services-sync/UIState.sys.mjs"
 );
+
 XPCOMUtils.defineLazyGetter(this, "fxAccounts", () => {
   return ChromeUtils.import(
     "resource://gre/modules/FxAccounts.jsm"

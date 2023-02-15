@@ -724,7 +724,7 @@ impl<'w> BlockContext<'w> {
                             self.temp_list.resize(size as _, arg1_id);
 
                             let id = self.gen_id();
-                            block.body.push(Instruction::composite_construct(
+                            block.body.push(Instruction::constant_composite(
                                 result_type_id,
                                 id,
                                 &self.temp_list,
@@ -735,7 +735,7 @@ impl<'w> BlockContext<'w> {
                             self.temp_list.resize(size as _, arg2_id);
 
                             let id = self.gen_id();
-                            block.body.push(Instruction::composite_construct(
+                            block.body.push(Instruction::constant_composite(
                                 result_type_id,
                                 id,
                                 &self.temp_list,
@@ -888,6 +888,71 @@ impl<'w> BlockContext<'w> {
                         id,
                         arg0_id,
                     )),
+                    Mf::CountLeadingZeros => {
+                        let int = crate::ScalarValue::Sint(31);
+
+                        let (int_type_id, int_id) = match *arg_ty {
+                            crate::TypeInner::Vector { size, width, .. } => {
+                                let ty = self.get_type_id(LookupType::Local(LocalType::Value {
+                                    vector_size: Some(size),
+                                    kind: crate::ScalarKind::Sint,
+                                    width,
+                                    pointer_space: None,
+                                }));
+
+                                self.temp_list.clear();
+                                self.temp_list
+                                    .resize(size as _, self.writer.get_constant_scalar(int, width));
+
+                                let id = self.gen_id();
+                                block.body.push(Instruction::constant_composite(
+                                    ty,
+                                    id,
+                                    &self.temp_list,
+                                ));
+
+                                (ty, id)
+                            }
+                            crate::TypeInner::Scalar { width, .. } => (
+                                self.get_type_id(LookupType::Local(LocalType::Value {
+                                    vector_size: None,
+                                    kind: crate::ScalarKind::Sint,
+                                    width,
+                                    pointer_space: None,
+                                })),
+                                self.writer.get_constant_scalar(int, width),
+                            ),
+                            _ => unreachable!(),
+                        };
+
+                        block.body.push(Instruction::ext_inst(
+                            self.writer.gl450_ext_inst_id,
+                            spirv::GLOp::FindUMsb,
+                            int_type_id,
+                            id,
+                            &[arg0_id],
+                        ));
+
+                        let sub_id = self.gen_id();
+                        block.body.push(Instruction::binary(
+                            spirv::Op::ISub,
+                            int_type_id,
+                            sub_id,
+                            int_id,
+                            id,
+                        ));
+
+                        if let Some(crate::ScalarKind::Uint) = arg_scalar_kind {
+                            block.body.push(Instruction::unary(
+                                spirv::Op::Bitcast,
+                                result_type_id,
+                                self.gen_id(),
+                                sub_id,
+                            ));
+                        }
+
+                        return Ok(());
+                    }
                     Mf::CountOneBits => MathOp::Custom(Instruction::unary(
                         spirv::Op::BitCount,
                         result_type_id,
@@ -1841,28 +1906,7 @@ impl<'w> BlockContext<'w> {
                     return Ok(());
                 }
                 crate::Statement::Barrier(flags) => {
-                    let memory_scope = if flags.contains(crate::Barrier::STORAGE) {
-                        spirv::Scope::Device
-                    } else {
-                        spirv::Scope::Workgroup
-                    };
-                    let mut semantics = spirv::MemorySemantics::ACQUIRE_RELEASE;
-                    semantics.set(
-                        spirv::MemorySemantics::UNIFORM_MEMORY,
-                        flags.contains(crate::Barrier::STORAGE),
-                    );
-                    semantics.set(
-                        spirv::MemorySemantics::WORKGROUP_MEMORY,
-                        flags.contains(crate::Barrier::WORK_GROUP),
-                    );
-                    let exec_scope_id = self.get_index_constant(spirv::Scope::Workgroup as u32);
-                    let mem_scope_id = self.get_index_constant(memory_scope as u32);
-                    let semantics_id = self.get_index_constant(semantics.bits());
-                    block.body.push(Instruction::control_barrier(
-                        exec_scope_id,
-                        mem_scope_id,
-                        semantics_id,
-                    ));
+                    self.writer.write_barrier(flags, &mut block);
                 }
                 crate::Statement::Store { pointer, value } => {
                     let value_id = self.cached[value];

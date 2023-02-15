@@ -5,10 +5,8 @@ const TEST_URL =
 
 function closeHandler(dialogWin) {
   let savedItemId = dialogWin.gEditItemOverlay.itemId;
-  return PlacesTestUtils.waitForNotification(
-    "bookmark-removed",
-    events => events.some(event => event.id === savedItemId),
-    "places"
+  return PlacesTestUtils.waitForNotification("bookmark-removed", events =>
+    events.some(event => event.id === savedItemId)
   );
 }
 
@@ -40,8 +38,8 @@ add_task(async function() {
           Assert.ok(acceptBtn.disabled, "Accept button is disabled");
 
           let promiseKeywordNotification = PlacesTestUtils.waitForNotification(
-            "onItemChanged",
-            (itemId, prop, isAnno, val) => prop == "keyword" && val == "kw"
+            "bookmark-keyword-changed",
+            events => events.some(event => event.keyword === "kw")
           );
 
           fillBookmarkTextField("editBMPanel_keywordField", "kw", dialogWin);
