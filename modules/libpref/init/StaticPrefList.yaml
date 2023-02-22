@@ -1277,6 +1277,18 @@
   value: false
   mirror: always
 
+# Whether to force alt text for missing images to be laid out inline.
+- name: browser.display.force_inline_alttext
+  type: bool
+  value: false
+  mirror: always
+
+# Enable showing image placeholders while image is loading or when image is broken.
+- name: browser.display.show_image_placeholders
+  type: bool
+  value: true
+  mirror: always
+
 # Whether we should always enable focus rings after focus was moved by keyboard.
 #
 # This behavior matches both historical and GTK / Windows focus behavior.
@@ -3200,7 +3212,7 @@
 # Autoplay Policy Detection https://w3c.github.io/autoplay/
 - name: dom.media.autoplay-policy-detection.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: always
 
 # Media Session API
@@ -5061,30 +5073,6 @@
   value: "#FFFFFF"
   mirror: never
 
-# Default length unit of indent blocks with CSS.
-# TODO: Delete this pref after checking the compatibility with the other
-#       browsers.
-- name: editor.css.default_length_unit
-  type: String
-  value: "px"
-  mirror: never
-
-# Allow or disallow to delete `<hr>` element when caret is at start of
-# following line of the element.  If false, Backspace from start of following
-# line of an `<hr>` element causes moving caret to immediatly after the `<hr>`
-# element, and then, another Backspace can delete it.
-- name: editor.hr_element.allow_to_delete_from_following_line
-  type: bool
-  value: true
-  mirror: always
-
-# Whether editor initializes attributes and/or child nodes of newly inserting
-# element before or after connecting to the DOM tree.
-- name: editor.initialize_element_before_connect
-  type: bool
-  value: true
-  mirror: always
-
 # Use compatible range computation when applying inline style.  This is used
 # for making it possible to backout with Normandy Pref Rollout.
 - name: editor.inline_style.range.compatible_with_the_other_browsers
@@ -5116,22 +5104,6 @@
 - name: editor.password.testing.mask_delay
   type: bool
   value: false
-  mirror: always
-
-# When an element becomes absolutely positioned, this offset is applied to
-# both `left` and `top`.
-# TODO: Delete this pref after verifying that nobody uses this pref.
-- name: editor.positioning.offset
-  type: int32_t
-  value: 0
-  mirror: always
-
-# Whether resizer keeps aspect ratio of `<img>` or can change its width/height
-# independently.
-# TODO: Delete this pref after verifying that nobody uses this pref.
-- name: editor.resizing.preserve_ratio
-  type: bool
-  value: true
   mirror: always
 
 # How line breakers are treated in single line editor:
@@ -5171,14 +5143,6 @@
 - name: editor.use_css
   type: bool
   value: false
-  mirror: always
-
-# Whether inserting <div> when typing Enter in a block element which can
-# contain <div>.  If false, inserts <br> instead.
-# TODO: Delete this pref after verifying nobody uses this pref.
-- name: editor.use_div_for_default_newlines
-  type: bool
-  value: true
   mirror: always
 
 # Whether enabling blink compatible white-space normalizer or keep using
@@ -6629,6 +6593,11 @@
   value: true
   mirror: always
 
+- name: gfx.webrender.svg-shapes
+  type: RelaxedAtomicBool
+  value: true
+  mirror: always
+
 - name: gfx.webrender.debug.blob.paint-flashing
   type: RelaxedAtomicBool
   value: false
@@ -6702,6 +6671,16 @@
 #else
   value: false
 #endif
+  mirror: once
+
+- name: gfx.webrender.scissored-cache-clears.enabled
+  type: bool
+  value: true
+  mirror: once
+
+- name: gfx.webrender.scissored-cache-clears.force-enabled
+  type: bool
+  value: false
   mirror: once
 
 - name: gfx.webrender.compositor.force-enabled
@@ -6919,6 +6898,15 @@
   type: RelaxedAtomicInt32
   value: 512
   mirror: always
+
+# WebRender upper bound for shared surface size
+# According to apitrace, textures larger than 2048 break fast clear
+# optimizations on some intel drivers. We sometimes need to go larger, but
+# we try to avoid it.
+- name: gfx.webrender.max-shared-surface-size
+  type: int32_t
+  value: 2048
+  mirror: once
 
 # Whether to use EGL robustness or not.
 - name: gfx.webrender.prefer-robustness
@@ -8931,7 +8919,7 @@
 # Is support for CSS overflow: overlay enabled
 - name: layout.css.overflow-overlay.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: always
   rust: true
 
@@ -8997,6 +8985,13 @@
 - name: layout.css.forced-colors.enabled
   type: RelaxedAtomicBool
   value: true
+  mirror: always
+  rust: true
+
+# Is support for forced-color-adjust properties enabled?
+- name: layout.css.forced-color-adjust.enabled
+  type: RelaxedAtomicBool
+  value: false
   mirror: always
   rust: true
 
@@ -9236,7 +9231,7 @@
 # Enables the Reveal Password context-menu entry.
 - name: layout.forms.reveal-password-context-menu.enabled
   type: bool
-  value: false
+  value: true
   mirror: always
 
 # Pref to control browser frame rate, in Hz. A value <= 0 means choose
@@ -11375,6 +11370,13 @@
 # Whether to show anti-spoof confirmation prompts when navigating to a url
 # with userinfo
 - name: network.auth.confirmAuth.enabled
+  type: bool
+  value: true
+  mirror: always
+
+# Whether to display auth prompts if X-Frame-Options header will block loading
+# page
+- name: network.auth.supress_auth_prompt_for_XFO_failures
   type: bool
   value: true
   mirror: always
@@ -13757,13 +13759,13 @@
 # No way to enable on Android, Bug 1552602
 - name: security.webauth.u2f
   type: bool
-  value: @IS_NOT_ANDROID@
+  value: false
   mirror: always
 
 # WebAuthn CTAP2 support
 - name: security.webauthn.ctap2
   type: bool
-  value: @IS_NIGHTLY_BUILD@
+  value: @IS_EARLY_BETA_OR_EARLIER@
   mirror: always
 
 # Block Worker/SharedWorker scripts with wrong MIME type.
@@ -13997,6 +13999,12 @@
 #else
   value: 0
 #endif
+  mirror: always
+
+# Whether to apply ECH GREASE settings to HTTP3/QUIC connections
+- name: security.tls.ech.grease_http3
+  type: RelaxedAtomicBool
+  value: false
   mirror: always
 
 # Whether to retry connections without ECH Grease

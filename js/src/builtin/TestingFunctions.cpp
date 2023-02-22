@@ -5810,13 +5810,18 @@ static bool FindPath(JSContext* cx, unsigned argc, Value* vp) {
       return false;
     }
 
-    RootedValue wrapped(cx, nodes[i]);
-    if (!cx->compartment()->wrap(cx, &wrapped)) {
-      return false;
-    }
+    // Only define the "node" property if we're not fuzzing, to prevent the
+    // fuzzers from messing with internal objects that we don't want to expose
+    // to arbitrary JS.
+    if (!fuzzingSafe) {
+      RootedValue wrapped(cx, nodes[i]);
+      if (!cx->compartment()->wrap(cx, &wrapped)) {
+        return false;
+      }
 
-    if (!JS_DefineProperty(cx, obj, "node", wrapped, JSPROP_ENUMERATE)) {
-      return false;
+      if (!JS_DefineProperty(cx, obj, "node", wrapped, JSPROP_ENUMERATE)) {
+        return false;
+      }
     }
 
     heaptools::EdgeName edgeName = std::move(edges[i]);
@@ -9242,6 +9247,10 @@ void js::FuzzilliHashObject(JSContext* cx, JSObject* obj) {
 
 void js::FuzzilliHashObjectInl(JSContext* cx, JSObject* obj, uint32_t* out) {
   *out = 0;
+  if (!js::SupportDifferentialTesting()) {
+    return;
+  }
+
   RootedValue v(cx);
   v.setObject(*obj);
 

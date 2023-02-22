@@ -526,6 +526,10 @@ class nsContentUtils {
       mozilla::dom::BrowserParent* aBrowserParent1,
       mozilla::dom::BrowserParent* aBrowserParent2);
 
+  // https://html.spec.whatwg.org/#target-element
+  // https://html.spec.whatwg.org/#find-a-potential-indicated-element
+  static Element* GetTargetElement(Document* aDocument,
+                                   const nsAString& aAnchorName);
   /**
    * Returns true if aNode1 is before aNode2 in the same connected
    * tree.
@@ -2880,13 +2884,12 @@ class nsContentUtils {
 
   static void TransferablesToIPCTransferables(
       nsIArray* aTransferables, nsTArray<mozilla::dom::IPCDataTransfer>& aIPC,
-      bool aInSyncMessage, mozilla::dom::ContentChild* aChild,
-      mozilla::dom::ContentParent* aParent);
+      bool aInSyncMessage, mozilla::dom::ContentParent* aParent);
 
   static void TransferableToIPCTransferable(
       nsITransferable* aTransferable,
       mozilla::dom::IPCDataTransfer* aIPCDataTransfer, bool aInSyncMessage,
-      mozilla::dom::ContentChild* aChild, mozilla::dom::ContentParent* aParent);
+      mozilla::dom::ContentParent* aParent);
 
   /*
    * Get the pixel data from the given source surface and return it as a

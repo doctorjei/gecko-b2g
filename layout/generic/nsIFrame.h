@@ -4130,12 +4130,12 @@ class nsIFrame : public nsQueryFrame {
    * Determines whether a frame is visible for painting;
    * taking into account whether it is painting a selection or printing.
    */
-  bool IsVisibleForPainting();
+  bool IsVisibleForPainting() const;
   /**
    * Determines whether a frame is visible for painting or collapsed;
    * taking into account whether it is painting a selection or printing,
    */
-  bool IsVisibleOrCollapsedForPainting();
+  bool IsVisibleOrCollapsedForPainting() const;
 
   /**
    * Determines if this frame is a stacking context.
@@ -5066,8 +5066,10 @@ class nsIFrame : public nsQueryFrame {
     AddStateBits(NS_FRAME_IN_REFLOW);
   }
 
+ private:
   nsFrameState mState;
 
+ protected:
   /**
    * List of properties attached to the frame.
    */

@@ -2872,14 +2872,6 @@ var gCSSProperties = {
     other_values: ["1"],
     invalid_values: [],
   },
-  "-moz-image-region": {
-    domProp: "MozImageRegion",
-    inherited: true,
-    type: CSS_TYPE_LONGHAND,
-    initial_values: ["auto"],
-    other_values: ["rect(3px 20px 15px 4px)", "rect(17px, 21px, 33px, 2px)"],
-    invalid_values: ["rect(17px, 21px, 33, 2px)"],
-  },
   "margin-inline": {
     domProp: "marginInline",
     inherited: false,
@@ -13510,13 +13502,16 @@ if (IsCSSPropertyPrefEnabled("layout.css.step-position-jump.enabled")) {
 
 if (IsCSSPropertyPrefEnabled("layout.css.linear-easing-function.enabled")) {
   let linear_function_other_values = [
-    "linear()",
-    "linear(0.5)",
     "linear(0, 1)",
     "linear(0 0% 50%, 1 50% 100%)",
   ];
 
-  let linear_function_invalid_values = ["linear(0% 0 100%)", "linear(0,)"];
+  let linear_function_invalid_values = [
+    "linear()",
+    "linear(0.5)",
+    "linear(0% 0 100%)",
+    "linear(0,)",
+  ];
   gCSSProperties["animation-timing-function"].other_values.push(
     ...linear_function_other_values
   );
@@ -13532,7 +13527,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.linear-easing-function.enabled")) {
   );
 
   gCSSProperties["animation"].other_values.push(
-    "1s 2s linear() bounce",
+    "1s 2s linear(0, 1) bounce",
     "4s linear(0, 0.5 25% 75%, 1 100% 100%)"
   );
 }
@@ -13626,6 +13621,17 @@ if (IsCSSPropertyPrefEnabled("layout.css.color-scheme.enabled")) {
       "light only",
     ],
     invalid_values: ["only normal", "normal only", "only light only"],
+  };
+}
+
+if (IsCSSPropertyPrefEnabled("layout.css.forced-color-adjust.enabled")) {
+  gCSSProperties["forced-color-adjust"] = {
+    domProp: "forcedColorAdjust",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: ["auto"],
+    other_values: ["none"],
+    invalid_values: [],
   };
 }
 

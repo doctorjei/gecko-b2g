@@ -253,7 +253,7 @@ static StyleAnimatedRGBA Interpolate(const StyleAnimatedRGBA& aLeft,
   // right now is sRGB. In the future we should implement interpolation in more
   // gradient color-spaces.
   static constexpr auto kMethod = StyleColorInterpolationMethod{
-      StyleInterpolationColorSpace::Srgb,
+      StyleColorSpace::Srgb,
       StyleHueInterpolationMethod::Shorter,
   };
   return Servo_InterpolateColor(&kMethod, &aRight, &aLeft, aFrac);
@@ -1155,12 +1155,13 @@ bool nsCSSGradientRenderer::TryPaintTilesWithExtendMode(
       return false;
     }
 
-    RefPtr<gfxContext> tileContext = gfxContext::CreateOrNull(tileTarget);
+    {
+      gfxContext tileContext(tileTarget);
 
-    tileContext->SetPattern(aGradientPattern);
-    tileContext->Paint();
+      tileContext.SetPattern(aGradientPattern);
+      tileContext.Paint();
+    }
 
-    tileContext = nullptr;
     tileSurface = tileTarget->Snapshot();
     tileTarget = nullptr;
   }

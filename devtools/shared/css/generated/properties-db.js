@@ -782,22 +782,6 @@ exports.CSS_PROPERTIES = {
       "unset"
     ]
   },
-  "-moz-image-region": {
-    "isInherited": true,
-    "subproperties": [
-      "-moz-image-region"
-    ],
-    "supports": [],
-    "values": [
-      "auto",
-      "inherit",
-      "initial",
-      "rect",
-      "revert",
-      "revert-layer",
-      "unset"
-    ]
-  },
   "-moz-margin-end": {
     "isInherited": false,
     "subproperties": [
@@ -3128,6 +3112,7 @@ exports.CSS_PROPERTIES = {
       "text-underline-position",
       "text-decoration-skip-ink",
       "hyphenate-character",
+      "forced-color-adjust",
       "cursor",
       "pointer-events",
       "-moz-user-input",
@@ -3141,7 +3126,6 @@ exports.CSS_PROPERTIES = {
       "list-style-type",
       "list-style-image",
       "quotes",
-      "-moz-image-region",
       "margin-top",
       "margin-right",
       "margin-bottom",

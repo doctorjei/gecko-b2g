@@ -3804,49 +3804,6 @@ class MToNumberInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
   ALLOW_CLONE(MToNumberInt32)
 };
 
-// Applies ECMA's ToInteger on a primitive (either typed or untyped) and expects
-// the result to be precisely representable as an Int32, otherwise bails.
-//
-// NB: Negative zero doesn't lead to a bailout, but instead will be treated the
-// same as positive zero for this operation.
-//
-// If the input is not primitive at runtime, a bailout occurs. If the input
-// cannot be converted to an int32 without loss (i.e. 2e10 or Infinity) then a
-// bailout occurs.
-class MToIntegerInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
-  explicit MToIntegerInt32(MDefinition* def)
-      : MUnaryInstruction(classOpcode, def) {
-    setResultType(MIRType::Int32);
-    setMovable();
-
-    // Guard unless the conversion is known to be non-effectful & non-throwing.
-    if (!def->definitelyType({MIRType::Undefined, MIRType::Null,
-                              MIRType::Boolean, MIRType::Int32, MIRType::Double,
-                              MIRType::Float32, MIRType::String})) {
-      setGuard();
-    }
-  }
-
- public:
-  INSTRUCTION_HEADER(ToIntegerInt32)
-  TRIVIAL_NEW_WRAPPERS
-
-  MDefinition* foldsTo(TempAllocator& alloc) override;
-
-  bool congruentTo(const MDefinition* ins) const override {
-    return congruentIfOperandsEqual(ins);
-  }
-
-  AliasSet getAliasSet() const override { return AliasSet::None(); }
-  void computeRange(TempAllocator& alloc) override;
-
-#ifdef DEBUG
-  bool isConsistentFloat32Use(MUse* use) const override { return true; }
-#endif
-
-  ALLOW_CLONE(MToIntegerInt32)
-};
-
 // Converts a value or typed input to a truncated int32, for use with bitwise
 // operations. This is an infallible ValueToECMAInt32.
 class MTruncateToInt32 : public MUnaryInstruction, public ToInt32Policy::Data {
@@ -10107,6 +10064,9 @@ class MWasmDerivedIndexPointer : public MBinaryInstruction,
   ALLOW_CLONE(MWasmDerivedIndexPointer)
 };
 
+// Whether to perform a pre-write barrier for a wasm store reference.
+enum class WasmPreBarrierKind : uint8_t { None, Normal };
+
 // Stores a reference to an address. This performs a pre-barrier on the address,
 // but not a post-barrier. A post-barrier must be performed separately, if it's
 // required.  The accessed location is `valueBase + valueOffset`.  The latter
@@ -10115,12 +10075,15 @@ class MWasmDerivedIndexPointer : public MBinaryInstruction,
 class MWasmStoreRef : public MAryInstruction<3>, public NoTypePolicy::Data {
   uint32_t offset_;
   AliasSet::Flag aliasSet_;
+  WasmPreBarrierKind preBarrierKind_;
 
   MWasmStoreRef(MDefinition* instance, MDefinition* valueBase,
-                size_t valueOffset, MDefinition* value, AliasSet::Flag aliasSet)
+                size_t valueOffset, MDefinition* value, AliasSet::Flag aliasSet,
+                WasmPreBarrierKind preBarrierKind)
       : MAryInstruction<3>(classOpcode),
         offset_(uint32_t(valueOffset)),
-        aliasSet_(aliasSet) {
+        aliasSet_(aliasSet),
+        preBarrierKind_(preBarrierKind) {
     MOZ_ASSERT(valueOffset <= INT32_MAX);
     MOZ_ASSERT(valueBase->type() == MIRType::Pointer ||
                valueBase->type() == MIRType::StackResults);
@@ -10137,6 +10100,7 @@ class MWasmStoreRef : public MAryInstruction<3>, public NoTypePolicy::Data {
 
   uint32_t offset() const { return offset_; }
   AliasSet getAliasSet() const override { return AliasSet::Store(aliasSet_); }
+  WasmPreBarrierKind preBarrierKind() const { return preBarrierKind_; }
 
 #ifdef JS_JITSPEW
   void getExtras(ExtrasCollector* extras) override {
@@ -10145,6 +10109,31 @@ class MWasmStoreRef : public MAryInstruction<3>, public NoTypePolicy::Data {
     extras->add(buf);
   }
 #endif
+};
+
+// Given a value being written to another object, update the generational store
+// buffer if the value is in the nursery and object is in the tenured heap.
+class MWasmPostWriteBarrier : public MQuaternaryInstruction,
+                              public NoTypePolicy::Data {
+  uint32_t valueOffset_;
+
+  MWasmPostWriteBarrier(MDefinition* instance, MDefinition* object,
+                        MDefinition* valueBase, uint32_t valueOffset,
+                        MDefinition* value)
+      : MQuaternaryInstruction(classOpcode, instance, object, valueBase, value),
+        valueOffset_(valueOffset) {
+    setGuard();
+  }
+
+ public:
+  INSTRUCTION_HEADER(WasmPostWriteBarrier)
+  TRIVIAL_NEW_WRAPPERS
+  NAMED_OPERANDS((0, instance), (1, object), (2, valueBase), (3, value))
+
+  AliasSet getAliasSet() const override { return AliasSet::None(); }
+  uint32_t valueOffset() const { return valueOffset_; }
+
+  ALLOW_CLONE(MWasmPostWriteBarrier)
 };
 
 class MWasmParameter : public MNullaryInstruction {
@@ -11269,12 +11258,18 @@ class MWasmStoreFieldRefKA : public MAryInstruction<4>,
                              public NoTypePolicy::Data {
   uint32_t offset_;
   AliasSet aliases_;
+  MaybeTrapSiteInfo maybeTrap_;
+  WasmPreBarrierKind preBarrierKind_;
 
   MWasmStoreFieldRefKA(MDefinition* instance, MDefinition* ka, MDefinition* obj,
-                       size_t offset, MDefinition* value, AliasSet aliases)
+                       size_t offset, MDefinition* value, AliasSet aliases,
+                       MaybeTrapSiteInfo maybeTrap,
+                       WasmPreBarrierKind preBarrierKind)
       : MAryInstruction<4>(classOpcode),
         offset_(uint32_t(offset)),
-        aliases_(aliases) {
+        aliases_(aliases),
+        maybeTrap_(maybeTrap),
+        preBarrierKind_(preBarrierKind) {
     MOZ_ASSERT(obj->type() == TargetWordMIRType() ||
                obj->type() == MIRType::Pointer ||
                obj->type() == MIRType::RefOrNull);
@@ -11292,6 +11287,9 @@ class MWasmStoreFieldRefKA : public MAryInstruction<4>,
     initOperand(1, ka);
     initOperand(2, obj);
     initOperand(3, value);
+    if (maybeTrap_) {
+      setGuard();
+    }
   }
 
  public:
@@ -11301,6 +11299,8 @@ class MWasmStoreFieldRefKA : public MAryInstruction<4>,
 
   uint32_t offset() const { return offset_; }
   AliasSet getAliasSet() const override { return aliases_; }
+  MaybeTrapSiteInfo maybeTrap() const { return maybeTrap_; }
+  WasmPreBarrierKind preBarrierKind() const { return preBarrierKind_; }
 
 #ifdef JS_JITSPEW
   void getExtras(ExtrasCollector* extras) override {

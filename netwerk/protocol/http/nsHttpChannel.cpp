@@ -17,6 +17,7 @@
 #include "mozilla/dom/nsCSPService.h"
 #include "mozilla/StoragePrincipalHelper.h"
 
+#include "nsContentSecurityUtils.h"
 #include "nsHttp.h"
 #include "nsHttpChannel.h"
 #include "nsHttpChannelAuthProvider.h"
@@ -2374,6 +2375,13 @@ nsresult nsHttpChannel::ContinueProcessResponse3(nsresult rv) {
         // any cached credentials, nor we want to ask the user.
         // It's up to the consumer to re-try w/o setting a custom
         // auth header if cached credentials should be attempted.
+        rv = NS_ERROR_FAILURE;
+      } else if (httpStatus == 401 &&
+                 StaticPrefs::
+                     network_auth_supress_auth_prompt_for_XFO_failures() &&
+                 !nsContentSecurityUtils::CheckCSPFrameAncestorAndXFO(this)) {
+        // CSP Frame Ancestor and X-Frame-Options check has failed
+        // Do not prompt http auth - Bug 1629307
         rv = NS_ERROR_FAILURE;
       } else {
         rv = mAuthProvider->ProcessAuthentication(
@@ -5674,6 +5682,13 @@ nsresult nsHttpChannel::CancelInternal(nsresult status) {
     needAsyncAbort = false;
     Unused << AsyncAbort(status);
   } else if (channelClassifierCancellationPending) {
+    // If mCallOnResume is not null here, it's set in
+    // nsHttpChannel::CancelByURLClassifier. We can override mCallOnResume since
+    // mCanceled is true and nsHttpChannel::ContinueCancellingByURLClassifier
+    // does nothing.
+    if (mCallOnResume) {
+      mCallOnResume = nullptr;
+    }
     // If we're coming from an asynchronous path when canceling a channel due
     // to safe-browsing protection, we need to AsyncAbort the channel now.
     needAsyncAbort = false;

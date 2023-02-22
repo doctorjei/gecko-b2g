@@ -3194,10 +3194,8 @@ toolbar#nav-bar {
                 # Currently for automation, the pref defaults to true (but can be
                 # overridden with --setpref).
                 "serviceworker_e10s": True,
-                "sessionHistoryInParent": self.extraPrefs.get(
-                    "fission.sessionHistoryInParent", False
-                )
-                or self.extraPrefs.get("fission.autostart", True),
+                "sessionHistoryInParent": not options.disable_fission
+                or self.extraPrefs.get("fission.sessionHistoryInParent", False),
                 "socketprocess_e10s": self.extraPrefs.get(
                     "network.process.enabled", False
                 ),
@@ -3655,7 +3653,7 @@ toolbar#nav-bar {
         self.message_logger.dump_buffered()
         self.message_logger.buffering = False
         self.log.info(error_message)
-        self.log.error("Force-terminating active process(es).")
+        self.log.warning("Force-terminating active process(es).")
 
         browser_pid = browser_pid or proc.pid
         child_pids = self.extract_child_pids(processLog, browser_pid)

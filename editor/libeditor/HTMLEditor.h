@@ -732,30 +732,34 @@ class HTMLEditor final : public EditorBase,
       EDirection aSelect = eNone);
 
   /**
-   * DeleteTextWithTransaction() removes text in the range from aTextNode if
-   * it's modifiable.  Note that this not an override of same method of
-   * EditorBase.
+   * Delete text in the range in aTextNode.  If aTextNode is not editable, this
+   * does nothing.
    *
    * @param aTextNode           The text node which should be modified.
    * @param aOffset             Start offset of removing text in aTextNode.
    * @param aLength             Length of removing text.
    */
-  MOZ_CAN_RUN_SCRIPT nsresult DeleteTextWithTransaction(dom::Text& aTextNode,
-                                                        uint32_t aOffset,
-                                                        uint32_t aLength);
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CaretPoint, nsresult>
+  DeleteTextWithTransaction(dom::Text& aTextNode, uint32_t aOffset,
+                            uint32_t aLength);
 
   /**
-   * ReplaceTextWithTransaction() replaces text in the range with
-   * aStringToInsert.
+   * Replace text in the range with aStringToInsert.  If there is a DOM range
+   * exactly same as the replacing range, it'll be collapsed to
+   * {aTextNode, aOffset} because of the order of deletion and insertion.
+   * Therefore, the callers may need to handle `Selection` even when callers
+   * do not want to update `Selection`.
    */
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT nsresult ReplaceTextWithTransaction(
-      dom::Text& aTextNode, uint32_t aOffset, uint32_t aLength,
-      const nsAString& aStringToInsert);
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<InsertTextResult, nsresult>
+  ReplaceTextWithTransaction(dom::Text& aTextNode, uint32_t aOffset,
+                             uint32_t aLength,
+                             const nsAString& aStringToInsert);
 
   /**
-   * InsertTextWithTransaction() inserts aStringToInsert at aPointToInsert.
+   * Insert aStringToInsert to aPointToInsert.  If the point is not editable,
+   * this returns error.
    */
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<EditorDOMPoint, nsresult>
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<InsertTextResult, nsresult>
   InsertTextWithTransaction(Document& aDocument,
                             const nsAString& aStringToInsert,
                             const EditorDOMPoint& aPointToInsert) final;
@@ -1228,10 +1232,8 @@ class HTMLEditor final : public EditorBase,
 
   /**
    * InitializeInsertingElement is a callback type of methods which inserts
-   * an element into the DOM tree.  This is called immediately before or
-   * after inserting aNewElement into the DOM tree (depending on
-   * "editor.initialize_element_before_connect" pref whether this is called
-   * before or after inserting the element).
+   * an element into the DOM tree.  This is called immediately before inserting
+   * aNewElement into the DOM tree.
    *
    * @param aHTMLEditor     The HTML editor which modifies the DOM tree.
    * @param aNewElement     The new element which will be or was inserted into
@@ -1276,10 +1278,10 @@ class HTMLEditor final : public EditorBase,
    *                            Note that this point will be invalid once this
    *                            method inserts the new element.
    * @param aInitializer        A function to initialize the new element before
-   *                            or after (depends on the pref) connecting the
-   *                            element into the DOM tree. Note that this should
-   *                            not touch outside given element because doing it
-   *                            would break range updater's result.
+   *                            connecting the element into the DOM tree. Note
+   *                            that this should not touch outside given element
+   *                            because doing it would break range updater's
+   *                            result.
    * @return                    The created new element node and candidate caret
    *                            position.
    */
@@ -1361,10 +1363,10 @@ class HTMLEditor final : public EditorBase,
    *                            split point.
    * @param aEditingHost        The editing host with which we're handling it.
    * @param aInitializer        A function to initialize the new element before
-   *                            or after (depends on the pref) connecting the
-   *                            element into the DOM tree. Note that this should
-   *                            not touch outside given element because doing it
-   *                            would break range updater's result.
+   *                            connecting the element into the DOM tree. Note
+   *                            that this should not touch outside given element
+   *                            because doing it would break range updater's
+   *                            result.
    * @return                    If succeeded, returns the new element node and
    *                            suggesting point to put caret.
    */
@@ -1501,12 +1503,11 @@ class HTMLEditor final : public EditorBase,
                                       const Element& aEditingHost);
 
   /**
-   * InsertBRElementIfHardLineIsEmptyAndEndsWithBlockBoundary() determines if
-   * aPointToInsert is start of a hard line and end of the line (i.e, the
-   * line is empty) and the line ends with block boundary, inserts a `<br>`
-   * element.
+   * Determine if aPointToInsert is start of a hard line and end of the line
+   * (i.e, in an empty line) and the line ends with block boundary, inserts a
+   * `<br>` element.
    */
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT nsresult
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CaretPoint, nsresult>
   InsertBRElementIfHardLineIsEmptyAndEndsWithBlockBoundary(
       const EditorDOMPoint& aPointToInsert);
 
@@ -1677,7 +1678,7 @@ class HTMLEditor final : public EditorBase,
     RemoveAllEmptyInlineAncestors,
   };
   template <typename EditorDOMPointType>
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT nsresult
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CaretPoint, nsresult>
   DeleteTextAndTextNodesWithTransaction(
       const EditorDOMPointType& aStartPoint,
       const EditorDOMPointType& aEndPoint,
@@ -2002,7 +2003,7 @@ class HTMLEditor final : public EditorBase,
     Forward,
     Backward,
   };
-  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<EditorDOMPoint, nsresult>
+  [[nodiscard]] MOZ_CAN_RUN_SCRIPT Result<CaretPoint, nsresult>
   DeleteTextAndNormalizeSurroundingWhiteSpaces(
       const EditorDOMPointInText& aStartToDelete,
       const EditorDOMPointInText& aEndToDelete,
@@ -4100,7 +4101,6 @@ class HTMLEditor final : public EditorBase,
 
   MOZ_CAN_RUN_SCRIPT nsresult StartMoving();
   MOZ_CAN_RUN_SCRIPT nsresult SetFinalPosition(int32_t aX, int32_t aY);
-  void AddPositioningOffset(int32_t& aX, int32_t& aY);
   void SnapToGrid(int32_t& newX, int32_t& newY) const;
   nsresult GrabberClicked();
   MOZ_CAN_RUN_SCRIPT nsresult EndMoving();

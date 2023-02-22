@@ -16,6 +16,7 @@
 #include "SSLServerCertVerification.h"
 #include "SSLTokensCache.h"
 #include "ScopedNSSTypes.h"
+#include "mozilla/RandomNum.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/net/DNS.h"
@@ -171,8 +172,17 @@ nsresult Http3Session::Init(const nsHttpConnectionInfo* aConnInfo,
     ZeroRttTelemetry(ZeroRttOutcome::NOT_USED);
   }
 
-  if (gHttpHandler->EchConfigEnabled(true)) {
-    mSocketControl->SetEchConfig(mConnInfo->GetEchConfig());
+  auto config = mConnInfo->GetEchConfig();
+  if (config.IsEmpty()) {
+    if (StaticPrefs::security_tls_ech_grease_http3() && config.IsEmpty()) {
+      if ((RandomUint64().valueOr(0) % 100) >=
+          100 - StaticPrefs::security_tls_ech_grease_probability()) {
+        // Setting an empty config enables GREASE mode.
+        mSocketControl->SetEchConfig(config);
+      }
+    }
+  } else if (gHttpHandler->EchConfigEnabled(true) && !config.IsEmpty()) {
+    mSocketControl->SetEchConfig(config);
     HttpConnectionActivity activity(
         mConnInfo->HashKey(), mConnInfo->GetOrigin(), mConnInfo->OriginPort(),
         mConnInfo->EndToEndSSL(), !mConnInfo->GetEchConfig().IsEmpty(),
@@ -190,14 +200,12 @@ nsresult Http3Session::Init(const nsHttpConnectionInfo* aConnInfo,
 }
 
 void Http3Session::DoSetEchConfig(const nsACString& aEchConfig) {
-  if (!aEchConfig.IsEmpty()) {
-    LOG(("Http3Session::DoSetEchConfig %p", this));
-    nsTArray<uint8_t> config;
-    config.AppendElements(
-        reinterpret_cast<const uint8_t*>(aEchConfig.BeginReading()),
-        aEchConfig.Length());
-    mHttp3Connection->SetEchConfig(config);
-  }
+  LOG(("Http3Session::DoSetEchConfig %p", this));
+  nsTArray<uint8_t> config;
+  config.AppendElements(
+      reinterpret_cast<const uint8_t*>(aEchConfig.BeginReading()),
+      aEchConfig.Length());
+  mHttp3Connection->SetEchConfig(config);
 }
 
 nsresult Http3Session::SendPriorityUpdateFrame(uint64_t aStreamId,
@@ -659,16 +667,20 @@ nsresult Http3Session::ProcessEvents() {
                    "0x%" PRIx64 " cleanup stream rv=0x%" PRIx32 " done=%d.\n",
                    this, stream.get(), stream->StreamId(),
                    static_cast<uint32_t>(rv), stream->Done()));
-              if (mStreamTransactionHash.Contains(stream->Transaction())) {
+              // We need to keep the transaction, so we can use it to remove the
+              // stream from mStreamTransactionHash.
+              nsAHttpTransaction* trans = stream->Transaction();
+              if (mStreamTransactionHash.Contains(trans)) {
                 CloseStream(stream, (rv == NS_BINDING_RETARGETED)
                                         ? NS_BINDING_RETARGETED
                                         : NS_OK);
+                mStreamTransactionHash.Remove(trans);
               } else {
                 stream->GetHttp3WebTransportSession()->TransactionIsDone(
                     (rv == NS_BINDING_RETARGETED) ? NS_BINDING_RETARGETED
                                                   : NS_OK);
               }
-              return NS_OK;
+              break;
             }
 
             if (NS_FAILED(rv) && rv != NS_BASE_STREAM_WOULD_BLOCK) {
@@ -1189,15 +1201,15 @@ nsresult Http3Session::TryActivatingWebTransportStream(
 
   MOZ_ASSERT(*aStreamId != UINT64_MAX);
 
-  RefPtr<Http3StreamBase> stream = mStreamIdHash.Get(wtStream->SessionId());
-  MOZ_ASSERT(stream);
-  Http3WebTransportSession* wtSession = stream->GetHttp3WebTransportSession();
+  RefPtr<Http3StreamBase> session = mStreamIdHash.Get(wtStream->SessionId());
+  MOZ_ASSERT(session);
+  Http3WebTransportSession* wtSession = session->GetHttp3WebTransportSession();
   MOZ_ASSERT(wtSession);
 
   wtSession->RemoveWebTransportStream(wtStream);
 
   // WebTransportStream is managed by Http3Session now.
-  mWebTransportStreams.AppendElement(stream);
+  mWebTransportStreams.AppendElement(wtStream);
   mStreamIdHash.InsertOrUpdate(*aStreamId, std::move(wtStream));
   return NS_OK;
 }

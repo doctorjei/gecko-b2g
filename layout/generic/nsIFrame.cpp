@@ -693,7 +693,7 @@ void nsIFrame::Init(nsIContent* aContent, nsContainerFrame* aParent,
     // It's fine to fetch the EffectSet for the style frame here because in the
     // following code we take care of the case where animations may target
     // a different frame.
-    EffectSet* effectSet = EffectSet::GetEffectSetForStyleFrame(this);
+    EffectSet* effectSet = EffectSet::GetForStyleFrame(this);
     if (effectSet) {
       mMayHaveOpacityAnimation = effectSet->MayHaveOpacityAnimation();
 
@@ -841,7 +841,7 @@ void nsIFrame::DestroyFrom(nsIFrame* aDestructRoot,
 
   nsPresContext* presContext = PresContext();
   mozilla::PresShell* presShell = presContext->GetPresShell();
-  if (mState & NS_FRAME_OUT_OF_FLOW) {
+  if (HasAnyStateBits(NS_FRAME_OUT_OF_FLOW)) {
     nsPlaceholderFrame* placeholder = GetPlaceholderFrame();
     NS_ASSERTION(
         !placeholder || (aDestructRoot != this),
@@ -869,7 +869,7 @@ void nsIFrame::DestroyFrom(nsIFrame* aDestructRoot,
       // It's fine to look up the style frame here since if we're destroying the
       // frames for display:table content we should be destroying both wrapper
       // and inner frame.
-      EffectSet::GetEffectSetForStyleFrame(this)) {
+      EffectSet::GetForStyleFrame(this)) {
     // If no new frame for this element is created by the end of the
     // restyling process, stop animations and transitions for this frame
     RestyleManager::AnimationsWithDestroyedFrame* adf =
@@ -899,7 +899,7 @@ void nsIFrame::DestroyFrom(nsIFrame* aDestructRoot,
 
   presShell->NotifyDestroyingFrame(this);
 
-  if (mState & NS_FRAME_EXTERNAL_REFERENCE) {
+  if (HasAnyStateBits(NS_FRAME_EXTERNAL_REFERENCE)) {
     presShell->ClearFrameRefs(this);
   }
 
@@ -1829,7 +1829,7 @@ bool nsIFrame::IsSVGTransformed(gfx::Matrix* aOwnTransforms,
 bool nsIFrame::Extend3DContext(const nsStyleDisplay* aStyleDisplay,
                                const nsStyleEffects* aStyleEffects,
                                mozilla::EffectSet* aEffectSetForOpacity) const {
-  if (!(mState & NS_FRAME_MAY_BE_TRANSFORMED)) {
+  if (!HasAnyStateBits(NS_FRAME_MAY_BE_TRANSFORMED)) {
     return false;
   }
   const nsStyleDisplay* disp = StyleDisplayWithOptionalParam(aStyleDisplay);
@@ -2395,18 +2395,27 @@ already_AddRefed<ComputedStyle> nsIFrame::ComputeSelectionStyle(
       aSelectionStatus != nsISelectionController::SELECTION_DISABLED) {
     return nullptr;
   }
-  // When in high-contrast mode, the style system ends up ignoring the color
-  // declarations, which means that the ::selection style becomes the inherited
-  // color, and default background. That's no good.
-  if (PresContext()->ForcingColors()) {
-    return nullptr;
-  }
   Element* element = FindElementAncestorForMozSelection(GetContent());
   if (!element) {
     return nullptr;
   }
-  return PresContext()->StyleSet()->ProbePseudoElementStyle(
-      *element, PseudoStyleType::selection, Style());
+  RefPtr<ComputedStyle> pseudoStyle =
+      PresContext()->StyleSet()->ProbePseudoElementStyle(
+          *element, PseudoStyleType::selection, Style());
+  if (!pseudoStyle) {
+    return nullptr;
+  }
+  // When in high-contrast mode, the style system ends up ignoring the color
+  // declarations, which means that the ::selection style becomes the inherited
+  // color, and default background. That's no good.
+  // When force-color-adjust is set to none allow using the color styles,
+  // as they will not be replaced.
+  if (PresContext()->ForcingColors() &&
+      pseudoStyle->StyleText()->mForcedColorAdjust !=
+          StyleForcedColorAdjust::None) {
+    return nullptr;
+  }
+  return do_AddRef(pseudoStyle);
 }
 
 already_AddRefed<ComputedStyle> nsIFrame::ComputeHighlightSelectionStyle(
@@ -3136,8 +3145,8 @@ void nsIFrame::BuildDisplayListForStackingContext(
   const auto& style = *Style();
   const nsStyleDisplay* disp = style.StyleDisplay();
   const nsStyleEffects* effects = style.StyleEffects();
-  EffectSet* effectSetForOpacity = EffectSet::GetEffectSetForFrame(
-      this, nsCSSPropertyIDSet::OpacityProperties());
+  EffectSet* effectSetForOpacity =
+      EffectSet::GetForFrame(this, nsCSSPropertyIDSet::OpacityProperties());
   // We can stop right away if this is a zero-opacity stacking context and
   // we're painting, and we're not animating opacity.
   bool needHitTestInfo = aBuilder->BuildCompositorHitTestInfo() &&
@@ -8356,9 +8365,11 @@ void nsIFrame::DumpFrameTreeLimitedInCSSPixels() const {
 
 #endif
 
-bool nsIFrame::IsVisibleForPainting() { return StyleVisibility()->IsVisible(); }
+bool nsIFrame::IsVisibleForPainting() const {
+  return StyleVisibility()->IsVisible();
+}
 
-bool nsIFrame::IsVisibleOrCollapsedForPainting() {
+bool nsIFrame::IsVisibleOrCollapsedForPainting() const {
   return StyleVisibility()->IsVisibleOrCollapsed();
 }
 
@@ -9973,7 +9984,7 @@ bool nsIFrame::FinishAndStoreOverflow(OverflowAreas& aOverflowAreas,
     DebugOnly<nsRect*> r = &aOverflowAreas.Overflow(otype);
     NS_ASSERTION(aNewSize.width == 0 || aNewSize.height == 0 ||
                      r->width == nscoord_MAX || r->height == nscoord_MAX ||
-                     (mState & NS_FRAME_SVG_LAYOUT) ||
+                     HasAnyStateBits(NS_FRAME_SVG_LAYOUT) ||
                      r->Contains(nsRect(nsPoint(0, 0), aNewSize)),
                  "Computed overflow area must contain frame bounds");
   }
@@ -10431,13 +10442,13 @@ ComputedStyle* nsIFrame::DoGetParentComputedStyle(
     }
   }
 
-  if (!(mState & NS_FRAME_OUT_OF_FLOW)) {
+  if (!HasAnyStateBits(NS_FRAME_OUT_OF_FLOW)) {
     /*
      * If this frame is an anonymous block created when an inline with a block
      * inside it got split, then the parent style is on its preceding inline. We
      * can get to it using GetIBSplitSiblingForAnonymousBlock.
      */
-    if (mState & NS_FRAME_PART_OF_IBSPLIT) {
+    if (HasAnyStateBits(NS_FRAME_PART_OF_IBSPLIT)) {
       nsIFrame* ibSplitSibling = GetIBSplitSiblingForAnonymousBlock(this);
       if (ibSplitSibling) {
         return (*aProviderFrame = ibSplitSibling)->Style();
@@ -11535,15 +11546,13 @@ nsIFrame::CaretPosition::CaretPosition() : mContentOffset(0) {}
 nsIFrame::CaretPosition::~CaretPosition() = default;
 
 bool nsIFrame::HasCSSAnimations() {
-  auto collection =
-      AnimationCollection<CSSAnimation>::GetAnimationCollection(this);
-  return collection && collection->mAnimations.Length() > 0;
+  auto* collection = AnimationCollection<CSSAnimation>::Get(this);
+  return collection && !collection->mAnimations.IsEmpty();
 }
 
 bool nsIFrame::HasCSSTransitions() {
-  auto collection =
-      AnimationCollection<CSSTransition>::GetAnimationCollection(this);
-  return collection && collection->mAnimations.Length() > 0;
+  auto* collection = AnimationCollection<CSSTransition>::Get(this);
+  return collection && !collection->mAnimations.IsEmpty();
 }
 
 void nsIFrame::AddSizeOfExcludingThisForTree(nsWindowSizes& aSizes) const {
@@ -11770,10 +11779,8 @@ void nsIFrame::UpdateVisibleDescendantsState() {
 }
 
 void nsIFrame::UpdateAnimationVisibility() {
-  auto* animationCollection =
-      AnimationCollection<CSSAnimation>::GetAnimationCollection(this);
-  auto* transitionCollection =
-      AnimationCollection<CSSTransition>::GetAnimationCollection(this);
+  auto* animationCollection = AnimationCollection<CSSAnimation>::Get(this);
+  auto* transitionCollection = AnimationCollection<CSSTransition>::Get(this);
 
   if ((!animationCollection || animationCollection->mAnimations.IsEmpty()) &&
       (!transitionCollection || transitionCollection->mAnimations.IsEmpty())) {

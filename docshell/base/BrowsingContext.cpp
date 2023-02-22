@@ -2694,6 +2694,23 @@ nsresult BrowsingContext::ResetGVAutoplayRequestStatus() {
   return txn.Commit(this);
 }
 
+template <typename Callback>
+void BrowsingContext::WalkPresContexts(Callback&& aCallback) {
+  PreOrderWalk([&](BrowsingContext* aContext) {
+    if (nsIDocShell* shell = aContext->GetDocShell()) {
+      if (RefPtr pc = shell->GetPresContext()) {
+        aCallback(pc.get());
+      }
+    }
+  });
+}
+
+void BrowsingContext::PresContextAffectingFieldChanged() {
+  WalkPresContexts([&](nsPresContext* aPc) {
+    aPc->RecomputeBrowsingContextDependentData();
+  });
+}
+
 void BrowsingContext::DidSet(FieldIndex<IDX_SessionStoreEpoch>,
                              uint32_t aOldValue) {
   if (!mCurrentWindowContext) {
@@ -2775,21 +2792,7 @@ void BrowsingContext::DidSet(FieldIndex<IDX_InRDMPane>, bool aOldValue) {
   if (GetInRDMPane() == aOldValue) {
     return;
   }
-
-  PreOrderWalk([&](BrowsingContext* aContext) {
-    if (nsIDocShell* shell = aContext->GetDocShell()) {
-      if (nsPresContext* pc = shell->GetPresContext()) {
-        pc->RecomputeTheme();
-
-        // This is a bit of a lie, but this affects the overlay-scrollbars
-        // media query and it's the code-path that gets taken for regular system
-        // metrics changes via ThemeChanged().
-        pc->MediaFeatureValuesChanged(
-            {MediaFeatureChangeReason::SystemMetricsChange},
-            MediaFeatureChangePropagation::JustThisDocument);
-      }
-    }
-  });
+  PresContextAffectingFieldChanged();
 }
 
 bool BrowsingContext::CanSet(FieldIndex<IDX_PageAwakeRequestCount>,
@@ -2858,6 +2861,20 @@ bool BrowsingContext::CanSet(FieldIndex<IDX_TouchEventsOverrideInternal>,
   return XRE_IsParentProcess() && !aSource;
 }
 
+void BrowsingContext::DidSet(FieldIndex<IDX_TouchEventsOverrideInternal>,
+                             dom::TouchEventsOverride&& aOldValue) {
+  if (GetTouchEventsOverrideInternal() == aOldValue) {
+    return;
+  }
+  WalkPresContexts([&](nsPresContext* aPc) {
+    aPc->MediaFeatureValuesChanged(
+        {MediaFeatureChangeReason::SystemMetricsChange},
+        // We're already iterating through sub documents, so we don't need to
+        // propagate the change again.
+        MediaFeatureChangePropagation::JustThisDocument);
+  });
+}
+
 void BrowsingContext::DidSet(FieldIndex<IDX_EmbedderColorSchemes>,
                              EmbedderColorSchemes&& aOldValue) {
   if (GetEmbedderColorSchemes() == aOldValue) {
@@ -2892,19 +2909,15 @@ void BrowsingContext::DidSet(FieldIndex<IDX_DisplayMode>,
     return;
   }
 
-  PreOrderWalk([&](BrowsingContext* aContext) {
-    if (nsIDocShell* shell = aContext->GetDocShell()) {
-      if (nsPresContext* pc = shell->GetPresContext()) {
-        pc->MediaFeatureValuesChanged(
-            {MediaFeatureChangeReason::DisplayModeChange},
-            // We're already iterating through sub documents, so we don't need
-            // to propagate the change again.
-            //
-            // Images and other resources don't change their display-mode
-            // evaluation, display-mode is a property of the browsing context.
-            MediaFeatureChangePropagation::JustThisDocument);
-      }
-    }
+  WalkPresContexts([&](nsPresContext* aPc) {
+    aPc->MediaFeatureValuesChanged(
+        {MediaFeatureChangeReason::DisplayModeChange},
+        // We're already iterating through sub documents, so we don't need
+        // to propagate the change again.
+        //
+        // Images and other resources don't change their display-mode
+        // evaluation, display-mode is a property of the browsing context.
+        MediaFeatureChangePropagation::JustThisDocument);
   });
 }
 
@@ -2952,16 +2965,6 @@ void BrowsingContext::DidSet(FieldIndex<IDX_OverrideDPPX>, float aOldValue) {
     return;
   }
   PresContextAffectingFieldChanged();
-}
-
-void BrowsingContext::PresContextAffectingFieldChanged() {
-  PreOrderWalk([&](BrowsingContext* aContext) {
-    if (nsIDocShell* shell = aContext->GetDocShell()) {
-      if (nsPresContext* pc = shell->GetPresContext()) {
-        pc->RecomputeBrowsingContextDependentData();
-      }
-    }
-  });
 }
 
 void BrowsingContext::SetCustomUserAgent(const nsAString& aUserAgent,
@@ -3172,19 +3175,14 @@ bool BrowsingContext::CanSet(FieldIndex<IDX_UseErrorPages>,
   return CheckOnlyEmbedderCanSet(aSource);
 }
 
-mozilla::dom::TouchEventsOverride BrowsingContext::TouchEventsOverride() const {
-  const BrowsingContext* bc = this;
-  while (bc) {
-    mozilla::dom::TouchEventsOverride tev =
-        bc->GetTouchEventsOverrideInternal();
-    if (tev != mozilla::dom::TouchEventsOverride::None) {
+TouchEventsOverride BrowsingContext::TouchEventsOverride() const {
+  for (const auto* bc = this; bc; bc = bc->GetParent()) {
+    auto tev = bc->GetTouchEventsOverrideInternal();
+    if (tev != dom::TouchEventsOverride::None) {
       return tev;
     }
-
-    bc = bc->GetParent();
   }
-
-  return mozilla::dom::TouchEventsOverride::None;
+  return dom::TouchEventsOverride::None;
 }
 
 bool BrowsingContext::TargetTopLevelLinkClicksToBlank() const {

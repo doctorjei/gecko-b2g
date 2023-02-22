@@ -3771,7 +3771,7 @@ mozilla::ipc::IPCResult ContentParent::RecvGetClipboard(
   clipboard->GetData(trans, aWhichClipboard);
 
   nsContentUtils::TransferableToIPCTransferable(
-      trans, aDataTransfer, true /* aInSyncMessage */, nullptr, this);
+      trans, aDataTransfer, true /* aInSyncMessage */, this);
   return IPC_OK();
 }
 
@@ -3853,8 +3853,7 @@ mozilla::ipc::IPCResult ContentParent::RecvGetClipboardAsync(
                  GenericPromise::ResolveOrRejectValue&& aValue) {
                IPCDataTransfer ipcDataTransfer;
                nsContentUtils::TransferableToIPCTransferable(
-                   trans, &ipcDataTransfer, false /* aInSyncMessage */, nullptr,
-                   self);
+                   trans, &ipcDataTransfer, false /* aInSyncMessage */, self);
                aResolver(std::move(ipcDataTransfer));
              });
   return IPC_OK();
@@ -4436,7 +4435,9 @@ ContentParent::Observe(nsISupports* aSubject, const char* aTopic,
 
     // only broadcast the cookie change to content processes that need it
     const Cookie& cookie = xpcCookie->AsCookie();
-    if (!cs->CookieMatchesContentList(cookie)) {
+
+    // do not send cookie if content process does not have similar cookie
+    if (!cs->ContentProcessHasCookie(cookie)) {
       return NS_OK;
     }
 
@@ -6101,7 +6102,7 @@ void ContentParent::MaybeInvokeDragSession(BrowserParent* aParent) {
           aParent ? aParent->GetLoadContext() : nullptr;
       nsCOMPtr<nsIArray> transferables = transfer->GetTransferables(lc);
       nsContentUtils::TransferablesToIPCTransferables(
-          transferables, dataTransfers, false, nullptr, this);
+          transferables, dataTransfers, false, this);
       uint32_t action;
       session->GetDragAction(&action);
 
@@ -7556,6 +7557,11 @@ mozilla::ipc::IPCResult ContentParent::RecvSetAllowStorageAccessRequestFlag(
   MOZ_ASSERT(aEmbeddedPrincipal);
   MOZ_ASSERT(aEmbeddingOrigin);
 
+  if (!aEmbeddedPrincipal || !aEmbeddingOrigin) {
+    aResolver(false);
+    return IPC_OK();
+  }
+
   // Get the permission manager and build the key.
   RefPtr<PermissionManager> permManager = PermissionManager::GetInstance();
   if (!permManager) {
@@ -8070,10 +8076,7 @@ mozilla::ipc::IPCResult ContentParent::RecvRaiseWindow(
 
   CanonicalBrowsingContext* context = aContext.get_canonical();
 
-  ContentProcessManager* cpm = ContentProcessManager::GetSingleton();
-  if (cpm) {
-    ContentParent* cp =
-        cpm->GetContentProcessById(ContentParentId(context->OwnerProcessId()));
+  if (ContentParent* cp = context->GetContentParent()) {
     Unused << cp->SendRaiseWindow(context, aCallerType, aActionId);
   }
   return IPC_OK();
@@ -8915,17 +8918,23 @@ void ContentParent::DidLaunchSubprocess() {
 
 IPCResult ContentParent::RecvGetSystemIcon(nsIURI* aURI,
                                            GetSystemIconResolver&& aResolver) {
+  using ResolverArgs = Tuple<const nsresult&, mozilla::Maybe<ByteBuf>&&>;
+
+  if (!aURI) {
+    Maybe<ByteBuf> bytebuf = Nothing();
+    aResolver(ResolverArgs(NS_ERROR_NULL_POINTER, std::move(bytebuf)));
+    return IPC_OK();
+  }
+
 #if defined(MOZ_WIDGET_GTK)
   Maybe<ByteBuf> bytebuf = Some(ByteBuf{});
   nsresult rv = nsIconChannel::GetIcon(aURI, bytebuf.ptr());
   if (NS_WARN_IF(NS_FAILED(rv))) {
     bytebuf = Nothing();
   }
-  using ResolverArgs = Tuple<const nsresult&, mozilla::Maybe<ByteBuf>&&>;
   aResolver(ResolverArgs(rv, std::move(bytebuf)));
   return IPC_OK();
 #elif defined(XP_WIN)
-  using ResolverArgs = Tuple<const nsresult&, mozilla::Maybe<ByteBuf>&&>;
   nsIconChannel::GetIconAsync(aURI)->Then(
       GetCurrentSerialEventTarget(), __func__,
       [aResolver](ByteBuf&& aByteBuf) {

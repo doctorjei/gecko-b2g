@@ -2075,6 +2075,21 @@ sidebar:
       - 'firefox'
     record_in_processes:
       - 'main'
+  link:
+    bug_numbers:
+      - 1815706
+    description: >
+      The number of history items opened from the History sidebar.
+    expires: never
+    kind: uint
+    keyed: true
+    notification_emails:
+      - rtestard@mozilla.com
+    release_channel_collection: opt-out
+    products:
+      - 'firefox'
+    record_in_processes:
+      - 'main'
 
 os.environment:
   is_admin_without_uac:
@@ -2533,9 +2548,10 @@ media:
     bug_numbers:
       - 1733722
       - 1754657
+      - 1811157
     description: >
       Record whether hardware decoding is supported for the specific video codec. The key is the type of video codec, eg. video/vp9.
-    expires: "112"
+    expires: never
     kind: boolean
     keyed: true
     notification_emails:
@@ -2551,9 +2567,10 @@ media:
     bug_numbers:
       - 1741286
       - 1754657
+      - 1811157
     description: >
       Record whether hardware decoding is supported for the specific video codec, this only records video in HD (1280*720) or higher resultion. The key is the type of video codec, eg. video/vp9.
-    expires: "112"
+    expires: never
     kind: boolean
     keyed: true
     notification_emails:
