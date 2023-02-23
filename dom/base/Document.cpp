@@ -3752,6 +3752,19 @@ nsresult Document::InitCSP(nsIChannel* aChannel) {
     return rv;
   }
 
+  // Set the default Tile CSP if it's a tile:// url.
+  nsCOMPtr<nsIURI> uri;
+  aChannel->GetOriginalURI(getter_AddRefs(uri));
+  nsAutoCString scheme;
+  uri->GetScheme(scheme);
+  if (scheme.EqualsLiteral("tile")) {
+    printf_stderr("ZZZ Document::InitCSP this is a tile:// document\n");
+    nsAutoString tileCsp;
+    Preferences::GetString("network.protocol-handler.tile.csp", tileCsp);
+    printf_stderr("ZZZ CSP: |%s|\n", NS_ConvertUTF16toUTF8(tileCsp).get());
+    mCSP->AppendPolicy(tileCsp, false, false);
+  }
+
   if (httpChannel) {
     Unused << httpChannel->GetResponseHeader("content-security-policy"_ns,
                                              tCspHeaderValue);

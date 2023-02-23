@@ -1475,6 +1475,17 @@ nsresult WorkerPrivate::SetCSPFromHeaderValues(
     addonPolicy = basePrin->AddonPolicy();
   }
 
+  // Set the default Tile CSP if it's a tile:// url.
+  nsAutoCString scheme;
+  selfURI->GetScheme(scheme);
+  if (scheme.EqualsLiteral("tile")) {
+    printf_stderr("ZZZ WorkerPrivate::SetCSPFromHeaderValues this is a tile:// document\n");
+    nsAutoString tileCsp;
+    Preferences::GetString("network.protocol-handler.tile.csp", tileCsp);
+    printf_stderr("ZZZ CSP: |%s|\n", NS_ConvertUTF16toUTF8(tileCsp).get());
+    csp->AppendPolicy(tileCsp, false, false);
+  }
+
   // For extension workers there aren't any csp header values,
   // instead it will inherit the Extension CSP.
   if (addonPolicy) {
