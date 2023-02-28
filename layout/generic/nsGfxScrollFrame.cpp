@@ -1347,30 +1347,34 @@ static void GetScrollableOverflowForPerspective(
   }
 }
 
-nscoord nsHTMLScrollFrame::GetLogicalBaseline(WritingMode aWritingMode) const {
-  // This function implements some of the spec text here:
-  //  https://drafts.csswg.org/css-align/#baseline-export
-  //
-  // Specifically: if our scrolled frame is a block, we just use the inherited
-  // GetLogicalBaseline() impl, which synthesizes a baseline from the
-  // margin-box. Otherwise, we defer to our scrolled frame, considering it
-  // to be scrolled to its initial scroll position.
-  if (mHelper.mScrolledFrame->IsBlockFrameOrSubclass() ||
-      StyleDisplay()->IsContainLayout()) {
-    return nsContainerFrame::GetLogicalBaseline(aWritingMode);
+Maybe<nscoord> nsHTMLScrollFrame::GetNaturalBaselineBOffset(
+    WritingMode aWM, BaselineSharingGroup aBaselineGroup) const {
+  // Block containers that are scrollable always have a first & last baselines
+  // that are synthesized from block-end margin edge.
+  // Note(dshin): This behaviour is really only relevant to `inline-block`
+  // alignment context. In the context of table/flex/grid alignment, first/last
+  // baselines are calculated through `GetFirstLineBaseline`, which does
+  // calculations of its own.
+  // https://drafts.csswg.org/css-align/#baseline-export
+  if (mHelper.mScrolledFrame->IsBlockFrameOrSubclass()) {
+    return Some(SynthesizeFallbackBaseline(aWM, aBaselineGroup));
   }
 
-  // OK, here's where we defer to our scrolled frame. We have to add our
-  // border BStart thickness to whatever it returns, to produce an offset in
-  // our frame-rect's coordinate system. (We don't have to add padding,
-  // because the scrolled frame handles our padding.)
-  LogicalMargin border = GetLogicalUsedBorder(aWritingMode);
+  if (StyleDisplay()->IsContainLayout()) {
+    return Nothing{};
+  }
 
-  // Clamp the baseline to the border rect. See bug 1791069.
-  return std::clamp(
-      border.BStart(aWritingMode) +
-          mHelper.mScrolledFrame->GetLogicalBaseline(aWritingMode),
-      0, GetLogicalSize(aWritingMode).BSize(aWritingMode));
+  // OK, here's where we defer to our scrolled frame.
+  return mHelper.mScrolledFrame->GetNaturalBaselineBOffset(aWM, aBaselineGroup)
+      .map([this, aWM](nscoord aBaseline) {
+        // We have to add our border BStart thickness to whatever it returns, to
+        // produce an offset in our frame-rect's coordinate system. (We don't
+        // have to add padding, because the scrolled frame handles our padding.)
+        LogicalMargin border = GetLogicalUsedBorder(aWM);
+        const auto bSize = GetLogicalSize(aWM).BSize(aWM);
+        // Clamp the baseline to the border rect. See bug 1791069.
+        return std::clamp(border.BStart(aWM) + aBaseline, 0, bSize);
+      });
 }
 
 void nsHTMLScrollFrame::AdjustForPerspective(nsRect& aScrollableOverflow) {
@@ -2341,6 +2345,7 @@ void ScrollFrameHelper::AsyncScroll::InitSmoothScroll(
   mAnimationPhysics->Update(aTime, aDestination, aCurrentVelocity);
 }
 
+/* static */
 bool ScrollFrameHelper::IsSmoothScrollingEnabled() {
   return StaticPrefs::general_smoothScroll();
 }
@@ -4206,7 +4211,21 @@ void ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder* aBuilder,
   nscoord radii[8];
   const bool haveRadii = mOuter->GetPaddingBoxBorderRadii(radii);
   if (mIsRoot) {
-    clipRect.SizeTo(nsLayoutUtils::CalculateCompositionSizeForFrame(mOuter));
+    clipRect.SizeTo(nsLayoutUtils::CalculateCompositionSizeForFrame(
+        mOuter, true /* aSubtractScrollbars */,
+        nullptr /* aOverrideScrollPortSize */,
+        // With the dynamic toolbar, this CalculateCompositionSizeForFrame call
+        // basically expands the region being covered up by the dynamic toolbar,
+        // but if the root scroll container is not scrollable, e.g. the root
+        // element has `overflow: hidden` or `position: fixed`, the function
+        // doesn't expand the region since expanding the region in such cases
+        // will prevent the content from restoring zooming to 1.0 zoom level
+        // such as bug 1652190. That said, this `clipRect` which will be used
+        // for the async zoom container needs to be expanded because zoomed-in
+        // contents can be scrollable __visually__ so that the region under the
+        // dynamic toolbar area will be revealed.
+        nsLayoutUtils::IncludeDynamicToolbar::Force));
+
     // The composition size is essentially in visual coordinates.
     // If we are hit-testing in layout coordinates, transform the clip rect
     // to layout coordinates to match.
@@ -5651,7 +5670,6 @@ already_AddRefed<Element> ScrollFrameHelper::MakeScrollbar(
 
   e->SetAttr(kNameSpaceID_None, nsGkAtoms::orient, kOrientValues[aVertical],
              false);
-  e->SetAttr(kNameSpaceID_None, nsGkAtoms::clickthrough, u"always"_ns, false);
 
   if (mIsRoot) {
     e->SetProperty(nsGkAtoms::docLevelNativeAnonymousContent,
@@ -5828,8 +5846,6 @@ nsresult ScrollFrameHelper::CreateAnonymousContent(
         NS_WARNING("only resizable types should have resizers");
     }
     mResizerContent->SetAttr(kNameSpaceID_None, nsGkAtoms::dir, dir, false);
-    mResizerContent->SetAttr(kNameSpaceID_None, nsGkAtoms::clickthrough,
-                             u"always"_ns, false);
     aElements.AppendElement(mResizerContent);
   }
 
@@ -8415,6 +8431,14 @@ bool ScrollFrameHelper::SmoothScrollVisual(
 }
 
 bool ScrollFrameHelper::IsSmoothScroll(dom::ScrollBehavior aBehavior) const {
+  // The user smooth scrolling preference should be honored for any requested
+  // smooth scrolls. A requested smooth scroll when smooth scrolling is
+  // disabled should be equivalent to an instant scroll.
+  if (aBehavior == dom::ScrollBehavior::Instant ||
+      !ScrollFrameHelper::IsSmoothScrollingEnabled()) {
+    return false;
+  }
+
   if (aBehavior == dom::ScrollBehavior::Smooth) {
     return true;
   }

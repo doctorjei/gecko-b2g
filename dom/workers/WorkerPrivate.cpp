@@ -98,6 +98,7 @@
 #include "WorkerRef.h"
 #include "WorkerRunnable.h"
 #include "WorkerThread.h"
+#include "nsContentSecurityManager.h"
 
 #include "nsThreadManager.h"
 
@@ -4148,53 +4149,48 @@ void WorkerPrivate::NotifyWorkerRefs(WorkerStatus aStatus) {
   }
 }
 
-bool WorkerPrivate::RegisterShutdownTask(nsITargetShutdownTask* aTask) {
-  MOZ_ASSERT(aTask);
+nsresult WorkerPrivate::RegisterShutdownTask(nsITargetShutdownTask* aTask) {
+  NS_ENSURE_ARG(aTask);
 
   MutexAutoLock lock(mMutex);
 
-  if (mRunShutdownTasksStarted) {
-    return false;
+  // If we've already started running shutdown tasks, don't allow registering
+  // new ones.
+  if (mShutdownTasksRun) {
+    return NS_ERROR_UNEXPECTED;
   }
 
   MOZ_ASSERT(!mShutdownTasks.Contains(aTask));
   mShutdownTasks.AppendElement(aTask);
-
-  return true;
+  return NS_OK;
 }
 
-bool WorkerPrivate::UnregisterShutdownTask(nsITargetShutdownTask* aTask) {
-  MOZ_ASSERT(aTask);
+nsresult WorkerPrivate::UnregisterShutdownTask(nsITargetShutdownTask* aTask) {
+  NS_ENSURE_ARG(aTask);
 
   MutexAutoLock lock(mMutex);
 
-  if (mRunShutdownTasksFinished) {
-    return false;
+  // We've already started running shutdown tasks, so can't unregister them
+  // anymore.
+  if (mShutdownTasksRun) {
+    return NS_ERROR_UNEXPECTED;
   }
 
-  MOZ_ASSERT(mShutdownTasks.Contains(aTask));
-  mShutdownTasks.RemoveElement(aTask);
-
-  return true;
+  return mShutdownTasks.RemoveElement(aTask) ? NS_OK : NS_ERROR_UNEXPECTED;
 }
 
 void WorkerPrivate::RunShutdownTasks() {
-  CopyableTArray<nsCOMPtr<nsITargetShutdownTask>> shutdownTasks;
+  nsTArray<nsCOMPtr<nsITargetShutdownTask>> shutdownTasks;
 
   {
     MutexAutoLock lock(mMutex);
-    shutdownTasks = mShutdownTasks;
-    mRunShutdownTasksStarted = true;
+    shutdownTasks = std::move(mShutdownTasks);
+    mShutdownTasks.Clear();
+    mShutdownTasksRun = true;
   }
 
   for (auto& task : shutdownTasks) {
     task->TargetShutdown();
-  }
-
-  {
-    MutexAutoLock lock(mMutex);
-    mShutdownTasks.Clear();
-    mRunShutdownTasksFinished = true;
   }
 }
 
@@ -5780,16 +5776,17 @@ Result<Ok, nsresult> WorkerPrivate::SetEmbedderPolicy(
     return Ok();
   }
 
-  // If owner's emebedder policy is corp_reqired, aPolicy must also be
-  // corp_reqired. But if owner's embedder policy is null, aPolicy needs not
-  // match owner's value.
-  // https://wicg.github.io/cross-origin-embedder-policy/#cascade-vs-require
+  // https://html.spec.whatwg.org/multipage/browsers.html#check-a-global-object's-embedder-policy
+  // If ownerPolicy's value is not compatible with cross-origin isolation or
+  // policy's value is compatible with cross-origin isolation, then return true.
   EnsureOwnerEmbedderPolicy();
-  if (mOwnerEmbedderPolicy.valueOr(nsILoadInfo::EMBEDDER_POLICY_NULL) !=
-      nsILoadInfo::EMBEDDER_POLICY_NULL) {
-    if (mOwnerEmbedderPolicy.valueOr(aPolicy) != aPolicy) {
-      return Err(NS_ERROR_BLOCKED_BY_POLICY);
-    }
+  nsILoadInfo::CrossOriginEmbedderPolicy ownerPolicy =
+      mOwnerEmbedderPolicy.valueOr(nsILoadInfo::EMBEDDER_POLICY_NULL);
+  if (nsContentSecurityManager::IsCompatibleWithCrossOriginIsolation(
+          ownerPolicy) &&
+      !nsContentSecurityManager::IsCompatibleWithCrossOriginIsolation(
+          aPolicy)) {
+    return Err(NS_ERROR_BLOCKED_BY_POLICY);
   }
 
   mEmbedderPolicy.emplace(aPolicy);

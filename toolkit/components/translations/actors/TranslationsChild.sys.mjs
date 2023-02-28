@@ -14,8 +14,88 @@ XPCOMUtils.defineLazyGetter(lazy, "console", () => {
 });
 
 /**
- * @typedef {import("../translations").LanguageModelFiles} LanguageModelFiles
+ * @typedef {import("../translations").LanguageTranslationModelFiles} LanguageTranslationModelFiles
+ * @typedef {import("../translations").TranslationsEnginePayload} TranslationsEnginePayload
  */
+
+export class LanguageIdEngine {
+  /** @type {Worker} */
+  #languageIdWorker;
+  // Multiple messages can be sent before a response is received. This ID is used to keep
+  // track of the messages. It is incremented on every use.
+  #messageId = 0;
+
+  /**
+   * Construct and initialize the language-id worker.
+   *
+   * @param {ArrayBuffer} wasmArrayBuffer
+   * @param {ArrayBuffer} languageIdModel
+   */
+  constructor(wasmBuffer, modelBuffer) {
+    this.#languageIdWorker = new Worker(
+      "chrome://global/content/translations/language-id-engine-worker.js"
+    );
+
+    this.isReady = new Promise((resolve, reject) => {
+      const onMessage = ({ data }) => {
+        if (data.type === "initialization-success") {
+          resolve();
+        } else if (data.type === "initialization-failure") {
+          reject(data.error);
+        }
+        this.#languageIdWorker.removeEventListener("message", onMessage);
+      };
+      this.#languageIdWorker.addEventListener("message", onMessage);
+    });
+
+    this.#languageIdWorker.postMessage({
+      type: "initialize",
+      wasmBuffer,
+      modelBuffer,
+      isLoggingEnabled:
+        Services.prefs.getCharPref("browser.translations.logLevel") === "All",
+    });
+  }
+
+  /**
+   * Attempts to identify the human language in which the message is written.
+   * Generally, the longer a message is, the higher the likelihood that the
+   * identified language will be correct. Shorter messages increase the chance
+   * of false identification.
+   *
+   * The returned confidence is a number between 0.0 and 1.0 of how confident
+   * the language identification model was that it identified the correct language.
+   *
+   * @param {string} message
+   * @returns {Promise<{ languageLabel: string, confidence: number }>}
+   */
+  identifyLanguage(message) {
+    const messageId = this.#messageId++;
+    return new Promise((resolve, reject) => {
+      const onMessage = ({ data }) => {
+        if (data.messageId !== messageId) {
+          // Multiple translation requests can be sent before a response is received.
+          // Ensure that the response received here is the correct one.
+          return;
+        }
+        if (data.type === "language-id-response") {
+          let { languageLabel, confidence } = data;
+          resolve({ languageLabel, confidence });
+        }
+        if (data.type === "language-id-error") {
+          reject(data.error);
+        }
+        this.#languageIdWorker.removeEventListener("message", onMessage);
+      };
+      this.#languageIdWorker.addEventListener("message", onMessage);
+      this.#languageIdWorker.postMessage({
+        type: "language-id-request",
+        message,
+        messageId,
+      });
+    });
+  }
+}
 
 /**
  * The TranslationsEngine encapsulates the logic for translating messages. It can
@@ -27,7 +107,7 @@ XPCOMUtils.defineLazyGetter(lazy, "console", () => {
  */
 export class TranslationsEngine {
   /** @type {Worker} */
-  #worker;
+  #translationsWorker;
   // Multiple messages can be sent before a response is received. This ID is used to keep
   // track of the messages. It is incremented on every use.
   #messageId = 0;
@@ -37,21 +117,15 @@ export class TranslationsEngine {
    *
    * @param {string} fromLanguage
    * @param {string} toLanguage
-   * @param {ArrayBuffer} bergamotWasmArrayBuffer
-   * @param {LanguageModelFiles[]} languageModelFiles
+   * @param {TranslationsEnginePayload} enginePayload
    */
-  constructor(
-    fromLanguage,
-    toLanguage,
-    bergamotWasmArrayBuffer,
-    languageModelFiles
-  ) {
+  constructor(fromLanguage, toLanguage, enginePayload) {
     /** @type {string} */
     this.fromLanguage = fromLanguage;
     /** @type {string} */
     this.toLanguage = toLanguage;
-    this.#worker = new Worker(
-      "chrome://global/content/translations/engine-worker.js"
+    this.#translationsWorker = new Worker(
+      "chrome://global/content/translations/translations-engine-worker.js"
     );
 
     /** @type {Promise<void>} */
@@ -63,17 +137,16 @@ export class TranslationsEngine {
         } else if (data.type === "initialization-failure") {
           reject(data.error);
         }
-        this.#worker.removeEventListener("message", onMessage);
+        this.#translationsWorker.removeEventListener("message", onMessage);
       };
-      this.#worker.addEventListener("message", onMessage);
+      this.#translationsWorker.addEventListener("message", onMessage);
     });
 
-    this.#worker.postMessage({
+    this.#translationsWorker.postMessage({
       type: "initialize",
       fromLanguage,
       toLanguage,
-      bergamotWasmArrayBuffer,
-      languageModelFiles,
+      enginePayload,
       messageId: this.#messageId++,
       isLoggingEnabled:
         Services.prefs.getCharPref("browser.translations.logLevel") === "All",
@@ -102,12 +175,12 @@ export class TranslationsEngine {
         if (data.type === "translation-error") {
           reject(data.error);
         }
-        this.#worker.removeEventListener("message", onMessage);
+        this.#translationsWorker.removeEventListener("message", onMessage);
       };
 
-      this.#worker.addEventListener("message", onMessage);
+      this.#translationsWorker.addEventListener("message", onMessage);
 
-      this.#worker.postMessage({
+      this.#translationsWorker.postMessage({
         type: "translation-request",
         messageBatch,
         messageId,
@@ -121,7 +194,7 @@ export class TranslationsEngine {
    * translations.
    */
   terminate() {
-    this.#worker.terminate();
+    this.#translationsWorker.terminate();
   }
 }
 
@@ -141,9 +214,20 @@ export class TranslationsChild extends JSWindowActorChild {
   #bergamotWasmArrayBuffer = null;
 
   /**
+   * The translations engine could be mocked for tests, since the wasm and the language
+   * models must be downloaded from Remote Settings.
+   */
+  #isTranslationsEngineMocked = false;
+
+  /**
    * @returns {Promise<ArrayBuffer>}
    */
   async #getBergamotWasmArrayBuffer() {
+    if (this.#isTranslationsEngineMocked) {
+      throw new Error(
+        "The engine is mocked, the Bergamot wasm is not available."
+      );
+    }
     let arrayBuffer = this.#bergamotWasmArrayBuffer;
     if (!arrayBuffer) {
       arrayBuffer = await this.sendQuery(
@@ -155,12 +239,35 @@ export class TranslationsChild extends JSWindowActorChild {
   }
 
   /**
+   * Retrieves the language-identification model binary from the TranslationsParent.
+   *
+   * @returns {Promise<ArrayBuffer>}
+   */
+  #getLanguageIdModelArrayBuffer() {
+    return this.sendQuery("Translations:GetLanguageIdModelArrayBuffer");
+  }
+
+  /**
+   * Retrieves the language-identification wasm binary from the TranslationsParent.
+   *
+   * @returns {Promise<ArrayBuffer>}
+   */
+  async #getLanguageIdWasmArrayBuffer() {
+    return this.sendQuery("Translations:GetLanguageIdWasmArrayBuffer");
+  }
+
+  /**
    * @param {string} fromLanguage
    * @param {string} toLanguage
-   * @returns {Promise<LanguageModelFiles[]>}
+   * @returns {Promise<LanguageTranslationModelFiles[]>}
    */
-  async #getLanguageModelFiles(fromLanguage, toLanguage) {
-    return this.sendQuery("Translations:GetLanguageModelFiles", {
+  async #getLanguageTranslationModelFiles(fromLanguage, toLanguage) {
+    if (this.#isTranslationsEngineMocked) {
+      throw new Error(
+        "The engine is mocked, there are no language model files available."
+      );
+    }
+    return this.sendQuery("Translations:GetLanguageTranslationModelFiles", {
       fromLanguage,
       toLanguage,
     });
@@ -172,6 +279,21 @@ export class TranslationsChild extends JSWindowActorChild {
   handleEvent(event) {
     // TODO
     lazy.console.log("TranslationsChild observed a pageshow event.");
+  }
+
+  /**
+   * Receive a message from the parent.
+   *
+   * @param {{ name: string, data: any }} message
+   */
+  receiveMessage(message) {
+    switch (message.name) {
+      case "Translations:IsMocked":
+        this.#isTranslationsEngineMocked = message.data;
+        break;
+      default:
+        lazy.console.warn("Unknown message.");
+    }
   }
 
   /**
@@ -189,22 +311,52 @@ export class TranslationsChild extends JSWindowActorChild {
   }
 
   /**
+   * Construct and initialize the LanguageId Engine.
+   */
+  async createLanguageIdEngine() {
+    const [wasmBuffer, languageIdModelArrayBuffer] = await Promise.all([
+      this.#getLanguageIdWasmArrayBuffer(),
+      this.#getLanguageIdModelArrayBuffer(),
+    ]);
+    const engine = new LanguageIdEngine(wasmBuffer, languageIdModelArrayBuffer);
+    await engine.isReady;
+    return engine;
+  }
+
+  /**
+   * The engine is not avialable in tests.
+   *
+   * @param {string} fromLanguage
+   * @param {string} toLanguage
+   * @returns {null | TranslationsEnginePayload}
+   */
+  async #getTranslationsEnginePayload(fromLanguage, toLanguage) {
+    if (this.#isTranslationsEngineMocked) {
+      return null;
+    }
+    const [bergamotWasmArrayBuffer, languageModelFiles] = await Promise.all([
+      this.#getBergamotWasmArrayBuffer(),
+      this.#getLanguageTranslationModelFiles(fromLanguage, toLanguage),
+    ]);
+    return { bergamotWasmArrayBuffer, languageModelFiles };
+  }
+
+  /**
    * Construct and initialize the Translations Engine.
    *
    * @param {string} fromLanguage
    * @param {string} toLanguage
    */
   async createTranslationsEngine(fromLanguage, toLanguage) {
-    const [bergamotWasmArrayBuffer, languageModelFiles] = await Promise.all([
-      this.#getBergamotWasmArrayBuffer(),
-      this.#getLanguageModelFiles(fromLanguage, toLanguage),
-    ]);
+    const enginePayload = await this.#getTranslationsEnginePayload(
+      fromLanguage,
+      toLanguage
+    );
 
     const engine = new TranslationsEngine(
       fromLanguage,
       toLanguage,
-      bergamotWasmArrayBuffer,
-      languageModelFiles
+      enginePayload
     );
 
     await engine.isReady;

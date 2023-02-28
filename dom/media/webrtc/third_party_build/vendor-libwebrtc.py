@@ -32,6 +32,31 @@ LIBWEBRTC_UNUSED_IN_FIREFOX = [
     "presubmit_test_mocks.py",
     "pylintrc",
     "style-guide.md",
+    # Only the camera code under sdk/android/api/org/webrtc is used, so
+    # we remove a bunch of other java files that aren't useful.
+    "sdk/android/api/org/webrtc/CandidatePairChangeEvent.java",
+    "sdk/android/api/org/webrtc/DefaultVideoEncoderFactory.java",
+    "sdk/android/api/org/webrtc/HardwareVideoEncoderFactory.java",
+    "sdk/android/api/org/webrtc/IceCandidate.java",
+    "sdk/android/api/org/webrtc/MediaStream.java",
+    "sdk/android/api/org/webrtc/NetworkChangeDetector.java",
+    "sdk/android/api/org/webrtc/NetworkChangeDetectorFactory.java",
+    "sdk/android/api/org/webrtc/NetworkControllerFactoryFactory.java",
+    "sdk/android/api/org/webrtc/NetworkMonitor.java",
+    "sdk/android/api/org/webrtc/NetworkMonitorAutoDetect.java",
+    "sdk/android/api/org/webrtc/NetworkStatePredictorFactoryFactory.java",
+    "sdk/android/api/org/webrtc/PeerConnection.java",
+    "sdk/android/api/org/webrtc/PeerConnectionDependencies.java",
+    "sdk/android/api/org/webrtc/PeerConnectionFactory.java",
+    "sdk/android/api/org/webrtc/RTCStats.java",
+    "sdk/android/api/org/webrtc/RTCStatsCollectorCallback.java",
+    "sdk/android/api/org/webrtc/RTCStatsReport.java",
+    "sdk/android/api/org/webrtc/RtcCertificatePem.java",
+    "sdk/android/api/org/webrtc/RtpParameters.java",
+    "sdk/android/api/org/webrtc/RtpReceiver.java",
+    "sdk/android/api/org/webrtc/RtpSender.java",
+    "sdk/android/api/org/webrtc/RtpTransceiver.java",
+    "sdk/android/src/java/org/webrtc/JniHelper.java",
 ]
 
 
@@ -114,19 +139,23 @@ def fetch_local(target, path, commit):
 
 def validate_tar_member(member, path):
     def _is_within_directory(directory, target):
-        abs_directory = os.path.abspath(directory)
-        abs_target = os.path.abspath(target)
-        prefix = os.path.commonprefix([abs_directory, abs_target])
-        return prefix == abs_directory
+        real_directory = os.path.realpath(directory)
+        real_target = os.path.realpath(target)
+        prefix = os.path.commonprefix([real_directory, real_target])
+        return prefix == real_directory
 
     member_path = os.path.join(path, member.name)
     if not _is_within_directory(path, member_path):
         raise Exception("Attempted path traversal in tar file: " + member.name)
+    if member.issym():
+        link_path = os.path.join(os.path.dirname(member_path), member.linkname)
+        if not _is_within_directory(path, link_path):
+            raise Exception("Attempted link path traversal in tar file: " + member.name)
     if member.mode & (stat.S_ISUID | stat.S_ISGID):
         raise Exception("Attempted setuid or setgid in tar file: " + member.name)
 
 
-def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+def safe_extract(tar, path=".", *, numeric_owner=False):
     def _files(tar, path):
         for member in tar:
             validate_tar_member(member, path)
@@ -144,9 +173,11 @@ def unpack(target):
         pass
     with tarfile.open(target_archive) as t:
         safe_extract(t, path=target_path)
-    libwebrtc_used_in_firefox = os.listdir(target_path)
 
     if target == "libwebrtc":
+        # use the top level directories from the tarfile and
+        # delete those directories in LIBWEBRTC_DIR
+        libwebrtc_used_in_firefox = os.listdir(target_path)
         for path in libwebrtc_used_in_firefox:
             try:
                 shutil.rmtree(os.path.join(LIBWEBRTC_DIR, path))
@@ -160,17 +191,26 @@ def unpack(target):
             # GitHub packs everything inside a separate directory
             target_path = os.path.join(target_path, os.listdir(target_path)[0])
 
-        # remove the exceptions we don't want to vendor into our tree
+        # remove the top level exceptions we don't want to vendor into our tree
         libwebrtc_used_in_firefox = [
             path
             for path in libwebrtc_used_in_firefox
             if (path not in LIBWEBRTC_UNUSED_IN_FIREFOX)
         ]
 
+        # move all the top level entries from the tarfile to LIBWEBRTC_DIR
         for path in libwebrtc_used_in_firefox:
             shutil.move(
                 os.path.join(target_path, path), os.path.join(LIBWEBRTC_DIR, path)
             )
+
+        # remove any non-top-level entries in LIBWEBRTC_UNUSED_IN_FIREFOX
+        for path in LIBWEBRTC_UNUSED_IN_FIREFOX:
+            try:
+                os.remove(os.path.join(LIBWEBRTC_DIR, path))
+            except OSError:
+                # we can ignore errors from trying to delete directories
+                pass
     elif target == "build":
         try:
             shutil.rmtree(os.path.join(LIBWEBRTC_DIR, "build"))

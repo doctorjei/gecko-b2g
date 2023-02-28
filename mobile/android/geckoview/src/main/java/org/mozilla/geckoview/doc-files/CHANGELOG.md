@@ -13,6 +13,12 @@ exclude: true
 
 ⚠️  breaking change and deprecation notices
 
+## v112
+- Added `GeckoSession.LOAD_FLAGS_BYPASS_LOAD_URI_DELEGATE`, see ([bug 1809269]({{bugzilla}}1809269)).
+- Added [`GeckoSession.hasCookieBannerRuleForBrowsingContextTree`][112.1] to expose Gecko API nsICookieBannerService::hasRuleForBrowsingContextTree see ([bug 1806740]({{bugzilla}}1806740))
+
+[112.1]: {{javadoc_uri}}/GeckoSession.html#hasCookieBannerRuleForBrowsingContextTree()
+
 ## v111
 
 - Removed deprecated [`SelectionActionDelegate.Selection.clientRect`][111.10], [`BasicSelectionActionDelegate.mTempMatrix`][111.11] and  [`BasicSelectionActionDelegate.mTempRect`][111.12], ([bug 1801615]({{bugzilla}}1801615))
@@ -1318,4 +1324,4 @@ to allow adding gecko profiler markers.
 [65.24]: {{javadoc_uri}}/CrashReporter.html#sendCrashReport(android.content.Context,android.os.Bundle,java.lang.String)
 [65.25]: {{javadoc_uri}}/GeckoResult.html
 
-[api-version]: 5c6f2bfdee45037ef4de5b47ecf3c775b738a9ed
+[api-version]: 2eda8f8745bff92ab7b9462d550c91ca5f1dfa85

@@ -2105,17 +2105,40 @@ void nsIFrame::SetAdditionalComputedStyle(int32_t aIndex,
   MOZ_ASSERT(aIndex >= 0, "invalid index number");
 }
 
-nscoord nsIFrame::GetLogicalBaseline(WritingMode aWritingMode) const {
+nscoord nsIFrame::SynthesizeFallbackBaseline(
+    WritingMode aWM, BaselineSharingGroup aBaselineGroup) const {
+  const auto margin = GetLogicalUsedMargin(aWM);
   NS_ASSERTION(!IsSubtreeDirty(), "frame must not be dirty");
   // Baseline for inverted line content is the top (block-start) margin edge,
   // as the frame is in effect "flipped" for alignment purposes.
-  if (aWritingMode.IsLineInverted()) {
-    return -GetLogicalUsedMargin(aWritingMode).BStart(aWritingMode);
+  if (aWM.IsLineInverted()) {
+    const auto marginStart = margin.BStart(aWM);
+    return aBaselineGroup == BaselineSharingGroup::First
+               ? -marginStart
+               : BSize(aWM) + marginStart;
   }
   // Otherwise, the bottom margin edge, per CSS2.1's definition of the
   // 'baseline' value of 'vertical-align'.
-  return BSize(aWritingMode) +
-         GetLogicalUsedMargin(aWritingMode).BEnd(aWritingMode);
+  const auto marginEnd = margin.BEnd(aWM);
+  return aBaselineGroup == BaselineSharingGroup::First ? BSize(aWM) + marginEnd
+                                                       : -marginEnd;
+}
+
+nscoord nsIFrame::GetLogicalBaseline(WritingMode aWM) const {
+  return GetLogicalBaseline(aWM, GetDefaultBaselineSharingGroup());
+}
+
+nscoord nsIFrame::GetLogicalBaseline(
+    WritingMode aWM, BaselineSharingGroup aBaselineGroup) const {
+  const auto result =
+      GetNaturalBaselineBOffset(aWM, aBaselineGroup)
+          .valueOrFrom([this, aWM, aBaselineGroup]() {
+            return SynthesizeFallbackBaseline(aWM, aBaselineGroup);
+          });
+  if (aBaselineGroup == BaselineSharingGroup::Last) {
+    return BSize(aWM) - result;
+  }
+  return result;
 }
 
 const nsFrameList& nsIFrame::GetChildList(ChildListID aListID) const {
@@ -2149,6 +2172,22 @@ AutoTArray<nsIFrame::ChildList, 4> nsIFrame::CrossDocChildLists() {
 
   GetChildLists(&childLists);
   return childLists;
+}
+
+nsIFrame::CaretBlockAxisMetrics nsIFrame::GetCaretBlockAxisMetrics(
+    mozilla::WritingMode aWM, const nsFontMetrics& aFM) const {
+  // Note(dshin): Ultimately, this does something highly similar (But still
+  // different) to `nsLayoutUtils::GetFirstLinePosition`.
+  const auto baseline = GetCaretBaseline();
+  nscoord ascent = 0, descent = 0;
+  ascent = aFM.MaxAscent();
+  descent = aFM.MaxDescent();
+  const nscoord height = ascent + descent;
+  if (aWM.IsVertical() && aWM.IsLineInverted()) {
+    return CaretBlockAxisMetrics{.mOffset = baseline - descent,
+                                 .mExtent = height};
+  }
+  return CaretBlockAxisMetrics{.mOffset = baseline - ascent, .mExtent = height};
 }
 
 const nsAtom* nsIFrame::ComputePageValue() const {

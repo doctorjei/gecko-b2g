@@ -134,6 +134,9 @@ nom = { path = "build/rust/nom" }
 # Patch nix 0.24 to 0.25
 nix = { path = "build/rust/nix" }
 
+# Patch hermit-abi 0.1 to 0.2
+hermit-abi = { path = "build/rust/hermit-abi" }
+
 # Patch autocfg to hide rustc output. Workaround for https://github.com/cuviper/autocfg/issues/30
 autocfg = { path = "third_party/rust/autocfg" }
 
@@ -169,7 +172,7 @@ warp = { git = "https://github.com/glandium/warp", rev = "4af45fae95bc98b0eba1ef
 fluent-fallback = { path = "b2g/forks/fluent-fallback" }
 glean-core = { path = "b2g/forks/glean-core" }
 
-cssparser = { git = "https://github.com/servo/rust-cssparser", rev = "d3670a89bae26ba3a8db4758eb7976616113987d" }
+cssparser = { git = "https://github.com/servo/rust-cssparser", rev = "b196a164dcbb317016d4aa6c58c13147e6045ebb" }
 
 # application-services overrides to make updating them all simpler.
 interrupt-support = { git = "https://github.com/bendk/application-services", rev = "ecb35df5fc40357c49922f90e86bf4147fa52953" }

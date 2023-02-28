@@ -5257,23 +5257,13 @@ bool nsWindow::ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,
         break;
       }
 
-      nsresult rv;
-      bool didChange = false;
-
       // update the global font list
-      nsCOMPtr<nsIFontEnumerator> fontEnum =
-          do_GetService("@mozilla.org/gfx/fontenumerator;1", &rv);
-      if (NS_SUCCEEDED(rv)) {
-        fontEnum->UpdateFontList(&didChange);
-        if (didChange) {
-          gfxPlatform::ForceGlobalReflow(gfxPlatform::NeedsReframe::Yes);
-        }
-      }  // if (NS_SUCCEEDED(rv))
+      gfxPlatform::GetPlatform()->UpdateFontList();
     } break;
 
     case WM_SETTINGCHANGE: {
       if (wParam == SPI_SETCLIENTAREAANIMATION ||
-          wParam == SPI_SETKEYBOARDCUES || wParam == SPI_SETKEYBOARDDELAY) {
+          wParam == SPI_SETKEYBOARDDELAY) {
         // These need to update LookAndFeel cached values.
         // They affect reduced motion settings / caret blink count / and
         // keyboard cues, so no need to invalidate style / layout.
@@ -5620,11 +5610,11 @@ bool nsWindow::ProcessMessageInternal(UINT msg, WPARAM& wParam, LPARAM& lParam,
         userMovedMouse = true;
       }
 
-      result =
-          DispatchMouseEvent(eMouseMove, wParam, lParam, false,
-                             MouseButton::ePrimary, MOUSE_INPUT_SOURCE(),
-                             mPointerEvents.GetCachedPointerInfo(msg, wParam));
       if (userMovedMouse) {
+        result = DispatchMouseEvent(
+            eMouseMove, wParam, lParam, false, MouseButton::ePrimary,
+            MOUSE_INPUT_SOURCE(),
+            mPointerEvents.GetCachedPointerInfo(msg, wParam));
         DispatchPendingEvents();
       }
     } break;

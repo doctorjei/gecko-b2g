@@ -7,8 +7,15 @@
 // allow for the page to get access to additional privileged features.
 
 /* global AT_getSupportedLanguages, AT_log, AT_getScriptDirection,
-   AT_getAppLocale, AT_logError, AT_destroyEngine,
-   AT_createTranslationsEngine, AT_translate */
+   AT_getAppLocale, AT_logError, AT_destroyTranslationsEngine,
+   AT_createTranslationsEngine, AT_createLanguageIdEngine, 
+   AT_translate, AT_identifyLanguage */
+
+// Allow tests to override this value so that they can run faster.
+// This is the delay in milliseconds.
+window.DEBOUNCE_DELAY = 200;
+// Allow tests to test the debounce behavior by counting debounce runs.
+window.DEBOUNCE_RUN_COUNT = 0;
 
 /**
  * The model and controller for initializing about:translations.
@@ -46,12 +53,18 @@ class TranslationsState {
   messageToTranslate = "";
 
   /**
+   * Only send one translation in at a time to the worker.
+   * @type {Promise<string[]>}
+   */
+  translationRequest = Promise.resolve([]);
+
+  /**
    * The translations engine is only valid for a single language pair, and needs
    * to be recreated if the language pair changes.
    *
    * @type {null | Promise<TranslationsEngine>}
    */
-  engine = null;
+  translationsEngine = null;
 
   constructor() {
     this.supportedLanguages = AT_getSupportedLanguages();
@@ -60,44 +73,98 @@ class TranslationsState {
   }
 
   /**
-   * Only request translation when it's needed.
+   * Identifies the human language in which the message is written and logs the result.
+   *
+   * @param {string} message
    */
-  async maybeRequestTranslation() {
-    // The contents of "this" can change between async steps, store a local variable
-    // binding of these values.
-    const { fromLanguage, toLanguage, messageToTranslate, engine } = this;
-
-    if (!fromLanguage || !toLanguage || !messageToTranslate || !engine) {
-      // Not everything is set for translation.
-      this.ui.updateTranslation("");
-      return;
-    }
-
-    // Ensure the engine is ready to go.
-    await engine;
-
-    // Check if the configuration has changed between each async step.
-    const isStale = () =>
-      this.engine !== engine ||
-      this.fromLanguage !== fromLanguage ||
-      this.toLanguage !== toLanguage ||
-      this.messageToTranslate !== messageToTranslate;
-
-    if (isStale()) {
-      return;
-    }
-
+  async identifyLanguage(message) {
     const start = performance.now();
-    const [translation] = await AT_translate([this.messageToTranslate]);
-
-    if (isStale()) {
-      return;
-    }
-
-    this.ui.updateTranslation(translation);
+    const { languageLabel, confidence } = await AT_identifyLanguage(message);
     const duration = performance.now() - start;
-    AT_log(`Translation done in ${duration / 1000} seconds`);
+    AT_log(
+      `[ ${languageLabel.slice(-2)}(${(confidence * 100).toFixed(2)}%) ]`,
+      `Source language identified in ${duration / 1000} seconds`
+    );
   }
+
+  /**
+   * Only request a translation when it's ready.
+   */
+  maybeRequestTranslation = debounce({
+    /**
+     * Debounce the translation requests so that the worker doesn't fire for every
+     * single keyboard input, but instead the keyboard events are ignored until
+     * there is a short break, or enough events have happened that it's worth sending
+     * in a new translation request.
+     */
+    onDebounce: async () => {
+      // The contents of "this" can change between async steps, store a local variable
+      // binding of these values.
+      const {
+        fromLanguage,
+        toLanguage,
+        messageToTranslate,
+        translationsEngine,
+      } = this;
+
+      if (
+        !fromLanguage ||
+        !toLanguage ||
+        !messageToTranslate ||
+        !translationsEngine
+      ) {
+        // Not everything is set for translation.
+        this.ui.updateTranslation("");
+        return;
+      }
+
+      await Promise.all([
+        // Ensure the engine is ready to go.
+        translationsEngine,
+        // Ensure the previous translation has finished so that only the latest
+        // translation goes through.
+        this.translationRequest,
+      ]);
+
+      if (
+        // Check if the current configuration has changed and if this is stale. If so
+        // then skip this request, as there is already a newer request with more up to
+        // date information.
+        this.translationsEngine !== translationsEngine ||
+        this.fromLanguage !== fromLanguage ||
+        this.toLanguage !== toLanguage ||
+        this.messageToTranslate !== messageToTranslate
+      ) {
+        return;
+      }
+
+      const start = performance.now();
+
+      this.translationRequest = AT_translate([messageToTranslate]);
+      const [translation] = await this.translationRequest;
+
+      // The measure events will show up in the Firefox Profiler.
+      performance.measure(
+        `Translations: Translate "${this.fromLanguage}" to "${this.toLanguage}" with ${messageToTranslate.length} characters.`,
+        {
+          start,
+          end: performance.now(),
+        }
+      );
+
+      this.ui.updateTranslation(translation);
+      const duration = performance.now() - start;
+      AT_log(`Translation done in ${duration / 1000} seconds`);
+    },
+
+    // Mark the events so that they show up in the Firefox Profiler. This makes it handy
+    // to visualize the debouncing behavior.
+    doEveryTime: () => {
+      performance.mark(
+        `Translations: input changed to ${this.messageToTranslate.length} characters`
+      );
+    },
+  });
 
   /**
    * Any time a language pair is changed, the TranslationsEngine needs to be rebuilt.
@@ -109,10 +176,10 @@ class TranslationsState {
     if (!this.fromLanguage || !this.toLanguage) {
       // A from or to language could have been removed. Don't do any more translations
       // with it.
-      if (this.engine) {
+      if (this.translationsEngine) {
         // The engine is no longer needed.
-        AT_destroyEngine();
-        this.engine = null;
+        AT_destroyTranslationsEngine();
+        this.translationsEngine = null;
       }
       return;
     }
@@ -122,14 +189,14 @@ class TranslationsState {
       `Rebuilding the translations worker for "${this.fromLanguage}" to "${this.toLanguage}"`
     );
 
-    this.engine = AT_createTranslationsEngine(
+    this.translationsEngine = AT_createTranslationsEngine(
       this.fromLanguage,
       this.toLanguage
     );
     this.maybeRequestTranslation();
 
     try {
-      await this.engine;
+      await this.translationsEngine;
       const duration = performance.now() - start;
       AT_log(`Rebuilt the TranslationsEngine in ${duration / 1000} seconds`);
       // TODO (Bug 1813781) - Report this error in the UI.
@@ -163,6 +230,7 @@ class TranslationsState {
    */
   setMessageToTranslate(message) {
     if (message !== this.messageToTranslate) {
+      this.identifyLanguage(message);
       this.messageToTranslate = message;
       this.maybeRequestTranslation();
     }
@@ -200,6 +268,10 @@ class TranslationsUI {
   setup() {
     this.setupDropdowns();
     this.setupTextarea();
+    const start = performance.now();
+    AT_createLanguageIdEngine();
+    const duration = performance.now() - start;
+    AT_log(`Created LanguageIdEngine in ${duration / 1000} seconds`);
   }
 
   /**
@@ -378,3 +450,54 @@ window.addEventListener("AboutTranslationsChromeToContent", ({ detail }) => {
       throw new Error("Unknown AboutTranslationsChromeToContent event.");
   }
 });
+
+/**
+ * Debounce a function so that it is only called after some wait time with no activity.
+ * This is good for grouping text entry via keyboard.
+ *
+ * @param {Object} settings
+ * @param {Function} settings.onDebounce
+ * @param {Function} settings.doEveryTime
+ * @returns {Function}
+ */
+function debounce({ onDebounce, doEveryTime }) {
+  /** @type {number | null} */
+  let timeoutId = null;
+  let lastDispatch = null;
+
+  return (...args) => {
+    doEveryTime(...args);
+
+    const now = Date.now();
+    if (lastDispatch === null) {
+      // This is the first call to the function.
+      lastDispatch = now;
+    }
+
+    const timeLeft = lastDispatch + window.DEBOUNCE_DELAY - now;
+
+    // Always discard the old timeout, either the function will run, or a new
+    // timer will be scheduled.
+    clearTimeout(timeoutId);
+
+    if (timeLeft <= 0) {
+      // It's been long enough to go ahead and call the function.
+      timeoutId = null;
+      lastDispatch = null;
+      window.DEBOUNCE_RUN_COUNT += 1;
+      onDebounce(...args);
+      return;
+    }
+
+    // Re-set the timeout with the current time left.
+    clearTimeout(timeoutId);
+
+    timeoutId = setTimeout(() => {
+      // Timeout ended, call the function.
+      timeoutId = null;
+      lastDispatch = null;
+      window.DEBOUNCE_RUN_COUNT += 1;
+      onDebounce(...args);
+    }, timeLeft);
+  };
+}

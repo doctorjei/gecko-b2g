@@ -147,7 +147,6 @@ static const char sIntPrefs[][45] = {
     "ui.treeScrollLinesMax",
     "accessibility.tabfocus",  // Weird one...
     "ui.chosenMenuItemsShouldBlink",
-    "ui.showKeyboardCues",
     "ui.windowsAccentColorInTitlebar",
     "ui.windowsDefaultTheme",
     "ui.dwmCompositor",
@@ -531,7 +530,6 @@ static constexpr struct {
     // need to re-layout.
     {"browser.theme.toolbar-theme"_ns, widget::ThemeChangeKind::AllBits},
     {"browser.theme.content-theme"_ns},
-    {"layout.css.moz-box-flexbox-emulation.enabled"_ns},
     {"mathml.legacy_maction_and_semantics_implementations.disabled"_ns},
     {"mathml.ms_lquote_rquote_attributes.disabled"_ns},
 };
