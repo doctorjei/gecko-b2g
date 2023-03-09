@@ -89,6 +89,14 @@ const Template = ({ state, dialogMode }) => html`
   </div>
 `;
 
+export const LoadingSkeleton = Template.bind({});
+LoadingSkeleton.args = {
+  dialogMode: true,
+  state: {
+    page: MigrationWizardConstants.PAGES.LOADING,
+  },
+};
+
 export const MainSelectorVariant1 = Template.bind({});
 MainSelectorVariant1.args = {
   dialogMode: true,
@@ -186,5 +194,13 @@ SafariPermissions.args = {
   dialogMode: true,
   state: {
     page: MigrationWizardConstants.PAGES.SAFARI_PERMISSION,
+  },
+};
+
+export const NoBrowsersFound = Template.bind({});
+NoBrowsersFound.args = {
+  dialogMode: true,
+  state: {
+    page: MigrationWizardConstants.PAGES.NO_BROWSERS_FOUND,
   },
 };

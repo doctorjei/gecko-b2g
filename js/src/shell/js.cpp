@@ -952,6 +952,16 @@ static bool ShellInterruptCallback(JSContext* cx) {
   return result;
 }
 
+static void GCSliceCallback(JSContext* cx, JS::GCProgress progress,
+                            const JS::GCDescription& desc) {
+  if (progress == JS::GC_CYCLE_END) {
+#if defined(MOZ_MEMORY)
+    // We call this here to match the browser's DOMGCSliceCallback.
+    jemalloc_free_dirty_pages();
+#endif
+  }
+}
+
 /*
  * Some UTF-8 files, notably those written using Notepad, have a Unicode
  * Byte-Order-Mark (BOM) as their first character. This is useless (byte-order
@@ -11032,6 +11042,10 @@ int main(int argc, char** argv) {
   SetOutputFile("JS_STDOUT", &rcStdout, &gOutFile);
   SetOutputFile("JS_STDERR", &rcStderr, &gErrFile);
 
+  // Use a larger jemalloc page cache. This should match the value for browser
+  // foreground processes in ContentChild::RecvNotifyProcessPriorityChanged.
+  moz_set_max_dirty_page_modifier(3);
+
   OptionParser op("Usage: {progname} [options] [[script] scriptArgs*]");
   if (!InitOptionParser(op)) {
     return EXIT_FAILURE;
@@ -11140,6 +11154,8 @@ int main(int argc, char** argv) {
   js::SetWindowProxyClass(cx, &ShellWindowProxyClass);
 
   JS_AddInterruptCallback(cx, ShellInterruptCallback);
+
+  JS::SetGCSliceCallback(cx, GCSliceCallback);
 
   bufferStreamState = js_new<ExclusiveWaitableData<BufferStreamState>>(
       mutexid::BufferStreamState);
@@ -11299,6 +11315,8 @@ bool InitOptionParser(OptionParser& op) {
                        "The maximum bytecode length of a 'small function' for "
                        "the purpose of inlining.",
                        -1) ||
+      !op.addBoolOption('\0', "only-inline-selfhosted",
+                        "Only inline selfhosted functions") ||
       !op.addBoolOption('\0', "no-asmjs", "Disable asm.js compilation") ||
       !op.addStringOption(
           '\0', "wasm-compiler", "[option]",
@@ -12350,6 +12368,9 @@ bool SetContextJITOptions(JSContext* cx, const OptionParser& op) {
   }
   if (op.getBoolOption("disable-watchtower")) {
     jit::JitOptions.enableWatchtowerMegamorphic = false;
+  }
+  if (op.getBoolOption("only-inline-selfhosted")) {
+    jit::JitOptions.onlyInlineSelfHosted = true;
   }
 
   if (const char* str = op.getStringOption("ion-iterator-indices")) {

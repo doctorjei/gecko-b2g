@@ -41,6 +41,9 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PlacesUIUtils: "resource:///modules/PlacesUIUtils.sys.mjs",
   PlacesUtils: "resource://gre/modules/PlacesUtils.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+  ProvenanceData: "resource:///modules/ProvenanceData.sys.mjs",
+  PublicSuffixList:
+    "resource://gre/modules/netwerk-dns/PublicSuffixList.sys.mjs",
   QuickSuggest: "resource:///modules/QuickSuggest.sys.mjs",
 
   RemoteSecuritySettings:
@@ -93,7 +96,6 @@ XPCOMUtils.defineLazyModuleGetters(lazy, {
   PdfJs: "resource://pdf.js/PdfJs.jsm",
   PluralForm: "resource://gre/modules/PluralForm.jsm",
   ProcessHangMonitor: "resource:///modules/ProcessHangMonitor.jsm",
-  PublicSuffixList: "resource://gre/modules/netwerk-dns/PublicSuffixList.jsm",
   RFPHelper: "resource://gre/modules/RFPHelper.jsm",
   SafeBrowsing: "resource://gre/modules/SafeBrowsing.jsm",
   Sanitizer: "resource:///modules/Sanitizer.jsm",
@@ -616,7 +618,7 @@ let JSWINDOWACTORS = {
     child: {
       esModuleURI: "resource:///actors/MigrationWizardChild.sys.mjs",
       events: {
-        "MigrationWizard:Init": { wantUntrusted: true },
+        "MigrationWizard:RequestState": { wantUntrusted: true },
         "MigrationWizard:BeginMigration": { wantsUntrusted: true },
       },
     },
@@ -2868,6 +2870,14 @@ BrowserGlue.prototype = {
         name: "start-orb-javascript-oracle",
         task: () => {
           ChromeUtils.ensureJSOracleStarted();
+        },
+      },
+
+      {
+        name: "report-attribution-provenance-telemetry",
+        condition: lazy.TelemetryUtils.isTelemetryEnabled,
+        task: async () => {
+          await lazy.ProvenanceData.submitProvenanceTelemetry();
         },
       },
 

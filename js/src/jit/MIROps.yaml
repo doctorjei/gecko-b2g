@@ -286,8 +286,14 @@
 - name: ArrayState
   gen_boilerplate: false
 
-- name: NewBoundFunction
+- name: BindFunction
   gen_boilerplate: false
+
+- name: NewBoundFunction
+  arguments:
+    templateObj: JSObject*
+  result_type: Object
+  alias_set: none
 
 - name: BoundFunctionNumArgs
   operands:
@@ -1509,6 +1515,16 @@
   movable: true
   congruent_to: if_operands_equal
   alias_set: none
+
+- name: GuardGlobalGeneration
+  arguments:
+   expected: uint32_t
+   generationAddr: const void*
+  result_type: None
+  guard: true
+  movable: true
+  alias_set: custom
+  congruent_to: custom
 
 - name: GuardIsProxy
   operands:

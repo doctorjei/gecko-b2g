@@ -4091,6 +4091,16 @@ void CodeGenerator::visitGuardIsNativeObject(LGuardIsNativeObject* guard) {
   bailoutFrom(&bail, guard->snapshot());
 }
 
+void CodeGenerator::visitGuardGlobalGeneration(LGuardGlobalGeneration* guard) {
+  Register temp = ToRegister(guard->temp0());
+  Label bail;
+
+  masm.load32(AbsoluteAddress(guard->mir()->generationAddr()), temp);
+  masm.branch32(Assembler::NotEqual, temp, Imm32(guard->mir()->expected()),
+                &bail);
+  bailoutFrom(&bail, guard->snapshot());
+}
+
 void CodeGenerator::visitGuardIsProxy(LGuardIsProxy* guard) {
   Register obj = ToRegister(guard->input());
   Register temp = ToRegister(guard->temp0());
@@ -7013,7 +7023,7 @@ void CodeGenerator::visitNewTypedArrayFromArrayBuffer(
   callVM<Fn, js::NewTypedArrayWithTemplateAndBuffer>(lir);
 }
 
-void CodeGenerator::visitNewBoundFunction(LNewBoundFunction* lir) {
+void CodeGenerator::visitBindFunction(LBindFunction* lir) {
   Register target = ToRegister(lir->target());
   Register temp1 = ToRegister(lir->temp0());
   Register temp2 = ToRegister(lir->temp1());
@@ -7050,6 +7060,23 @@ void CodeGenerator::visitNewBoundFunction(LNewBoundFunction* lir) {
   using Fn = BoundFunctionObject* (*)(JSContext*, Handle<JSObject*>, Value*,
                                       uint32_t, Handle<BoundFunctionObject*>);
   callVM<Fn, js::BoundFunctionObject::functionBindImpl>(lir);
+}
+
+void CodeGenerator::visitNewBoundFunction(LNewBoundFunction* lir) {
+  Register output = ToRegister(lir->output());
+  Register temp = ToRegister(lir->temp0());
+
+  JSObject* templateObj = lir->mir()->templateObj();
+
+  using Fn = BoundFunctionObject* (*)(JSContext*, Handle<BoundFunctionObject*>);
+  OutOfLineCode* ool = oolCallVM<Fn, BoundFunctionObject::createWithTemplate>(
+      lir, ArgList(ImmGCPtr(templateObj)), StoreRegisterTo(output));
+
+  TemplateObject templateObject(templateObj);
+  masm.createGCObject(output, temp, templateObject, gc::DefaultHeap,
+                      ool->entry());
+
+  masm.bind(ool->rejoin());
 }
 
 // Out-of-line object allocation for JSOp::NewObject.
@@ -11161,6 +11188,7 @@ void JitRuntime::generateLazyLinkStub(MacroAssembler& masm) {
   masm.pushReturnAddress();
 #endif
   masm.Push(FramePointer);
+  masm.moveStackPtrTo(FramePointer);
 
   AllocatableGeneralRegisterSet regs(GeneralRegisterSet::Volatile());
   Register temp0 = regs.takeAny();
@@ -11178,8 +11206,9 @@ void JitRuntime::generateLazyLinkStub(MacroAssembler& masm) {
   masm.callWithABI<Fn, LazyLinkTopActivation>(
       MoveOp::GENERAL, CheckUnsafeCallWithABI::DontCheckHasExitFrame);
 
-  // Discard exit frame and frame pointer.
-  masm.leaveExitFrame(sizeof(void*));
+  // Discard exit frame and restore frame pointer.
+  masm.leaveExitFrame(0);
+  masm.pop(FramePointer);
 
 #ifdef JS_USE_LINK_REGISTER
   // Restore the return address such that the emitPrologue function of the
@@ -11198,6 +11227,7 @@ void JitRuntime::generateInterpreterStub(MacroAssembler& masm) {
   masm.pushReturnAddress();
 #endif
   masm.Push(FramePointer);
+  masm.moveStackPtrTo(FramePointer);
 
   AllocatableGeneralRegisterSet regs(GeneralRegisterSet::Volatile());
   Register temp0 = regs.takeAny();
@@ -11217,8 +11247,9 @@ void JitRuntime::generateInterpreterStub(MacroAssembler& masm) {
 
   masm.branchIfFalseBool(ReturnReg, masm.failureLabel());
 
-  // Discard exit frame and frame pointer.
-  masm.leaveExitFrame(sizeof(void*));
+  // Discard exit frame and restore frame pointer.
+  masm.leaveExitFrame(0);
+  masm.pop(FramePointer);
 
   // InvokeFromInterpreterStub stores the return value in argv[0], where the
   // caller stored |this|. Subtract |sizeof(void*)| for the frame pointer we
@@ -16591,17 +16622,18 @@ void CodeGenerator::visitWasmGcObjectIsSubtypeOf(
   const MWasmGcObjectIsSubtypeOf* mir = ins->mir();
   Register object = ToRegister(ins->object());
   Register superTypeDef = ToRegister(ins->superTypeDef());
-  Register subTypeDef = ToRegister(ins->temp0());
-  Register scratch = ins->temp1()->isBogusTemp() ? Register::Invalid()
-                                                 : ToRegister(ins->temp1());
+  Register scratch1 = ToRegister(ins->temp0());
+  Register scratch2 = ins->temp1()->isBogusTemp() ? Register::Invalid()
+                                                  : ToRegister(ins->temp1());
   Register result = ToRegister(ins->output());
   Label failed;
   Label success;
   Label join;
   masm.branchTestPtr(Assembler::Zero, object, object,
                      mir->succeedOnNull() ? &success : &failed);
-  masm.loadPtr(Address(object, WasmGcObject::offsetOfTypeDef()), subTypeDef);
-  masm.branchWasmTypeDefIsSubtype(subTypeDef, superTypeDef, scratch,
+  masm.branchTestObjectIsWasmGcObject(false, object, scratch1, &failed);
+  masm.loadPtr(Address(object, WasmGcObject::offsetOfTypeDef()), scratch1);
+  masm.branchWasmTypeDefIsSubtype(scratch1, superTypeDef, scratch2,
                                   mir->subTypingDepth(), &success, true);
   masm.bind(&failed);
   masm.xor32(result, result);
@@ -16616,15 +16648,16 @@ void CodeGenerator::visitWasmGcObjectIsSubtypeOfAndBranch(
   MOZ_ASSERT(gen->compilingWasm());
   Register object = ToRegister(ins->object());
   Register superTypeDef = ToRegister(ins->superTypeDef());
-  Register subTypeDef = ToRegister(ins->temp0());
-  Register scratch = ins->temp1()->isBogusTemp() ? Register::Invalid()
-                                                 : ToRegister(ins->temp1());
+  Register scratch1 = ToRegister(ins->temp0());
+  Register scratch2 = ins->temp1()->isBogusTemp() ? Register::Invalid()
+                                                  : ToRegister(ins->temp1());
   Label* onSuccess = getJumpLabelForBranch(ins->ifTrue());
   Label* onFail = getJumpLabelForBranch(ins->ifFalse());
   Label* onNull = ins->succeedOnNull() ? onSuccess : onFail;
   masm.branchTestPtr(Assembler::Zero, object, object, onNull);
-  masm.loadPtr(Address(object, WasmGcObject::offsetOfTypeDef()), subTypeDef);
-  masm.branchWasmTypeDefIsSubtype(subTypeDef, superTypeDef, scratch,
+  masm.branchTestObjectIsWasmGcObject(false, object, scratch1, onFail);
+  masm.loadPtr(Address(object, WasmGcObject::offsetOfTypeDef()), scratch1);
+  masm.branchWasmTypeDefIsSubtype(scratch1, superTypeDef, scratch2,
                                   ins->subTypingDepth(), onSuccess, true);
   masm.jump(onFail);
 }

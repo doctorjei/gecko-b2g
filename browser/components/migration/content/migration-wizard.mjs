@@ -25,7 +25,19 @@ export class MigrationWizard extends HTMLElement {
     return `
       <template>
         <link rel="stylesheet" href="chrome://browser/skin/migration/migration-wizard.css">
-        <named-deck id="wizard-deck" selected-view="page-selection" aria-live="polite">
+        <named-deck id="wizard-deck" selected-view="page-loading" aria-live="polite" aria-busy="true">
+          <div name="page-loading">
+            <h3 data-l10n-id="migration-wizard-selection-header"></h3>
+            <div class="loading-block large"></div>
+            <div class="loading-block small"></div>
+            <div class="loading-block small"></div>
+            <moz-button-group class="buttons">
+              <!-- If possible, use the same button labels as the SELECTION page with the same strings.
+                   That'll prevent flicker when the load state exits if we then enter the SELECTION page. -->
+              <button class="cancel-close" data-l10n-id="migration-cancel-button-label" disabled></button>
+              <button data-l10n-id="migration-import-button-label" disabled></button>
+            </moz-button-group>
+          </div>
 
           <div name="page-selection">
             <h3 data-l10n-id="migration-wizard-selection-header"></h3>
@@ -98,6 +110,17 @@ export class MigrationWizard extends HTMLElement {
           <div name="page-safari-permission">
             <h3>TODO: Safari permission page</h3>
           </div>
+
+          <div name="page-no-browsers-found">
+            <h3 data-l10n-id="migration-wizard-selection-header"></h3>
+            <div class="no-browsers-found">
+              <span class="error-icon" role="img"></span>
+              <div class="no-browsers-found-message" data-l10n-id="migration-wizard-import-browser-no-browsers"></div>
+            </div>
+            <moz-button-group class="buttons">
+              <button class="cancel-close" data-l10n-id="migration-cancel-button-label"></button>
+            </moz-button-group>
+          </div>
         </named-deck>
       </template>
     `;
@@ -127,6 +150,7 @@ export class MigrationWizard extends HTMLElement {
     const shadow = this.attachShadow({ mode: "closed" });
 
     if (window.MozXULElement) {
+      window.MozXULElement.insertFTLIfNeeded("branding/brand.ftl");
       window.MozXULElement.insertFTLIfNeeded(
         "locales-preview/migrationWizard.ftl"
       );
@@ -161,8 +185,14 @@ export class MigrationWizard extends HTMLElement {
   }
 
   connectedCallback() {
+    if (this.hasAttribute("auto-request-state")) {
+      this.requestState();
+    }
+  }
+
+  requestState() {
     this.dispatchEvent(
-      new CustomEvent("MigrationWizard:Init", { bubbles: true })
+      new CustomEvent("MigrationWizard:RequestState", { bubbles: true })
     );
   }
 
@@ -199,6 +229,10 @@ export class MigrationWizard extends HTMLElement {
       }
     }
 
+    this.#deck.toggleAttribute(
+      "aria-busy",
+      state.page == MigrationWizardConstants.PAGES.LOADING
+    );
     this.#deck.setAttribute("selected-view", `page-${state.page}`);
 
     if (window.IS_STORYBOOK) {
@@ -216,6 +250,7 @@ export class MigrationWizard extends HTMLElement {
       .resourceTypes;
     for (let child of this.#resourceTypeList.children) {
       child.hidden = true;
+      child.control.checked = false;
     }
 
     for (let resourceType of resourceTypes) {
@@ -224,8 +259,11 @@ export class MigrationWizard extends HTMLElement {
       );
       if (resourceLabel) {
         resourceLabel.hidden = false;
+        resourceLabel.control.checked = true;
       }
     }
+    let selectAll = this.#shadowRoot.querySelector("#select-all").control;
+    selectAll.checked = true;
   }
 
   /**

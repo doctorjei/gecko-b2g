@@ -75,6 +75,14 @@ search:
     seperatePrivateDefaultUrlbarResultEnabled:
       type: boolean
       description: Whether the urlbar result for the separate private default is shown.
+    cbhStudyUs:
+      type: string
+      setPref: browser.search.param.google_channel_us
+      description: A string pref set by Nimbus tests for US search cohort
+    cbhStudyRow:
+      type: string
+      setPref: browser.search.param.google_channel_row
+      description: A string pref set by Nimbus tests for Rest of World search cohort
 
 urlbar:
   description: The Address Bar
@@ -207,6 +215,9 @@ urlbar:
       description: >-
         The index of sponsored QuickSuggest results within the general group. A
         negative index is relative to the end of the group
+    recordNavigationalSuggestionTelemetry:
+      type: boolean
+      description: Whether to record navigational suggestion telemetry. Defaults to false.
     searchEngagementTelemetryEnabled:
       type: boolean
       fallbackPref: browser.urlbar.searchEngagementTelemetry.enabled
@@ -218,7 +229,36 @@ urlbar:
     weatherFeatureGate:
       type: boolean
       fallbackPref: browser.urlbar.weather.featureGate
-      description: Feature gate that controls exposing all aspects of weather suggestions to the user.
+      description: >-
+        Feature gate that controls whether all aspects of the weather suggestion
+        feature are exposed to the user. See also `weatherKeywords` and
+        `weatherKeywordsMinimumLength`. In summary: To make the weather
+        suggestion triggered on keywords, set `weatherFeatureGate` to true,
+        `weatherKeywords` to an array of full keyword strings, and
+        `weatherKeywordsMinimumLength` to a non-zero integer. To make the
+        suggestion triggered on zero prefix, set `weatherFeatureGate` to true
+        and leave out both `weatherKeywords` and `weatherKeywordsMinimumLength`.
+        To turn off the weather suggestion feature, leave out all
+        weather-related variables.
+    weatherKeywords:
+      type: json
+      description: >-
+        An array of full keyword strings that will trigger the weather
+        suggestion when the user types them in the address bar. If absent or
+        null, the weather suggestion will be triggered on zero prefix. See also
+        `weatherKeywordsMinimumLength`.
+    weatherKeywordsMinimumLength:
+      type: int
+      description: >-
+        If defined and non-zero, the weather suggestion will be triggered by
+        typing any prefix of a full weather keyword when the prefix is at least
+        `weatherKeywordsMinimumLength` characters long. If this value is larger
+        than the length of a particular keyword, the user can still trigger the
+        suggestion by typing the keyword but they must type the full
+        keyword. So, to require the user to type only full keywords to trigger
+        the suggestion, set this to a value larger than the length of all
+        keywords. If this variable is absent or zero, the suggestion will be
+        triggered on zero prefix. See also `weatherKeywords`.
 
 aboutwelcome:
   description: "The about:welcome page"
@@ -330,7 +370,11 @@ pocketNewtab:
     spocPositions:
       type: string
       fallbackPref: browser.newtabpage.activity-stream.discoverystream.spoc-positions
-      description: CSV string of spoc position indexes on newtab grid
+      description: CSV string of spoc position indexes on newtab Pocket grid
+    spocTopsitesPositions:
+      type: string
+      fallbackPref: browser.newtabpage.activity-stream.discoverystream.spoc-topsites-positions
+      description: CSV string of spoc position indexes on newtab topsites section
     spocAdTypes:
       type: string
       fallbackPref: browser.newtabpage.activity-stream.discoverystream.spocAdTypes
@@ -508,6 +552,10 @@ pocketNewtab:
       description: A comma-separated list of regions that get spocs by default.
       type: string
       setPref: "browser.newtabpage.activity-stream.discoverystream.region-spocs-config"
+    topSitesMaxSponsored:
+      # Defined under `pocketNewtab` as it needs to be used along with other variables
+      type: int
+      description: The maximum number of sponsored Top Sites to be displayed
 
 saveToPocket:
   description: The save to Pocket feature
@@ -776,12 +824,18 @@ pictureinpicture:
     showIconOnly:
       type: boolean
       description: Whether to show the first time PiP toggle or show the PiP icon only
+    oldToggle:
+      type: boolean
+      description: Whether to show the control style (true) or variant style (false) for the first time PiP toggle
 
 glean:
   description: "The Glean data collection SDK within Firefox Desktop"
   owner: glean-team@mozilla.com
   hasExposure: false
   variables:
+    finalInactive:
+      type: "boolean"
+      description: "Enables FOG early shutdown pings when true"
     newtabPingEnabled:
       type: "boolean"
       fallbackPref: "browser.newtabpage.ping.enabled"
@@ -908,6 +962,40 @@ echPrefs:
       description: Assumed echConfig padding length for GREASE extensions (1-255).
       type: int
       setPref: "security.tls.ech.grease_size"
+
+dohPrefs:
+  description: Prefs that control DNS over HTTPS.
+  owner: vgosu@mozilla.com
+  hasExposure: false
+  variables:
+    trrMode:
+      description: Has a value of 2 for TRR first, 3 for TRR only, 0 for off.
+      type: int
+      setPref: "network.trr.mode"
+    trrUri:
+      description: The URL of the DNS over HTTPS endpoint
+      type: string
+      setPref: "network.trr.uri"
+    dohMode:
+      description: Same as trrMode, but set by the DoHController module.
+      type: int
+      setPref: "doh-rollout.mode"
+    dohUri:
+      description: Same as trrUri, but set by the DoHController module.
+      type: string
+      setPref: "doh-rollout.uri"
+    ohttpEnabled:
+      description: Whether to use Oblivious HTTP for the resolution
+      type: boolean
+      setPref: "network.trr.use_ohttp"
+    ohttpRelayUri:
+      description: The URL of the Oblivious HTTP relay
+      type: string
+      setPref: "network.trr.ohttp.relay_uri"
+    ohttpConfigUri:
+      description: The URL used to fetch the configuration of the Oblivious HTTP gateway
+      type: string
+      setPref: "network.trr.ohttp.config_uri"
 
 pingsender:
   description: "In-product usage of the pingsender telemetry reporter."

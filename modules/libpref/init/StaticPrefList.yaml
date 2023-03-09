@@ -3575,7 +3575,7 @@
   value: false
   mirror: always
 
-#ifdef XP_WIN
+#if defined(XP_WIN)
   # Preference that is used to set nsILocalFileWin::useDOSDevicePathSyntax
   # attribute for all local file instances created by QuotaManager and its
   # clients. The value of this preference is cached so changing the preference
@@ -3588,8 +3588,15 @@
     do_not_use_directly: true
 
   # Preference that is used to enable the hack for overrriding xFullPathname in
-  # TelemetryVFS.
+  # QuotaVFS.
 -   name: dom.quotaManager.overrideXFullPathname
+    type: RelaxedAtomicBool
+    value: true
+    mirror: always
+#elif defined(XP_UNIX)
+  # Preference that is used to enable the overriding of Unix xFullPathname
+  # implementation in QuotaVFS.
+-   name: dom.quotaManager.overrideXFullPathnameUnix
     type: RelaxedAtomicBool
     value: true
     mirror: always
@@ -3616,7 +3623,7 @@
 # Use a Background Task to delete files at shutdown.
 - name: dom.quotaManager.backgroundTask.enabled
   type: bool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: never
 #endif
 
@@ -5390,7 +5397,7 @@
 # If true, crash when a blocklisted preference is accessed in a subprocess
 - name: fission.enforceBlocklistedPrefsInSubprocesses
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: @IS_EARLY_BETA_OR_EARLIER@
   mirror: always
 
 #---------------------------------------------------------------------------
@@ -6418,7 +6425,7 @@
 # Use gfxPlatform::MaxAllocSize instead of the pref directly.
 - name: gfx.max-alloc-size
   type: int32_t
-  value: (int32_t)500000000
+  value: (int32_t)0x7FFFFFFF
   mirror: once
   do_not_use_directly: true
 
@@ -6778,7 +6785,7 @@
   # Whether to use a video overlay layers for sw decoded video with DirectComposition
 -   name: gfx.webrender.dcomp-video-sw-overlay-win
     type: bool
-    value: @IS_EARLY_BETA_OR_EARLIER@
+    value: true
     mirror: once
 -   name: gfx.webrender.dcomp-video-check-slow-present
     type: RelaxedAtomicBool
@@ -7013,12 +7020,9 @@
 #---------------------------------------------------------------------------
 
 # Turn HTML:inert on or off.
-#
-# Do not enable this by default until there's consensus in:
-# https://github.com/whatwg/html/issues/7796
 - name: html5.inert.enabled
   type: bool
-  value: @IS_EARLY_BETA_OR_EARLIER@
+  value: true
   mirror: always
 
 # Time in milliseconds between the time a network buffer is seen and the timer
@@ -7890,7 +7894,7 @@
 #if defined(ENABLE_WASM_EXTENDED_CONST)
 -   name: javascript.options.wasm_extended_const
     type: bool
-    value: @IS_NIGHTLY_BUILD@
+    value: true
     mirror: always
 #endif  // defined(ENABLE_WASM_EXTENDED_CONST)
 
@@ -8443,6 +8447,13 @@
   mirror: always
   rust: true
 
+# Whether exponential functions are enabled in calc().
+- name: layout.css.exp.enabled
+  type: RelaxedAtomicBool
+  value: @IS_NIGHTLY_BUILD@
+  mirror: always
+  rust: true
+
 # Whether infinity / nan constants are enabled in calc().
 - name: layout.css.nan-inf.enabled
   type: RelaxedAtomicBool
@@ -8868,6 +8879,13 @@
   mirror: always
   rust: true
 
+# Is support for motion-path offset-position enabled?
+- name: layout.css.motion-path-offset-position.enabled
+  type: RelaxedAtomicBool
+  value: @IS_NIGHTLY_BUILD@
+  mirror: always
+  rust: true
+
 # Pref to control whether the ::marker property restrictions defined in [1]
 # apply.
 #
@@ -8965,7 +8983,7 @@
 # Enables support for different CSS page sizes on each page when printing.
 - name: layout.css.allow-mixed-page-sizes
   type: RelaxedAtomicBool
-  value: false
+  value: @IS_EARLY_BETA_OR_EARLIER@
   mirror: always
 
 # Dictates whether or not the prefers contrast media query will be
@@ -9984,11 +10002,7 @@
   # May a Clearkey GMP x64 process be executed on ARM builds.
 - name: media.gmp-gmpclearkey.allow-x64-plugin-on-arm64
   type: RelaxedAtomicBool
-#if defined(NIGHTLY_BUILD) || !defined(XP_WIN)
   value: false
-#else
-  value: true
-#endif
   mirror: always
 #endif
 
@@ -13727,6 +13741,16 @@
     type: RelaxedAtomicBool
     value: false
     mirror: always
+
+  # Whether a Low Privilege AppContainer (LPAC) is enabled for the relevant
+  # process type.
+
+#if defined(MOZ_WMF_MEDIA_ENGINE)
+-   name: security.sandbox.utility-wmf-cdm.lpac.enabled
+    type: RelaxedAtomicBool
+    value: false
+    mirror: always
+#endif
 
   # Whether Arbitrary Code Guard is enabled for the RDD process.
 -   name: security.sandbox.rdd.acg.enabled

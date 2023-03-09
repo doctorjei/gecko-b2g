@@ -639,7 +639,11 @@ namespace lazy_getter {
 
 static const size_t SLOT_ID = 0;
 static const size_t SLOT_URI = 1;
-static const size_t SLOT_LAMBDA = 1;
+static const size_t SLOT_PARAMS = 1;
+
+static const size_t PARAM_INDEX_TARGET = 0;
+static const size_t PARAM_INDEX_LAMBDA = 1;
+static const size_t PARAMS_COUNT = 2;
 
 static bool ExtractArgs(JSContext* aCx, JS::CallArgs& aArgs,
                         JS::MutableHandle<JSObject*> aCallee,
@@ -665,20 +669,44 @@ static bool JSLazyGetter(JSContext* aCx, unsigned aArgc, JS::Value* aVp) {
   JS::CallArgs args = JS::CallArgsFromVp(aArgc, aVp);
 
   JS::Rooted<JSObject*> callee(aCx);
-  JS::Rooted<JSObject*> thisObj(aCx);
+  JS::Rooted<JSObject*> unused(aCx);
   JS::Rooted<jsid> id(aCx);
-  if (!ExtractArgs(aCx, args, &callee, &thisObj, &id)) {
+  if (!ExtractArgs(aCx, args, &callee, &unused, &id)) {
     return false;
   }
 
-  JS::Rooted<JS::Value> lambda(
-      aCx, js::GetFunctionNativeReserved(callee, SLOT_LAMBDA));
+  JS::Rooted<JS::Value> paramsVal(
+      aCx, js::GetFunctionNativeReserved(callee, SLOT_PARAMS));
+  if (paramsVal.isUndefined()) {
+    args.rval().setUndefined();
+    return true;
+  }
+  // Avoid calling the lambda multiple times, in case of:
+  //   * the getter function is retrieved from property descriptor and called
+  //   * the lambda gets the property again
+  //   * the getter function throws and accessed again
+  js::SetFunctionNativeReserved(callee, SLOT_PARAMS, JS::UndefinedHandleValue);
+
+  JS::Rooted<JSObject*> paramsObj(aCx, &paramsVal.toObject());
+
+  JS::Rooted<JS::Value> targetVal(aCx);
+  JS::Rooted<JS::Value> lambdaVal(aCx);
+  if (!JS_GetElement(aCx, paramsObj, PARAM_INDEX_TARGET, &targetVal)) {
+    return false;
+  }
+  if (!JS_GetElement(aCx, paramsObj, PARAM_INDEX_LAMBDA, &lambdaVal)) {
+    return false;
+  }
+
+  JS::Rooted<JSObject*> targetObj(aCx, &targetVal.toObject());
+
   JS::Rooted<JS::Value> value(aCx);
-  if (!JS::Call(aCx, thisObj, lambda, JS::HandleValueArray::empty(), &value)) {
+  if (!JS::Call(aCx, targetObj, lambdaVal, JS::HandleValueArray::empty(),
+                &value)) {
     return false;
   }
 
-  if (!JS_DefinePropertyById(aCx, thisObj, id, value, JSPROP_ENUMERATE)) {
+  if (!JS_DefinePropertyById(aCx, targetObj, id, value, JSPROP_ENUMERATE)) {
     return false;
   }
 
@@ -702,10 +730,20 @@ static bool DefineLazyGetter(JSContext* aCx, JS::Handle<JSObject*> aTarget,
     return false;
   }
 
-  js::SetFunctionNativeReserved(getter, SLOT_ID, aName);
+  JS::RootedVector<JS::Value> params(aCx);
+  if (!params.resize(PARAMS_COUNT)) {
+    return false;
+  }
+  params[PARAM_INDEX_TARGET].setObject(*aTarget);
+  params[PARAM_INDEX_LAMBDA].setObject(*aLambda);
+  JS::Rooted<JSObject*> paramsObj(aCx, JS::NewArrayObject(aCx, params));
+  if (!paramsObj) {
+    return false;
+  }
 
-  JS::Rooted<JS::Value> lambdaValue(aCx, JS::ObjectValue(*aLambda));
-  js::SetFunctionNativeReserved(getter, SLOT_LAMBDA, lambdaValue);
+  js::SetFunctionNativeReserved(getter, SLOT_ID, aName);
+  js::SetFunctionNativeReserved(getter, SLOT_PARAMS,
+                                JS::ObjectValue(*paramsObj));
 
   return JS_DefinePropertyById(aCx, aTarget, id, getter, nullptr,
                                JSPROP_ENUMERATE);

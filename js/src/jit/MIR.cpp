@@ -6360,6 +6360,16 @@ AliasSet MGuardMultipleShapes::getAliasSet() const {
   return AliasSet::Load(AliasSet::ObjectFields);
 }
 
+AliasSet MGuardGlobalGeneration::getAliasSet() const {
+  return AliasSet::Load(AliasSet::GlobalGenerationCounter);
+}
+
+bool MGuardGlobalGeneration::congruentTo(const MDefinition* ins) const {
+  return ins->isGuardGlobalGeneration() &&
+         ins->toGuardGlobalGeneration()->expected() == expected() &&
+         ins->toGuardGlobalGeneration()->generationAddr() == generationAddr();
+}
+
 MDefinition* MGuardIsNotProxy::foldsTo(TempAllocator& alloc) {
   KnownClass known = GetObjectKnownClass(object());
   if (known == KnownClass::None) {
@@ -6963,10 +6973,9 @@ MIonToWasmCall* MIonToWasmCall::New(TempAllocator& alloc,
   return ins;
 }
 
-MNewBoundFunction* MNewBoundFunction::New(TempAllocator& alloc,
-                                          MDefinition* target, uint32_t argc,
-                                          JSObject* templateObj) {
-  auto* ins = new (alloc) MNewBoundFunction(templateObj);
+MBindFunction* MBindFunction::New(TempAllocator& alloc, MDefinition* target,
+                                  uint32_t argc, JSObject* templateObj) {
+  auto* ins = new (alloc) MBindFunction(templateObj);
   if (!ins->init(alloc, NumNonArgumentOperands + argc)) {
     return nullptr;
   }

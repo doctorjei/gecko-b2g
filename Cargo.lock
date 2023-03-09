@@ -379,9 +379,9 @@ dependencies = [
 
 [[package]]
 name = "authenticator"
-version = "0.4.0-alpha.9"
+version = "0.4.0-alpha.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6314be6c155338119771d3e4b853232aa01c435c10434c960e3e66276f43bc6e"
+checksum = "2238116278e3a069a5148ce1efaa73d750a0d7341e011235a0ddb3e7079cb1be"
 dependencies = [
  "base64",
  "bitflags",
@@ -1709,7 +1709,7 @@ dependencies = [
 [[package]]
 name = "error-support"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "error-support-macros",
  "lazy_static",
@@ -1721,7 +1721,7 @@ dependencies = [
 [[package]]
 name = "error-support-macros"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2850,7 +2850,7 @@ dependencies = [
 [[package]]
 name = "interrupt-support"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "lazy_static",
  "parking_lot 0.12.999",
@@ -4034,7 +4034,7 @@ dependencies = [
 [[package]]
 name = "nss_build_common"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 
 [[package]]
 name = "nsstring"
@@ -5262,7 +5262,7 @@ dependencies = [
 [[package]]
 name = "sql-support"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "ffi-support",
  "interrupt-support",
@@ -5444,7 +5444,7 @@ dependencies = [
 [[package]]
 name = "sync-guid"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "base64",
  "rand 0.8.5",
@@ -5455,7 +5455,7 @@ dependencies = [
 [[package]]
 name = "sync15"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "anyhow",
  "error-support",
@@ -5485,7 +5485,7 @@ dependencies = [
 [[package]]
 name = "tabs"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "anyhow",
  "error-support",
@@ -6265,7 +6265,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "viaduct"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "ffi-support",
  "log",
@@ -6422,7 +6422,7 @@ dependencies = [
 [[package]]
 name = "webext-storage"
 version = "0.1.0"
-source = "git+https://github.com/bendk/application-services?rev=ecb35df5fc40357c49922f90e86bf4147fa52953#ecb35df5fc40357c49922f90e86bf4147fa52953"
+source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
 dependencies = [
  "error-support",
  "ffi-support",
@@ -6578,7 +6578,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "0.15.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=74303308cd6030071889e865c40aa638214ed938#74303308cd6030071889e865c40aa638214ed938"
+source = "git+https://github.com/gfx-rs/wgpu?rev=73b4257b17cc62ecc8df6d6aa3730bd9c6cba4b9#73b4257b17cc62ecc8df6d6aa3730bd9c6cba4b9"
 dependencies = [
  "arrayvec",
  "bit-vec",
@@ -6601,7 +6601,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "0.15.1"
-source = "git+https://github.com/gfx-rs/wgpu?rev=74303308cd6030071889e865c40aa638214ed938#74303308cd6030071889e865c40aa638214ed938"
+source = "git+https://github.com/gfx-rs/wgpu?rev=73b4257b17cc62ecc8df6d6aa3730bd9c6cba4b9#73b4257b17cc62ecc8df6d6aa3730bd9c6cba4b9"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -6638,7 +6638,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "0.15.0"
-source = "git+https://github.com/gfx-rs/wgpu?rev=74303308cd6030071889e865c40aa638214ed938#74303308cd6030071889e865c40aa638214ed938"
+source = "git+https://github.com/gfx-rs/wgpu?rev=73b4257b17cc62ecc8df6d6aa3730bd9c6cba4b9#73b4257b17cc62ecc8df6d6aa3730bd9c6cba4b9"
 dependencies = [
  "bitflags",
  "js-sys",

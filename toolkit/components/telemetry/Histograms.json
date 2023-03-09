@@ -1164,6 +1164,18 @@
     "bug_numbers": [1817741],
     "description": "Number of interruptions/donations per slice during parallel marking."
   },
+  "GC_TASK_START_DELAY_US": {
+    "record_in_processes": ["main", "content"],
+    "products": ["firefox"],
+    "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org", "jcoppeard@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "low": 1,
+    "high": 2000,
+    "n_buckets": 50,
+    "bug_numbers": [1817965],
+    "description": "Delay between queuing a GC task and the task starting."
+  },
   "DESERIALIZE_BYTES": {
     "record_in_processes": ["main", "content"],
     "products": ["firefox"],
@@ -2795,17 +2807,6 @@
     "kind": "categorical",
     "labels": ["AlreadyHTTPS", "NoReasonToUpgrade", "PrefBlockedSTS", "STS", "CSP", "BrowserDisplay"],
     "description": "Was the URL upgraded to HTTPS?"
-  },
-  "MIXED_CONTENT_UPGRADE_SUCCESS": {
-    "record_in_processes": ["main"],
-    "products": ["firefox", "fennec"],
-    "alert_emails": ["seceng-telemetry@mozilla.com", "julianwels@mozilla.com", "ckerschbaumer@mozilla.com"],
-    "bug_numbers": [1674926],
-    "releaseChannelCollection": "opt-out",
-    "expires_in_version": "never",
-    "kind": "categorical",
-    "labels": ["ImageSuccess", "ImageFailed", "VideoSuccess", "VideoFailed", "AudioSuccess", "AudioFailed"],
-    "description": "Did the mixed-display-content upgrade succeed?"
   },
   "HTTP_RESPONSE_STATUS_CODE": {
     "record_in_processes": ["main", "content"],
@@ -12273,11 +12274,23 @@
     "releaseChannelCollection": "opt-out",
     "description": "True if the browser was unable to set Firefox as the default browser"
   },
-  "BROWSER_SET_DEFAULT_USER_CHOICE_RESULT": {
+  "BROWSER_SET_DEFAULT_PDF_HANDLER_USER_CHOICE_RESULT": {
     "record_in_processes": ["main"],
     "products": ["firefox"],
     "operating_systems": ["windows"],
     "expires_in_version": "120",
+    "kind": "categorical",
+    "labels": ["Success", "ErrProgID", "ErrHash", "ErrLaunchExe", "ErrExeTimeout", "ErrExeProgID", "ErrExeHash", "ErrExeRejected", "ErrExeOther", "ErrOther", "ErrBuild"],
+    "releaseChannelCollection": "opt-out",
+    "bug_numbers": [1805509],
+    "alert_emails": ["application-update-telemetry-alerts@mozilla.com"],
+    "description": "Result of each attempt to set the default browser with SetDefaultExtensionHandlersUserChoice() for pdf extension"
+  },
+  "BROWSER_SET_DEFAULT_USER_CHOICE_RESULT": {
+    "record_in_processes": ["main"],
+    "products": ["firefox"],
+    "operating_systems": ["windows"],
+    "expires_in_version": "118",
     "kind": "categorical",
     "labels": ["Success", "ErrProgID", "ErrHash", "ErrLaunchExe", "ErrExeTimeout", "ErrExeProgID", "ErrExeHash", "ErrExeRejected", "ErrExeOther", "ErrOther", "ErrBuild"],
     "releaseChannelCollection": "opt-out",
@@ -12337,6 +12350,36 @@
     "expires_in_version": "90",
     "kind": "boolean",
     "description": "Accumulates how many downloads are mixed-content (True = The download is MixedContent, False= is not MixedContent)"
+  },
+  "MIXED_CONTENT_IMAGES": {
+    "record_in_processes": ["main", "content"],
+    "products": ["firefox", "fennec"],
+    "bug_numbers": [1819336],
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "categorical",
+    "labels": ["ImgUpSuccess", "ImgUpFailure", "ImgNoUpSuccess", "ImgNoUpFailure"],
+    "description": "How often image loads fail in regular mode and in upgrading mode?"
+  },
+  "MIXED_CONTENT_VIDEO": {
+    "record_in_processes": ["main", "content"],
+    "products": ["firefox", "fennec"],
+    "bug_numbers": [1819336],
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "categorical",
+    "labels": ["VideoUpSuccess", "VideoUpFailure", "VideoNoUpSuccess", "VideoNoUpFailure"],
+    "description": "How often video loads fail in regular mode and in upgrading mode?"
+  },
+  "MIXED_CONTENT_AUDIO": {
+    "record_in_processes": ["main", "content"],
+    "products": ["firefox", "fennec"],
+    "bug_numbers": [1819336],
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "categorical",
+    "labels": ["AudioUpSuccess", "AudioUpFailure", "AudioNoUpSuccess", "AudioNoUpFailure"],
+    "description": "How often audio loads fail in regular mode and in upgrading mode?"
   },
   "CONTENT_SIGNATURE_VERIFICATION_STATUS": {
     "record_in_processes": ["main", "content"],
@@ -15324,6 +15367,17 @@
     "description": "The total usage amount of the operations of tab audio indicator, mute=0 , unmuted=1, unblockByVisitingTab=2, unblockingByClickingIcon=3",
     "releaseChannelCollection": "opt-out"
   },
+  "EXTENSION_INSTALL_PROMPT_RESULT": {
+    "record_in_processes": ["main", "content"],
+    "products": ["firefox", "fennec"],
+    "alert_emails": ["aswan@mozilla.com", "andym@mozilla.com"],
+    "bug_numbers": [1338713],
+    "expires_in_version": "60",
+    "kind": "categorical",
+    "labels": ["installAmoAccepted", "installAmoRejected", "installLocalAccepted", "installLocalRejected", "installWebAccepted", "installWebRejected", "sideloadAccepted", "sideloadRejected", "updateAccepted", "updateRejected"],
+    "description": "Results of displaying add-on installation notifications.",
+    "releaseChannelCollection": "opt-out"
+  },
   "INPUT_EVENT_QUEUED_CLICK_MS": {
     "record_in_processes": ["main", "content"],
     "products": ["firefox", "fennec"],
@@ -16029,6 +16083,17 @@
     "labels": ["success", "failure"],
     "releaseChannelCollection": "opt-out",
     "description": "The number of times a storage.local backend data migration has been completed and results in one of the categories."
+  },
+  "EXTENSION_UPDATE_TYPE": {
+    "record_in_processes": ["main"],
+    "products": ["firefox", "fennec"],
+    "alert_emails": ["addons-dev-internal@mozilla.com"],
+    "bug_numbers": [1460336],
+    "expires_in_version": "66",
+    "kind": "categorical",
+    "labels": ["JSON", "RDF"],
+    "releaseChannelCollection": "opt-out",
+    "description": "The type of update manifest served for a given update request."
   },
   "PLACES_SEARCHBAR_FILTER_TYPE": {
     "record_in_processes": ["main"],
