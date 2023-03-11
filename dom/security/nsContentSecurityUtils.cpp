@@ -1038,10 +1038,8 @@ nsresult CheckCSPFrameAncestorPolicy(nsIChannel* aChannel,
   nsAutoCString scheme;
   uri->GetScheme(scheme);
   if (scheme.EqualsLiteral("tile")) {
-    printf_stderr("ZZZ CheckCSPFrameAncestorPolicy this is a tile:// document\n");
     nsAutoString tileCsp;
     Preferences::GetString("network.protocol-handler.tile.csp", tileCsp);
-    printf_stderr("ZZZ CSP: |%s|\n", NS_ConvertUTF16toUTF8(tileCsp).get());
     csp->AppendPolicy(tileCsp, false, false);
   }
 
