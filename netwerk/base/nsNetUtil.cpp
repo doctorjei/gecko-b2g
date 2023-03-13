@@ -2004,6 +2004,13 @@ nsresult NS_NewURI(nsIURI** aURI, const nsACString& aSpec,
     }
   }
 
+#if defined(MOZ_B2G)
+  if (scheme.EqualsLiteral("ipfs") || scheme.EqualsLiteral("ipns") ||
+      scheme.EqualsLiteral("tile")) {
+    return NewStandardURI(aSpec, aCharset, aBaseURI, -1, aURI);
+  }
+#endif
+
 #if defined(MOZ_THUNDERBIRD) || defined(MOZ_SUITE)
   rv = NS_NewMailnewsURI(aURI, aSpec, aCharset, aBaseURI);
   if (rv != NS_ERROR_UNKNOWN_PROTOCOL) {

@@ -323,6 +323,14 @@ const ServiceWorkerAssistant = {
   _createActivitiesToRegister(aManifestURL, aFeatures) {
     let activitiesToRegister = [];
     let activities = aFeatures.activities;
+
+    // Add the magic `start-$CID` activities for Tiles.
+    let url = new URL(aManifestURL);
+    if (url.protocol == "tile:") {
+      activities = activities || {};
+      activities[`start-${url.hostname}`] = {};
+    }
+
     if (!activities) {
       return activitiesToRegister;
     }
