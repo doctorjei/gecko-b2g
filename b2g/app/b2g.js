@@ -1315,4 +1315,5 @@ pref("layout.css.constructable-stylesheets.enabled", true);
 
 // Default CSP for document served with the tile:// protocol.
 // See https://hackmd.io/@browsers-n-platforms/HykU2_jws
-pref("network.protocol-handler.tile.csp", "default-src 'self' ipfs: ipns:; style-src 'self' 'unsafe-inline' ipfs: ipns:; script-src 'self' 'unsafe-inline' ipfs: ipns: 'wasm-unsafe-eval'; img-src 'self' ipfs: ipns: blob:; media-src 'self' ipfs: ipns: blob:;");
+pref("security.csp.enableNavigateTo", true);
+pref("network.protocol-handler.tile.csp", "default-src 'self' ipfs: ipns: http://*.localhost:*; style-src 'self' 'unsafe-inline' ipfs: ipns: http://*.localhost:*; script-src 'self' 'unsafe-inline' ipfs: ipns: 'wasm-unsafe-eval' http://*.localhost:*; img-src 'self' ipfs: ipns: blob:; media-src 'self' ipfs: ipns: blob:;  navigate-to 'self' ipfs: ipns:");
