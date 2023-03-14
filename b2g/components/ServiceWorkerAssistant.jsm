@@ -328,7 +328,11 @@ const ServiceWorkerAssistant = {
     let url = new URL(aManifestURL);
     if (url.protocol == "tile:") {
       activities = activities || {};
-      activities[`start-${url.hostname}`] = {};
+      activities[`tile-called`] = {
+        filters: { cid: url.hostname },
+        href: "/index.html",
+        returnValue: true,
+      };
     }
 
     if (!activities) {
