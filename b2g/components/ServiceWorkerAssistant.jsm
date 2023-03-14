@@ -328,7 +328,7 @@ const ServiceWorkerAssistant = {
     let url = new URL(aManifestURL);
     if (url.protocol == "tile:") {
       activities = activities || {};
-      activities[`tile-called`] = {
+      activities[`p2p-tile-called`] = {
         filters: { cid: url.hostname },
         href: "/index.html",
         returnValue: true,

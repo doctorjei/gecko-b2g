@@ -9811,6 +9811,8 @@ void OriginParser::HandleScheme(const nsDependentCSubstring& aToken) {
   bool isFile = false;
   bool isChrome = false;
   if (aToken.EqualsLiteral("http") || aToken.EqualsLiteral("https") ||
+      // tile:// uses a http channel under the hood.
+      aToken.EqualsLiteral("tile") ||
       (isAbout = aToken.EqualsLiteral("about") ||
                  (isMozSafeAbout = aToken.EqualsLiteral("moz-safe-about"))) ||
       aToken.EqualsLiteral("indexeddb") ||

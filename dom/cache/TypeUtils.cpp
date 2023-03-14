@@ -397,6 +397,7 @@ void TypeUtils::ProcessURL(nsACString& aUrl, bool* aSchemeValidOut,
     *aSchemeValidOut =
         scheme.LowerCaseEqualsLiteral("http") ||
         scheme.LowerCaseEqualsLiteral("https") ||
+        scheme.LowerCaseEqualsLiteral("tile") ||
         (StaticPrefs::extensions_backgroundServiceWorker_enabled_AtStartup() &&
          scheme.LowerCaseEqualsLiteral("moz-extension"));
   }
