@@ -22,6 +22,10 @@ var modules = {
   },
   neterror: {
     uri: netErrorURL(),
+    flags:
+      Ci.nsIAboutModule.ALLOW_SCRIPT |
+      Ci.nsIAboutModule.URI_CAN_LOAD_IN_CHILD |
+      Ci.nsIAboutModule.HIDE_FROM_ABOUTABOUT,
     privileged: true,
     hide: true,
   },
