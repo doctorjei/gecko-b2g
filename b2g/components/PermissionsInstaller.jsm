@@ -153,6 +153,13 @@ const PermissionsInstaller = {
         isCore = aFeatures.core === true;
       }
 
+      // tile:// pages have the same permissions as core apps for now.
+      // This may evolve to a dedicated appType if needed.
+      if (uri.scheme === "tile") {
+        appType = "signed";
+        isCore = true;
+      }
+
       // Add default permissions that are granted to all installed apps.
       defaultPermissions.forEach(permission => {
         PermissionsHelper.addPermission(permission, aManifestURL, ALLOW_ACTION);
