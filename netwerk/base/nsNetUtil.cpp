@@ -1985,7 +1985,7 @@ nsresult NS_NewURI(nsIURI** aURI, const nsACString& aSpec,
   }
 #endif
 
-  if (scheme.EqualsLiteral("android")) {
+  if (scheme.EqualsLiteral("android") || scheme.EqualsLiteral("tile")) {
     return NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID)
         .Apply(&nsIStandardURLMutator::Init, nsIStandardURL::URLTYPE_STANDARD,
                -1, aSpec, aCharset, aBaseURI, nullptr)
@@ -2003,13 +2003,6 @@ nsresult NS_NewURI(nsIURI** aURI, const nsACString& aSpec,
       return NewStandardURI(aSpec, aCharset, aBaseURI, -1, aURI);
     }
   }
-
-#if defined(MOZ_B2G)
-  if (scheme.EqualsLiteral("ipfs") || scheme.EqualsLiteral("ipns") ||
-      scheme.EqualsLiteral("tile")) {
-    return NewStandardURI(aSpec, aCharset, aBaseURI, -1, aURI);
-  }
-#endif
 
 #if defined(MOZ_THUNDERBIRD) || defined(MOZ_SUITE)
   rv = NS_NewMailnewsURI(aURI, aSpec, aCharset, aBaseURI);
