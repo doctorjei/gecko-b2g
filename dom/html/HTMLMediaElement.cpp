@@ -6704,12 +6704,16 @@ bool HTMLMediaElement::CanDecoderStartPlaying() const {
   if (mReadyState >= HAVE_METADATA && !HasAudio()) {
     return true;
   }
+#if defined(MOZ_WIDGET_GONK)
   // For files with audio tracks, allow playing when AudioChannelAgent has
   // started playing and is not suspended.
   if (mAudioChannelWrapper && !mAudioChannelWrapper->IsStoppedOrSuspended()) {
     return true;
   }
   return false;
+#else
+  return true;
+#endif
 }
 
 void HTMLMediaElement::NotifyOwnerDocumentActivityChanged() {
