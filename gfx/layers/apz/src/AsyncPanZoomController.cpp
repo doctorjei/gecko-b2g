@@ -2889,7 +2889,8 @@ nsEventStatus AsyncPanZoomController::OnPanEnd(const PanGestureInput& aEvent) {
   // This can happen if the OS sends a second pan-end event after
   // the first one has already started an overscroll animation.
   // This has been observed on some Wayland versions.
-  if (mState == OVERSCROLL_ANIMATION || mState == NOTHING) {
+  PanZoomState currentState = GetState();
+  if (currentState == OVERSCROLL_ANIMATION || currentState == NOTHING) {
     return nsEventStatus_eIgnore;
   }
 
@@ -2922,7 +2923,8 @@ nsEventStatus AsyncPanZoomController::OnPanEnd(const PanGestureInput& aEvent) {
   // triggers an overscroll animation. When we're finished with the overscroll
   // animation, the state will be reset and a TransformEnd will be sent to the
   // main thread.
-  if (mState != OVERSCROLL_ANIMATION) {
+  currentState = GetState();
+  if (currentState != OVERSCROLL_ANIMATION) {
     // Do not send a state change notification to the content controller here.
     // Instead queue a delayed task to dispatch the notification if no
     // momentum pan or scroll snap follows the pan-end.
@@ -2934,7 +2936,7 @@ nsEventStatus AsyncPanZoomController::OnPanEnd(const PanGestureInput& aEvent) {
               "layers::AsyncPanZoomController::"
               "DoDelayedTransformEndNotification",
               this, &AsyncPanZoomController::DoDelayedTransformEndNotification,
-              mState),
+              currentState),
           StaticPrefs::apz_scrollend_event_content_delay_ms());
       SetStateNoContentControllerDispatch(NOTHING);
     } else {
@@ -6186,6 +6188,11 @@ void AsyncPanZoomController::SetState(PanZoomState aNewState) {
   DispatchStateChangeNotification(oldState, aNewState);
 }
 
+auto AsyncPanZoomController::GetState() const -> PanZoomState {
+  RecursiveMutexAutoLock lock(mRecursiveMutex);
+  return mState;
+}
+
 void AsyncPanZoomController::DispatchStateChangeNotification(
     PanZoomState aOldState, PanZoomState aNewState) {
   {  // scope the lock
@@ -6250,8 +6257,8 @@ void AsyncPanZoomController::UpdateZoomConstraints(
              aConstraints.mMinZoom.scale, aConstraints.mMaxZoom.scale);
   }
 
-  if (IsNaN(aConstraints.mMinZoom.scale) ||
-      IsNaN(aConstraints.mMaxZoom.scale)) {
+  if (std::isnan(aConstraints.mMinZoom.scale) ||
+      std::isnan(aConstraints.mMaxZoom.scale)) {
     NS_WARNING("APZC received zoom constraints with NaN values; dropping...");
     return;
   }

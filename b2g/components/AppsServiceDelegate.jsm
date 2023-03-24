@@ -191,7 +191,11 @@ AppsServiceDelegate.prototype = {
         let manifest = JSON.parse(aManifest);
         // To compatible with when b2g_features only is passed.
         let features = manifest.b2g_features || manifest;
-        await ServiceWorkerAssistant.register(aManifestUrl, features, "onClear");
+        await ServiceWorkerAssistant.register(
+          aManifestUrl,
+          features,
+          "onClear"
+        );
       } catch (e) {
         log(`Error when trying re-register sw in onClear: ${e}`);
         aCallback.reject();

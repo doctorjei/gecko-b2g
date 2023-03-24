@@ -67,8 +67,7 @@ Http3Session::Http3Session() {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
   LOG(("Http3Session::Http3Session [this=%p]", this));
 
-  mCurrentTopBrowsingContextId =
-      gHttpHandler->ConnMgr()->CurrentTopBrowsingContextId();
+  mCurrentBrowserId = gHttpHandler->ConnMgr()->CurrentBrowserId();
   mThroughCaptivePortal = gHttpHandler->GetThroughCaptivePortal();
 }
 
@@ -230,7 +229,7 @@ void Http3Session::Shutdown() {
        (mError == NS_ERROR_NET_HTTP3_PROTOCOL_ERROR)) &&
       (mError !=
        mozilla::psm::GetXPCOMFromNSSError(SSL_ERROR_BAD_CERT_DOMAIN)) &&
-      !isEchRetry) {
+      !isEchRetry && !mConnInfo->GetWebTransport()) {
     gHttpHandler->ExcludeHttp3(mConnInfo);
   }
 
@@ -974,8 +973,7 @@ bool Http3Session::AddStream(nsAHttpTransaction* aHttpTransaction,
     mHasWebTransportSession = true;
   } else {
     LOG3(("Http3Session::AddStream %p atrans=%p.\n", this, aHttpTransaction));
-    stream = new Http3Stream(aHttpTransaction, this, cos,
-                             mCurrentTopBrowsingContextId);
+    stream = new Http3Stream(aHttpTransaction, this, cos, mCurrentBrowserId);
   }
 
   mStreamTransactionHash.InsertOrUpdate(aHttpTransaction, RefPtr{stream});
@@ -1036,10 +1034,10 @@ void Http3Session::QueueStream(Http3StreamBase* stream) {
 void Http3Session::ProcessPending() {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
-  Http3StreamBase* stream;
+  RefPtr<Http3StreamBase> stream;
   while ((stream = mQueuedStreams.PopFront())) {
     LOG3(("Http3Session::ProcessPending %p stream %p woken from queue.", this,
-          stream));
+          stream.get()));
     MOZ_ASSERT(stream->Queued());
     stream->SetQueued(false);
     mReadyForWrite.Push(stream);
@@ -1048,10 +1046,10 @@ void Http3Session::ProcessPending() {
 }
 
 static void RemoveStreamFromQueue(Http3StreamBase* aStream,
-                                  nsDeque<Http3StreamBase>& queue) {
+                                  nsRefPtrDeque<Http3StreamBase>& queue) {
   size_t size = queue.GetSize();
   for (size_t count = 0; count < size; ++count) {
-    Http3StreamBase* stream = queue.PopFront();
+    RefPtr<Http3StreamBase> stream = queue.PopFront();
     if (stream != aStream) {
       queue.Push(stream);
     }
@@ -1410,12 +1408,12 @@ nsresult Http3Session::SendData(nsIUDPSocket* socket) {
   //      to let the error be handled).
 
   nsresult rv = NS_OK;
-  Http3StreamBase* stream = nullptr;
+  RefPtr<Http3StreamBase> stream;
 
   // Step 1)
   while (CanSandData() && (stream = mReadyForWrite.PopFront())) {
     LOG(("Http3Session::SendData call ReadSegments from stream=%p [this=%p]",
-         stream, this));
+         stream.get(), this));
 
     rv = stream->ReadSegments();
 
@@ -1732,9 +1730,12 @@ void Http3Session::CloseStreamInternal(Http3StreamBase* aStream,
   }
   mWebTransportSessions.RemoveElement(aStream);
   mWebTransportStreams.RemoveElement(aStream);
+  // Close(NS_OK) implies that the NeqoHttp3Conn will be closed, so we can only
+  // do this when there is no Http3Steeam, WebTransportSession and
+  // WebTransportStream.
   if ((mShouldClose || mGoawayReceived) &&
-      (!mStreamTransactionHash.Count() || !mWebTransportSessions.IsEmpty() ||
-       !mWebTransportStreams.IsEmpty())) {
+      (!mStreamTransactionHash.Count() && mWebTransportSessions.IsEmpty() &&
+       mWebTransportStreams.IsEmpty())) {
     MOZ_ASSERT(!IsClosing());
     Close(NS_OK);
   }
@@ -1830,15 +1831,15 @@ void Http3Session::CloseWebTransportConn() {
       NS_DISPATCH_NORMAL);
 }
 
-void Http3Session::TopBrowsingContextIdChanged(uint64_t id) {
+void Http3Session::CurrentBrowserIdChanged(uint64_t id) {
   MOZ_ASSERT(OnSocketThread(), "not on socket thread");
 
-  mCurrentTopBrowsingContextId = id;
+  mCurrentBrowserId = id;
 
   for (const auto& stream : mStreamTransactionHash.Values()) {
     RefPtr<Http3Stream> httpStream = stream->GetHttp3Stream();
     if (httpStream) {
-      httpStream->TopBrowsingContextIdChanged(id);
+      httpStream->CurrentBrowserIdChanged(id);
     }
   }
 }

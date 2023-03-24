@@ -1737,7 +1737,7 @@
 #if defined(ANDROID)
   value: false
 #else
-  value: @IS_NIGHTLY_BUILD@
+  value: @IS_EARLY_BETA_OR_EARLIER@
 #endif
   mirror: always
 
@@ -1745,7 +1745,7 @@
 # ORB.
 - name: browser.opaqueResponseBlocking.javascriptValidator
   type: bool
-  value: @IS_NIGHTLY_BUILD@
+  value: @IS_EARLY_BETA_OR_EARLIER@
   mirror: always
 
 # When this pref is enabled, <object> and <embed> elements will create
@@ -2193,8 +2193,8 @@
   value: false
   mirror: always
 
-# Whether CanvasRenderingContext2D.mozTextStyle is enabled.
-- name: dom.mozTextStyle.enabled
+# Whether CanvasRenderingContext2D.mozImageSmoothingEnabled is enabled.
+- name: dom.mozImageSmoothingEnabled.enabled
   type: bool
   value: false
   mirror: always
@@ -2581,6 +2581,13 @@
 - name: dom.event.dragexit.enabled
   type: bool
   value: @IS_NOT_NIGHTLY_BUILD@
+  mirror: always
+
+# Whether wheel event target's should be grouped. When enabled, all wheel
+# events that occur in a given wheel transaction have the same event target.
+- name: dom.event.wheel-event-groups.enabled
+  type: bool
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 # Whether WheelEvent should return pixels instead of lines for
@@ -3115,6 +3122,12 @@
   value: @IS_NIGHTLY_BUILD@
   mirror: always
 
+# Is support for key events and focus events on disabled elements enabled?
+- name: dom.forms.always_allow_key_and_focus_events.enabled
+  type: bool
+  value: @IS_NIGHTLY_BUILD@
+  mirror: always
+
 # Is support for HTMLInputElement.showPicker enabled?
 - name: dom.input.showPicker
   type: bool
@@ -3635,7 +3648,7 @@
   mirror: never
 #endif
 
-# Use to control to dump CheckedUnsafePtr creation stack and assignment stacks. 
+# Use to control to dump CheckedUnsafePtr creation stack and assignment stacks.
 - name: dom.checkedUnsafePtr.dumpStacks.enabled
   type: RelaxedAtomicBool
   value: false
@@ -5107,7 +5120,7 @@
 # true:  Right node will be created (at splitting) and deleted (at joinining)
 - name: editor.join_split_direction.compatible_with_the_other_browsers
   type: bool
-  value: false
+  value: @IS_EARLY_BETA_OR_EARLIER@
   mirror: always
 
 # Delay to mask last input character in password fields.
@@ -5994,6 +6007,11 @@
 #endif
   mirror: always
 
+- name: gfx.color_management.display_profile
+  type: DataMutexString
+  value: ""
+  mirror: always # But be warned: We cache the result.
+
 - name: gfx.color_management.force_srgb
   type: RelaxedAtomicBool
   value: false
@@ -6001,7 +6019,7 @@
 
 - name: gfx.color_management.native_srgb
   type: RelaxedAtomicBool
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) || defined(XP_WIN)
   value: true
 #else
   value: false
@@ -6024,6 +6042,16 @@
 - name: gfx.color_management.rendering_intent
   type: RelaxedAtomicInt32
   value: 0
+  mirror: always
+
+- name: gfx.color_management.rec709_gamma_as_srgb
+  type: RelaxedAtomicBool
+  value: true # Tragic backwards compat.
+  mirror: always
+
+- name: gfx.color_management.rec2020_gamma_as_rec709
+  type: RelaxedAtomicBool
+  value: true # Match naive behavior, but hopefully we can stop soon!
   mirror: always
 
 - name: gfx.compositor.clearstate
@@ -7343,7 +7371,7 @@
 # Whether to allow decoding of animated AVIF sequences.
 - name: image.avif.sequence.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
 
 # Whether AVIF files containing sequences should be animated even when the
@@ -8645,7 +8673,7 @@
 # Whether the `content-visibility` CSS property is enabled
 - name: layout.css.content-visibility.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
   rust: true
 
@@ -8838,7 +8866,7 @@
 # Before enabling everywhere, make sure blockers of bug 1808229 are fixed.
 - name: layout.css.nth-child-of.enabled
   type: RelaxedAtomicBool
-  value: @IS_NIGHTLY_BUILD@
+  value: true
   mirror: always
   rust: true
 
@@ -9021,6 +9049,13 @@
   mirror: always
   rust: true
 
+# Dictates whether or not the prefers-reduced-transparency media query is enabled.
+- name: layout.css.prefers-reduced-transparency.enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+  rust: true
+
 # Is support for forced-color-adjust properties enabled?
 - name: layout.css.forced-color-adjust.enabled
   type: RelaxedAtomicBool
@@ -9149,7 +9184,7 @@
 # Enable experimental enhanced color CSS color spaces. (lab(), lch(), oklab(), oklch(), color())
 - name: layout.css.more_color_4.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: @IS_NIGHTLY_BUILD@
   mirror: always
   rust: true
 
@@ -10676,7 +10711,7 @@
 #elif defined(XP_MACOSX)
   value: true
 #elif defined(MOZ_WIDGET_ANDROID)
-  value: @IS_EARLY_BETA_OR_EARLIER@
+  value: true
 #elif defined(XP_UNIX)
   value: true
 #else
@@ -10758,7 +10793,7 @@
 
 - name: media.videocontrols.lock-video-orientation
   type: bool
-  value: @IS_ANDROID@
+  value: false
   mirror: always
 
 # Media Seamless Looping
@@ -12145,6 +12180,13 @@
   value: 30000
   mirror: always
 
+# Similar to network.http.http2.ping-timeout, but this is used when the
+# Http/2 connection is connected to the TRR server.
+- name: network.trr.ping_timeout
+  type: RelaxedAtomicUint32
+  value: 3000
+  mirror: always
+
 # The timeout of the TRR confirmation request
 - name: network.trr.confirmation_timeout_ms
   type: RelaxedAtomicUint32
@@ -12365,6 +12407,12 @@
 
 # URI from which to fetch the configuration for the Oblivious HTTP gateway for TRR requests.
 - name: network.trr.ohttp.config_uri
+  type: String
+  value: ""
+  mirror: never
+
+# The URI used for the target DoH server when network.trr.use_ohttp is true
+- name: network.trr.ohttp.uri
   type: String
   value: ""
   mirror: never
@@ -12685,6 +12733,13 @@
 
 # Whether to use port prefixed QNAME for HTTPS RR
 - name: network.dns.port_prefixed_qname_https_rr
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
+# Whether to use HTTPS RR and ignore NS_HTTP_DISALLOW_HTTPS_RR
+# This pref is only set when running tests
+- name: network.dns.force_use_https_rr
   type: RelaxedAtomicBool
   value: false
   mirror: always
@@ -13240,8 +13295,13 @@
 #
 # The variables will, however, be read often (specifically .microseconds on
 # each timer rounding) so performance is important.
-
 - name: privacy.resistFingerprinting
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+  do_not_use_directly: true
+
+- name: privacy.resistFingerprintingLite
   type: RelaxedAtomicBool
   value: false
   mirror: always
@@ -13295,6 +13355,13 @@
 - name: privacy.resistFingerprinting.target_video_res
   type: uint32_t
   value: 480
+  mirror: always
+
+# Setting TZ=UTC ensures that even libc functions use the spoofed time zone.
+# We want to remove that override as soon as possible however.
+- name: privacy.resistFingerprinting.testing.setTZtoUTC
+  type: bool
+  value: false
   mirror: always
 
 # Bitfield for selectively disabling RFP
@@ -13849,8 +13916,40 @@
 
 # WebAuthn CTAP2 support
 - name: security.webauthn.ctap2
-  type: bool
+  type: RelaxedAtomicBool
   value: true
+  mirror: always
+
+# Dispatch WebAuthn requests to the software CTAP1 token.
+# (mutually exclusive with webauthn_enable_android_fido2,
+# and webauthn_enable_usbtoken)
+- name: security.webauth.webauthn_enable_softtoken
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
+# Dispatch WebAuthn requests to the Android platform API
+- name: security.webauth.webauthn_enable_android_fido2
+  type: RelaxedAtomicBool
+  value: @IS_ANDROID@
+  mirror: always
+
+# Dispatch WebAuthn requests to authenticator-rs
+- name: security.webauth.webauthn_enable_usbtoken
+  type: RelaxedAtomicBool
+  value: @IS_NOT_ANDROID@
+  mirror: always
+
+# Skip direct attestation consent prompts (for tests).
+- name: security.webauth.webauthn_testing_allow_direct_attestation
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
+# Global counter for U2F soft token operations
+- name: security.webauth.softtoken_counter
+  type: RelaxedAtomicUint32
+  value: 0
   mirror: always
 
 # Block Worker/SharedWorker scripts with wrong MIME type.
@@ -14849,11 +14948,6 @@
 #else
   value: false
 #endif
-  mirror: always
-
-- name: webgl.all-angle-options
-  type: RelaxedAtomicBool
-  value: false
   mirror: always
 
 - name: webgl.angle.force-d3d11

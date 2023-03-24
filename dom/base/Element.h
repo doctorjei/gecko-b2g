@@ -580,6 +580,9 @@ class Element : public FragmentOrElement {
     return CreatePopoverData();
   }
 
+  bool IsAutoPopover() const;
+  bool IsPopoverOpen() const;
+
   ElementAnimationData* GetAnimationData() const {
     if (!MayHaveAnimations()) {
       return nullptr;
@@ -1069,8 +1072,6 @@ class Element : public FragmentOrElement {
    * @return the number of attributes
    */
   uint32_t GetAttrCount() const { return mAttrs.AttrCount(); }
-
-  virtual bool IsNodeOfType(uint32_t aFlags) const override;
 
   /**
    * Get the class list of this element (this corresponds to the value of the

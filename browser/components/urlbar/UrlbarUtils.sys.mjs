@@ -1313,11 +1313,12 @@ export var UrlbarUtils = {
    * Extracts a type for search engagement telemetry from a result.
    *
    * @param {UrlbarResult} result The result to analyze.
+   * @param {string} selType An optional parameter for the selected type.
    * @returns {string} Type as string.
    */
-  searchEngagementTelemetryType(result) {
+  searchEngagementTelemetryType(result, selType = null) {
     if (!result) {
-      return "unknown";
+      return selType === "oneoff" ? "search_shortcut_button" : "input_field";
     }
 
     if (
@@ -1453,7 +1454,7 @@ XPCOMUtils.defineLazyGetter(UrlbarUtils, "strings", () => {
 
 /**
  * Payload JSON schemas for each result type.  Payloads are validated against
- * these schemas using JsonSchemaValidator.jsm.
+ * these schemas using JsonSchemaValidator.sys.mjs.
  */
 UrlbarUtils.RESULT_PAYLOAD_SCHEMA = {
   [UrlbarUtils.RESULT_TYPE.TAB_SWITCH]: {

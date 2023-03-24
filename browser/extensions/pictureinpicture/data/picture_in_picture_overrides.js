@@ -67,6 +67,11 @@ let AVAILABLE_PIP_OVERRIDES;
         videoWrapperScriptPath: "video-wrappers/videojsWrapper.js",
       },
     },
+    cbc: {
+      "https://*.cbc.ca/*": {
+        videoWrapperScriptPath: "video-wrappers/cbc.js",
+      },
+    },
 
     dailymotion: {
       "https://*.dailymotion.com/*": {
@@ -164,6 +169,16 @@ let AVAILABLE_PIP_OVERRIDES;
       "https://*.piped.silkky.cloud/*": {
         videoWrapperScriptPath: "video-wrappers/piped.js",
       },
+    },
+
+    radiocanada: {
+      "https://*.ici.radio-canada.ca/*": {
+        videoWrapperScriptPath: "video-wrappers/radiocanada.js",
+      },
+    },
+
+    reddit: {
+      "https://*.reddit.com/*": { policy: TOGGLE_POLICIES.ONE_QUARTER },
     },
 
     sonyliv: {

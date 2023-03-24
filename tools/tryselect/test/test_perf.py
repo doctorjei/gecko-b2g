@@ -3,6 +3,9 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import os
+import pathlib
+import shutil
+import tempfile
 from unittest import mock
 
 import mozunit
@@ -748,6 +751,17 @@ def test_category_expansion(
             ),
         ),
         (
+            {"query": "'Pageload 'linux 'firefox"},
+            [8, 2, 2, 5],
+            2,
+            (
+                "\n!!!NOTE!!!\n You'll be able to find a performance comparison "
+                "here once the tests are complete (ensure you select the right framework): "
+                "https://treeherder.mozilla.org/perfherder/compare?originalProject=try&original"
+                "Revision=revision&newProject=try&newRevision=revision\n"
+            ),
+        ),
+        (
             {"dry_run": True},
             [8, 1, 1, 5],
             2,
@@ -760,6 +774,17 @@ def test_category_expansion(
         ),
         (
             {"show_all": True},
+            [1, 2, 2, 3],
+            0,
+            (
+                "\n!!!NOTE!!!\n You'll be able to find a performance comparison "
+                "here once the tests are complete (ensure you select the right framework): "
+                "https://treeherder.mozilla.org/perfherder/compare?originalProject=try&original"
+                "Revision=revision&newProject=try&newRevision=revision\n"
+            ),
+        ),
+        (
+            {"show_all": True, "query": "'shippable !32 speedometer 'firefox"},
             [1, 2, 2, 3],
             0,
             (
@@ -848,6 +873,41 @@ def test_category_rules(query, should_fail):
             PerfParser.run_category_checks()
     else:
         assert PerfParser.run_category_checks()
+
+
+@pytest.mark.parametrize(
+    "apk_name, apk_content, should_fail, failure_message",
+    [
+        (
+            "real-file",
+            "file-content",
+            False,
+            None,
+        ),
+        ("bad-file", None, True, "Path does not exist:"),
+    ],
+)
+def test_apk_upload(apk_name, apk_content, should_fail, failure_message):
+    with mock.patch("tryselect.selectors.perf.subprocess") as _, mock.patch(
+        "tryselect.selectors.perf.shutil"
+    ) as _:
+        temp_dir = None
+        try:
+            temp_dir = tempfile.mkdtemp()
+            sample_apk = pathlib.Path(temp_dir, apk_name)
+            if apk_content is not None:
+                with sample_apk.open("w") as f:
+                    f.write(apk_content)
+
+            if should_fail:
+                with pytest.raises(Exception) as exc_info:
+                    PerfParser.setup_apk_upload("browsertime", str(sample_apk))
+                assert failure_message in str(exc_info)
+            else:
+                PerfParser.setup_apk_upload("browsertime", str(sample_apk))
+        finally:
+            if temp_dir is not None:
+                shutil.rmtree(temp_dir)
 
 
 if __name__ == "__main__":

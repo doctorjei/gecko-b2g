@@ -26,6 +26,8 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   ProvenanceData: "resource:///modules/ProvenanceData.sys.mjs",
   SearchSERPTelemetry: "resource:///modules/SearchSERPTelemetry.sys.mjs",
+  WindowsInstallsInfo:
+    "resource://gre/modules/components-utils/WindowsInstallsInfo.sys.mjs",
   clearInterval: "resource://gre/modules/Timer.sys.mjs",
   clearTimeout: "resource://gre/modules/Timer.sys.mjs",
   setInterval: "resource://gre/modules/Timer.sys.mjs",
@@ -35,8 +37,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
 XPCOMUtils.defineLazyModuleGetters(lazy, {
   CustomizableUI: "resource:///modules/CustomizableUI.jsm",
   PageActions: "resource:///modules/PageActions.jsm",
-  WindowsInstallsInfo:
-    "resource://gre/modules/components-utils/WindowsInstallsInfo.jsm",
 });
 
 // This pref is in seconds!
@@ -1228,6 +1228,8 @@ let BrowserUsageTelemetry = {
       "browser.engagement.profile_count",
       valueToReport
     );
+    // Manually mirror to Glean
+    Glean.browserEngagement.profileCount.set(valueToReport);
   },
 
   /**
@@ -1251,8 +1253,9 @@ let BrowserUsageTelemetry = {
       return;
     }
 
+    let provenanceExtra = {};
     try {
-      await lazy.ProvenanceData.submitProvenanceTelemetry();
+      provenanceExtra = await lazy.ProvenanceData.submitProvenanceTelemetry();
     } catch (ex) {
       console.warn(
         "reportInstallationTelemetry - submitProvenanceTelemetry failed",
@@ -1388,6 +1391,13 @@ let BrowserUsageTelemetry = {
       installer_type,
       null,
       extra
+    );
+    Services.telemetry.recordEvent(
+      "installation",
+      "first_seen_prov_ext",
+      installer_type,
+      null,
+      provenanceExtra
     );
   },
 

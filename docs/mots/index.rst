@@ -800,13 +800,15 @@ Framework for embedding Gecko into Android applications
 
     * - Owner(s)
       -
-        | `agi <https://people.mozilla.org/s?query=agi>`__
+        | `owlish <https://people.mozilla.org/s?query=owlish>`__
     * - Peer(s)
       -
+        | `Cathy Lu (calu) <https://people.mozilla.org/s?query=calu>`__
+        | `Jonathan Almeida (jonalmeida) <https://people.mozilla.org/s?query=jonalmeida>`__
         | `Makoto Kato (m_kato) <https://people.mozilla.org/s?query=m_kato>`__
-        | `owlish <https://people.mozilla.org/s?query=owlish>`__
+        | `Olivia Hall (ohall) <https://people.mozilla.org/s?query=ohall>`__
     * - Owner(s) Emeritus
-      - James Willcox
+      - James Willcox, Agi Sferro
     * - Peer(s) Emeritus
       - Dylan Roeh, Eugen Sawin, Aaron Klotz, Jim Chen, Randall E. Barker
     * - Includes
@@ -3337,10 +3339,9 @@ The UI component controlling browser tabs.
         | `Dão Gottwald (dao) <https://people.mozilla.org/s?query=dao>`__
     * - Peer(s)
       -
-        | `Dão Gottwald (dao) <https://people.mozilla.org/s?query=dao>`__
-        | `Jared Wein (jaws) <https://people.mozilla.org/s?query=jaws>`__
         | `Marco Bonardo (mak) <https://people.mozilla.org/s?query=mak>`__
-        | `Matthew N (MattN) <https://people.mozilla.org/s?query=MattN>`__
+    * - Peer(s) Emeritus
+      - Jared Wein, Matthew N
     * - Includes
       -
         | `browser/base/content/tabbrowser\* <https://searchfox.org/mozilla-central/search?q=&path=browser/base/content/tabbrowser\*>`__

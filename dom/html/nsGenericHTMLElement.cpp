@@ -2008,6 +2008,17 @@ bool nsGenericHTMLFormElement::IsElementDisabledForEvents(WidgetEvent* aEvent,
     case eLegacyMouseLineOrPageScroll:
     case eLegacyMousePixelScroll:
       return false;
+    case eFocus:
+    case eBlur:
+    case eFocusIn:
+    case eFocusOut:
+    case eKeyPress:
+    case eKeyUp:
+    case eKeyDown:
+      if (StaticPrefs::dom_forms_always_allow_key_and_focus_events_enabled()) {
+        return false;
+      }
+      [[fallthrough]];
     case ePointerDown:
     case ePointerUp:
     case ePointerCancel:
@@ -2486,10 +2497,6 @@ nsINode* nsGenericHTMLFormControlElement::GetScopeChainParent() const {
   return mForm ? mForm : nsGenericHTMLElement::GetScopeChainParent();
 }
 
-bool nsGenericHTMLFormControlElement::IsNodeOfType(uint32_t aFlags) const {
-  return !(aFlags & ~eHTML_FORM_CONTROL);
-}
-
 void nsGenericHTMLFormControlElement::SaveSubtreeState() {
   SaveState();
 
@@ -2509,18 +2516,9 @@ nsIContent::IMEState nsGenericHTMLFormControlElement::GetDesiredIMEState() {
   return state;
 }
 
-nsresult nsGenericHTMLFormControlElement::BindToTree(BindContext& aContext,
-                                                     nsINode& aParent) {
-  nsresult rv = nsGenericHTMLFormElement::BindToTree(aContext, aParent);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  return NS_OK;
-}
-
 void nsGenericHTMLFormControlElement::UnbindFromTree(bool aNullParent) {
   // Save state before doing anything
   SaveState();
-
   nsGenericHTMLFormElement::UnbindFromTree(aNullParent);
 }
 
@@ -2751,6 +2749,15 @@ bool nsGenericHTMLFormControlElement::IsAutocapitalizeInheriting() const {
 
 //----------------------------------------------------------------------
 
+static const nsAttrValue::EnumTable kPopoverTargetActionTable[] = {
+    {"toggle", PopoverTargetAction::Toggle},
+    {"show", PopoverTargetAction::Show},
+    {"hide", PopoverTargetAction::Hide},
+    {nullptr, 0}};
+
+static const nsAttrValue::EnumTable* kPopoverTargetActionDefault =
+    &kPopoverTargetActionTable[0];
+
 nsGenericHTMLFormControlElementWithState::
     nsGenericHTMLFormControlElementWithState(
         already_AddRefed<mozilla::dom::NodeInfo>&& aNodeInfo,
@@ -2760,6 +2767,33 @@ nsGenericHTMLFormControlElementWithState::
                          ? OwnerDoc()->GetNextControlNumber()
                          : -1) {
   mStateKey.SetIsVoid(true);
+}
+
+bool nsGenericHTMLFormControlElementWithState::ParseAttribute(
+    int32_t aNamespaceID, nsAtom* aAttribute, const nsAString& aValue,
+    nsIPrincipal* aMaybeScriptedPrincipal, nsAttrValue& aResult) {
+  if (aNamespaceID == kNameSpaceID_None &&
+      aAttribute == nsGkAtoms::popovertargetaction &&
+      StaticPrefs::dom_element_popover_enabled()) {
+    return aResult.ParseEnumValue(aValue, kPopoverTargetActionTable, false,
+                                  kPopoverTargetActionDefault);
+  }
+
+  return nsGenericHTMLFormControlElement::ParseAttribute(
+      aNamespaceID, aAttribute, aValue, aMaybeScriptedPrincipal, aResult);
+}
+
+mozilla::dom::Element*
+nsGenericHTMLFormControlElementWithState::GetPopoverTargetElement() const {
+  // TODO: implement attr-associated element algorithm, see
+  // https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#attr-associated-element
+  return nullptr;
+}
+
+void nsGenericHTMLFormControlElementWithState::SetPopoverTargetElement(
+    mozilla::dom::Element*) {
+  // TODO: implement attr-associated element algorithm, see setter steps at
+  // https://html.spec.whatwg.org/multipage/common-dom-interfaces.html#attr-associated-element
 }
 
 void nsGenericHTMLFormControlElementWithState::GenerateStateKey() {
@@ -3165,18 +3199,7 @@ void nsGenericHTMLElement::ShowPopover(ErrorResult& aRv) {
 
 // https://html.spec.whatwg.org/#dom-hidepopover
 void nsGenericHTMLElement::HidePopover(ErrorResult& aRv) {
-  if (!CheckPopoverValidity(PopoverVisibilityState::Hidden, aRv)) {
-    return;
-  }
-
-  // TODO: Run auto popover steps.
-  // TODO: Fire beforetoggle event and re-check popover validity.
-  // TODO: Remove from Top Layer.
-
-  PopoverPseudoStateUpdate(false, true);
-  GetPopoverData()->SetPopoverVisibilityState(PopoverVisibilityState::Hidden);
-
-  // TODO: Queue popover toggle event task.
+  OwnerDoc()->HidePopover(*this, true, true, aRv);
 }
 
 // https://html.spec.whatwg.org/multipage/popover.html#dom-togglepopover

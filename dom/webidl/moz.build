@@ -280,6 +280,9 @@ with Files("GeolocationPosition*"):
 with Files("ProfileTimelineMarker.webidl"):
     BUG_COMPONENT = ("DevTools", "Performance Tools (Profiler/Timeline)")
 
+with Files("PopoverInvokerElement.webidl"):
+    BUG_COMPONENT = ("Core", "DOM: Core & HTML")
+
 with Files("ProgressEvent.webidl"):
     BUG_COMPONENT = ("Core", "DOM: Events")
 
@@ -827,6 +830,7 @@ WEBIDL_FILES = [
     "Plugin.webidl",
     "PluginArray.webidl",
     "PointerEvent.webidl",
+    "PopoverInvokerElement.webidl",
     "PowerSupplyManager.webidl",
     "ProcessingInstruction.webidl",
     "ProfileTimelineMarker.webidl",
@@ -1001,6 +1005,7 @@ WEBIDL_FILES = [
     "TextTrackList.webidl",
     "TimeEvent.webidl",
     "TimeRanges.webidl",
+    "ToggleEvent.webidl",
     "Touch.webidl",
     "TouchEvent.webidl",
     "TouchList.webidl",
@@ -1117,9 +1122,9 @@ if CONFIG["MOZ_WEBRTC"]:
         "RTCRtpSender.webidl",
         "RTCRtpSources.webidl",
         "RTCRtpTransceiver.webidl",
+        "RTCSctpTransport.webidl",
         "RTCSessionDescription.webidl",
         "RTCStatsReport.webidl",
-        "WebrtcDeprecated.webidl",
         "WebrtcGlobalInformation.webidl",
     ]
 
@@ -1258,6 +1263,7 @@ GENERATED_EVENTS_WEBIDL_FILES = [
     "TCPSocketEvent.webidl",
     "TetheringConfigChangeEvent.webidl",
     "TetheringStatusChangeEvent.webidl",
+    "ToggleEvent.webidl",
     "TrackEvent.webidl",
     "UDPMessageEvent.webidl",
     "UsbEvent.webidl",

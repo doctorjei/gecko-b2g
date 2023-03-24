@@ -230,6 +230,11 @@ ReflowInput::ReflowInput(nsPresContext* aPresContext,
       case LayoutFrameType::Canvas:         // FALLTHROUGH
       case LayoutFrameType::FlexContainer:  // FALLTHROUGH
       case LayoutFrameType::GridContainer:
+        if (mFrame->HasAnyStateBits(NS_FRAME_OUT_OF_FLOW)) {
+          // Never allow breakpoints inside of out-of-flow frames.
+          mFlags.mCanHaveClassABreakpoints = false;
+          break;
+        }
         // This frame type can have class A breakpoints, inherit this flag
         // from the parent (this is done for all flags during construction).
         // This also includes Canvas frames, as each PageContent frame always
@@ -1103,8 +1108,7 @@ nsIFrame* ReflowInput::GetHypotheticalBoxContainer(nsIFrame* aFrame,
     // produce a bogus negative content-box size.
     aCBIStartEdge = 0;
     aCBSize = aFrame->GetLogicalSize(wm);
-    if (!aCBSize.IsAllZero() ||
-        (!IsXULCollapsedXULFrame(aFrame->GetParent()))) {
+    if (!aCBSize.IsAllZero() || !IsXULCollapsedXULFrame(aFrame->GetParent())) {
       // aFrame is not XUL-collapsed (nor is it a child of a XUL-collapsed
       // frame), so we can go ahead and subtract out border padding.
       LogicalMargin borderPadding = aFrame->GetLogicalUsedBorderAndPadding(wm);

@@ -19,7 +19,6 @@ import {
   getProjectSearchStatus,
   getProjectSearchQuery,
   getContext,
-  getTextSearchModifiers,
 } from "../selectors";
 
 import ManagedTree from "./shared/ManagedTree";
@@ -32,8 +31,10 @@ import "./ProjectSearch.css";
 
 function getFilePath(item, index) {
   return item.type === "RESULT"
-    ? `${item.sourceId}-${index || "$"}`
-    : `${item.sourceId}-${item.line}-${item.column}-${index || "$"}`;
+    ? `${item.location.source.id}-${index || "$"}`
+    : `${item.location.source.id}-${item.location.line}-${
+        item.location.column
+      }-${index || "$"}`;
 }
 
 export class ProjectSearch extends Component {
@@ -118,16 +119,12 @@ export class ProjectSearch extends Component {
   isProjectSearchEnabled = () => this.props.activeSearch === "project";
 
   selectMatchItem = matchItem => {
-    this.props.selectSpecificLocation(this.props.cx, {
-      sourceId: matchItem.sourceId,
-      line: matchItem.line,
-      column: matchItem.column,
-    });
+    this.props.selectSpecificLocation(this.props.cx, matchItem.location);
     this.props.doSearchForHighlight(
       this.state.inputValue,
       getEditor(),
-      matchItem.line,
-      matchItem.column
+      matchItem.location.line,
+      matchItem.location.column
     );
   };
 
@@ -205,14 +202,14 @@ export class ProjectSearch extends Component {
     return (
       <div
         className={classnames("file-result", { focused })}
-        key={file.sourceId}
+        key={file.location.source.id}
       >
         <AccessibleImage className={classnames("arrow", { expanded })} />
         <AccessibleImage className="file" />
         <span className="file-path">
-          {file.filepath
-            ? getRelativePath(file.filepath)
-            : getFormattedSourceId(file.sourceId)}
+          {file.location.source.url
+            ? getRelativePath(file.location.source.url)
+            : getFormattedSourceId(file.location.source.id)}
         </span>
         <span className="matches-summary">{matches}</span>
       </div>
@@ -225,8 +222,8 @@ export class ProjectSearch extends Component {
         className={classnames("result", { focused })}
         onClick={() => setTimeout(() => this.selectMatchItem(match), 50)}
       >
-        <span className="line-number" key={match.line}>
-          {match.line}
+        <span className="line-number" key={match.location.line}>
+          {match.location.line}
         </span>
         {this.highlightMatches(match)}
       </div>
@@ -283,13 +280,7 @@ export class ProjectSearch extends Component {
   }
 
   renderInput() {
-    const {
-      cx,
-      closeProjectSearch,
-      status,
-      modifiers,
-      toggleProjectSearchModifier,
-    } = this.props;
+    const { closeProjectSearch, status } = this.props;
 
     return (
       <SearchInput
@@ -309,11 +300,8 @@ export class ProjectSearch extends Component {
         handleClose={closeProjectSearch}
         ref="searchInput"
         showSearchModifiers={true}
-        modifiers={modifiers}
-        onToggleSearchModifier={value => {
-          toggleProjectSearchModifier(cx, value);
-          this.doSearch(this.state.inputValue);
-        }}
+        searchKey="project-search"
+        onToggleSearchModifier={() => this.doSearch(this.state.inputValue)}
       />
     );
   }
@@ -344,7 +332,6 @@ const mapStateToProps = state => ({
   results: getProjectSearchResults(state),
   query: getProjectSearchQuery(state),
   status: getProjectSearchStatus(state),
-  modifiers: getTextSearchModifiers(state),
 });
 
 export default connect(mapStateToProps, {
@@ -354,5 +341,4 @@ export default connect(mapStateToProps, {
   selectSpecificLocation: actions.selectSpecificLocation,
   setActiveSearch: actions.setActiveSearch,
   doSearchForHighlight: actions.doSearchForHighlight,
-  toggleProjectSearchModifier: actions.toggleProjectSearchModifier,
 })(ProjectSearch);

@@ -11,7 +11,7 @@
 
 import { prefs, features } from "../utils/prefs";
 
-export const initialUIState = () => ({
+export const initialUIState = ({ supportsJavascriptTracing = false } = {}) => ({
   selectedPrimaryPaneTab: "sources",
   activeSearch: null,
   startPanelCollapsed: prefs.startPanelCollapsed,
@@ -26,6 +26,24 @@ export const initialUIState = () => ({
   inlinePreviewEnabled: features.inlinePreview,
   editorWrappingEnabled: prefs.editorWrapping,
   javascriptEnabled: true,
+  supportsJavascriptTracing,
+  mutableSearchOptions: prefs.searchOptions || {
+    "file-search": {
+      regexMatch: false,
+      wholeWord: false,
+      caseSensitive: false,
+    },
+    "project-search": {
+      regexMatch: false,
+      wholeWord: false,
+      caseSensitive: false,
+    },
+    "quickopen-search": {
+      regexMatch: false,
+      wholeWord: false,
+      caseSensitive: false,
+    },
+  },
 });
 
 function update(state = initialUIState(), action) {
@@ -117,6 +135,15 @@ function update(state = initialUIState(), action) {
 
     case "NAVIGATE": {
       return { ...state, activeSearch: null, highlightedLineRange: {} };
+    }
+
+    case "SET_SEARCH_OPTIONS": {
+      state.mutableSearchOptions[action.searchKey] = {
+        ...state.mutableSearchOptions[action.searchKey],
+        ...action.searchOptions,
+      };
+      prefs.searchOptions = state.mutableSearchOptions;
+      return { ...state };
     }
 
     default: {

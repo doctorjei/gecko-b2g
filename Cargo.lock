@@ -406,6 +406,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "authrs_bridge"
+version = "0.1.0"
+dependencies = [
+ "authenticator",
+ "log",
+ "moz_task",
+ "nserror",
+ "nsstring",
+ "serde_cbor",
+ "thin-vec",
+ "xpcom",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 
@@ -1198,7 +1212,7 @@ dependencies = [
 [[package]]
 name = "cssparser"
 version = "0.30.0"
-source = "git+https://github.com/servo/rust-cssparser?rev=b196a164dcbb317016d4aa6c58c13147e6045ebb#b196a164dcbb317016d4aa6c58c13147e6045ebb"
+source = "git+https://github.com/servo/rust-cssparser?rev=45bc47e2bcb846f1efb5aea156be5fe7d18624bf#45bc47e2bcb846f1efb5aea156be5fe7d18624bf"
 dependencies = [
  "cssparser-macros",
  "dtoa-short",
@@ -1213,7 +1227,7 @@ dependencies = [
 [[package]]
 name = "cssparser-macros"
 version = "0.6.0"
-source = "git+https://github.com/servo/rust-cssparser?rev=b196a164dcbb317016d4aa6c58c13147e6045ebb#b196a164dcbb317016d4aa6c58c13147e6045ebb"
+source = "git+https://github.com/servo/rust-cssparser?rev=45bc47e2bcb846f1efb5aea156be5fe7d18624bf#45bc47e2bcb846f1efb5aea156be5fe7d18624bf"
 dependencies = [
  "quote",
  "syn",
@@ -1709,7 +1723,7 @@ dependencies = [
 [[package]]
 name = "error-support"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "error-support-macros",
  "lazy_static",
@@ -1721,7 +1735,7 @@ dependencies = [
 [[package]]
 name = "error-support-macros"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2329,7 +2343,7 @@ dependencies = [
  "audioipc-server",
  "audioipc2-client",
  "audioipc2-server",
- "authenticator",
+ "authrs_bridge",
  "b2glinuxhal",
  "binary_http",
  "bitsdownload",
@@ -2444,9 +2458,9 @@ dependencies = [
 
 [[package]]
 name = "glean"
-version = "52.3.0"
+version = "52.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa4d34f9ae46bd3e68c5bb672762e7391843daedd609506a70b6b35ac6fea051"
+checksum = "e1bd184ec51a21129cb58a1b7380250d5f71de01b3461ab3b81594e0a2322123"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -2464,7 +2478,7 @@ dependencies = [
 
 [[package]]
 name = "glean-core"
-version = "52.3.0"
+version = "52.4.2"
 dependencies = [
  "android_logger",
  "bincode",
@@ -2474,7 +2488,6 @@ dependencies = [
  "log",
  "once_cell",
  "oslog",
- "remove_dir_all",
  "rkv",
  "serde",
  "serde_json",
@@ -2540,6 +2553,7 @@ dependencies = [
 name = "golden_gate"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "atomic_refcell",
  "cstr",
  "interrupt-support",
@@ -2736,6 +2750,9 @@ version = "0.1.1"
 dependencies = [
  "base64",
  "bindgen 0.63.0",
+ "cfg-if 1.0.0",
+ "http",
+ "hyper",
  "log",
  "mio 0.6.23",
  "mio-extras",
@@ -2744,6 +2761,7 @@ dependencies = [
  "neqo-http3",
  "neqo-qpack",
  "neqo-transport",
+ "tokio 1.17.0",
 ]
 
 [[package]]
@@ -2850,7 +2868,7 @@ dependencies = [
 [[package]]
 name = "interrupt-support"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "lazy_static",
  "parking_lot 0.12.999",
@@ -2958,7 +2976,7 @@ version = "0.3.100"
 [[package]]
 name = "jsparagus"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 dependencies = [
  "jsparagus-ast",
  "jsparagus-emitter",
@@ -2972,7 +2990,7 @@ dependencies = [
 [[package]]
 name = "jsparagus-ast"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 dependencies = [
  "bumpalo",
  "indexmap",
@@ -2981,7 +2999,7 @@ dependencies = [
 [[package]]
 name = "jsparagus-emitter"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 dependencies = [
  "bumpalo",
  "byteorder",
@@ -2994,7 +3012,7 @@ dependencies = [
 [[package]]
 name = "jsparagus-generated-parser"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 dependencies = [
  "bumpalo",
  "jsparagus-ast",
@@ -3004,12 +3022,12 @@ dependencies = [
 [[package]]
 name = "jsparagus-json-log"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 
 [[package]]
 name = "jsparagus-parser"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 dependencies = [
  "arrayvec",
  "bumpalo",
@@ -3021,7 +3039,7 @@ dependencies = [
 [[package]]
 name = "jsparagus-scope"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 dependencies = [
  "indexmap",
  "jsparagus-ast",
@@ -3031,7 +3049,7 @@ dependencies = [
 [[package]]
 name = "jsparagus-stencil"
 version = "0.1.0"
-source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=688a6574cf830b4a3adaf9c5d41efc1f7dd4017f#688a6574cf830b4a3adaf9c5d41efc1f7dd4017f"
+source = "git+https://github.com/mozilla-spidermonkey/jsparagus?rev=64ba08e24749616de2344112f226d1ef4ba893ae#64ba08e24749616de2344112f226d1ef4ba893ae"
 dependencies = [
  "jsparagus-ast",
 ]
@@ -4034,7 +4052,7 @@ dependencies = [
 [[package]]
 name = "nss_build_common"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 
 [[package]]
 name = "nsstring"
@@ -5190,6 +5208,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
+name = "signal-hook-registry"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8229b473baa5980ac72ef434c4415e70c4b5e71b423043adb4ba059f89c99a1"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "siphasher"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5263,7 +5290,7 @@ dependencies = [
 [[package]]
 name = "sql-support"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "ffi-support",
  "interrupt-support",
@@ -5445,7 +5472,7 @@ dependencies = [
 [[package]]
 name = "sync-guid"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "base64",
  "rand 0.8.5",
@@ -5456,7 +5483,7 @@ dependencies = [
 [[package]]
 name = "sync15"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "anyhow",
  "error-support",
@@ -5486,7 +5513,7 @@ dependencies = [
 [[package]]
 name = "tabs"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "anyhow",
  "error-support",
@@ -5684,7 +5711,10 @@ dependencies = [
  "memchr",
  "mio 0.8.0",
  "num_cpus",
+ "once_cell",
+ "parking_lot 0.12.999",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "winapi",
@@ -6266,7 +6296,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "viaduct"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
  "ffi-support",
  "log",
@@ -6353,18 +6383,18 @@ version = "0.2.100"
 
 [[package]]
 name = "wasm-encoder"
-version = "0.23.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c3e4bc09095436c8e7584d86d33e6c3ee67045af8fb262cbb9cc321de553428"
+checksum = "4eff853c4f09eec94d76af527eddad4e9de13b11d6286a1ef7134bc30135a2b7"
 dependencies = [
  "leb128",
 ]
 
 [[package]]
 name = "wasm-smith"
-version = "0.12.2"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "411278ee8e89067a252a3a6d6d578038251f9c0a1d4c088adf4162ad13e97b04"
+checksum = "549cb78be46f43ad6746402871336cb6a989127fb847e93eb6ba0817647485a6"
 dependencies = [
  "arbitrary",
  "flagset",
@@ -6376,9 +6406,9 @@ dependencies = [
 
 [[package]]
 name = "wasmparser"
-version = "0.100.0"
+version = "0.102.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64b20236ab624147dfbb62cf12a19aaf66af0e41b8398838b66e997d07d269d4"
+checksum = "48134de3d7598219ab9eaf6b91b15d8e50d31da76b8519fe4ecfcec2cf35104b"
 dependencies = [
  "indexmap",
  "url",
@@ -6386,9 +6416,9 @@ dependencies = [
 
 [[package]]
 name = "wast"
-version = "53.0.0"
+version = "55.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8244fa24196b1d8fd3ca4a96a3a164c40f846498c5deab6caf414c67340ca4af"
+checksum = "4984d3e1406571f4930ba5cf79bd70f75f41d0e87e17506e0bd19b0e5d085f05"
 dependencies = [
  "leb128",
  "memchr",
@@ -6423,14 +6453,16 @@ dependencies = [
 [[package]]
 name = "webext-storage"
 version = "0.1.0"
-source = "git+https://github.com/mozilla/application-services?rev=fe2867dbe82a2aaa85a856648107be94b1534683#fe2867dbe82a2aaa85a856648107be94b1534683"
+source = "git+https://github.com/mozilla/application-services?rev=86c84c217036c12283d19368867323a66bf35883#86c84c217036c12283d19368867323a66bf35883"
 dependencies = [
+ "anyhow",
  "error-support",
  "ffi-support",
  "interrupt-support",
  "lazy_static",
  "log",
  "nss_build_common",
+ "parking_lot 0.12.999",
  "rusqlite",
  "serde",
  "serde_derive",
@@ -6446,6 +6478,7 @@ dependencies = [
 name = "webext_storage_bridge"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "atomic_refcell",
  "cstr",
  "golden_gate",

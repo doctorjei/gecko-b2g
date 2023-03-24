@@ -3,6 +3,10 @@
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
 import React from "react";
+import { Provider } from "react-redux";
+import configureStore from "redux-mock-store";
+import PropTypes from "prop-types";
+
 import { mount, shallow } from "enzyme";
 import { ProjectSearch } from "../ProjectSearch";
 import { statusType } from "../../reducers/project-text-search";
@@ -30,43 +34,66 @@ const context = { shortcuts };
 
 const testResults = [
   {
-    filepath: "testFilePath1",
+    location: {
+      source: {
+        url: "testFilePath1",
+      },
+    },
     type: "RESULT",
     matches: [
       {
         match: "match1",
         value: "some thing match1",
-        column: 30,
+        location: {
+          source: {},
+          column: 30,
+        },
         type: "MATCH",
       },
       {
         match: "match2",
         value: "some thing match2",
-        column: 60,
+        location: {
+          source: {},
+          column: 60,
+        },
         type: "MATCH",
       },
       {
         match: "match3",
         value: "some thing match3",
-        column: 90,
+        location: {
+          source: {},
+          column: 90,
+        },
         type: "MATCH",
       },
     ],
   },
   {
-    filepath: "testFilePath2",
+    location: {
+      source: {
+        url: "testFilePath2",
+      },
+    },
     type: "RESULT",
     matches: [
       {
         match: "match4",
         value: "some thing match4",
-        column: 80,
+        location: {
+          source: {},
+          column: 80,
+        },
         type: "MATCH",
       },
       {
         match: "match5",
         value: "some thing match5",
-        column: 40,
+        location: {
+          source: {},
+          column: 40,
+        },
         type: "MATCH",
       },
     ],
@@ -78,11 +105,20 @@ const testMatch = {
   match: "match1",
   value: "some thing match1",
   sourceId: "some-target/source42",
-  line: 3,
-  column: 30,
+  location: {
+    source: {
+      id: "some-target/source42",
+    },
+    line: 3,
+    column: 30,
+  },
 };
 
 function render(overrides = {}, mounted = false) {
+  const mockStore = configureStore([]);
+  const store = mockStore({
+    ui: { mutableSearchOptions: { "foo-search": {} } },
+  });
   const props = {
     cx: mockcx,
     status: "DONE",
@@ -100,9 +136,21 @@ function render(overrides = {}, mounted = false) {
     ...overrides,
   };
 
-  return mounted
-    ? mount(<ProjectSearch {...props} />, { context })
-    : shallow(<ProjectSearch {...props} />, { context });
+  if (mounted) {
+    return mount(
+      <Provider store={store}>
+        <ProjectSearch {...props} />
+      </Provider>,
+      { context, childContextTypes: { shortcuts: PropTypes.object } }
+    ).childAt(0);
+  }
+
+  return shallow(
+    <Provider store={store}>
+      <ProjectSearch {...props} />
+    </Provider>,
+    { context }
+  ).dive();
 }
 
 describe("ProjectSearch", () => {
@@ -226,7 +274,9 @@ describe("ProjectSearch", () => {
     component.instance().state.focusedItem = { ...testMatch };
     shortcuts.dispatch("Enter");
     expect(selectSpecificLocation).toHaveBeenCalledWith(mockcx, {
-      sourceId: "some-target/source42",
+      source: {
+        id: "some-target/source42",
+      },
       line: 3,
       column: 30,
     });

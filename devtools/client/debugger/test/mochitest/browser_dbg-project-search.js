@@ -6,6 +6,8 @@
 
 "use strict";
 
+requestLongerTimeout(3);
+
 add_task(async function testOpeningAndClosingEmptyProjectSearch() {
   const dbg = await initDebugger(
     "doc-script-switching.html",
@@ -67,6 +69,30 @@ add_task(async function testSimpleProjectSearch() {
     dbg.selectors.getSelectedSource().url.includes("script-switching-01.js"),
     "The correct source (script-switching-01.js) is selected"
   );
+});
+
+add_task(async function testMatchesForRegexSearches() {
+  const dbg = await initDebugger("doc-react.html", "App.js");
+  await openProjectSearch(dbg);
+
+  type(dbg, "import .* from 'react'");
+  await clickElement(dbg, "projectSearchModifiersRegexMatch");
+
+  await waitForSearchResults(dbg, 2);
+
+  const queryMatch = findAllElements(dbg, "fileMatch")[1].querySelector(
+    ".query-match"
+  );
+
+  is(
+    queryMatch.innerText,
+    "import React, { Component } from 'react'",
+    "The highlighted text matches the search term"
+  );
+
+  // Turn off the regex modifier so does not break tests below
+  await clickElement(dbg, "projectSearchModifiersRegexMatch");
+  await closeProjectSearch(dbg);
 });
 
 // Test expanding search results to reveal the search matches.

@@ -83,11 +83,9 @@ function PlacesController(aView) {
     "places.forgetThisSite.clearByBaseDomain",
     false
   );
-  ChromeUtils.defineModuleGetter(
-    this,
-    "ForgetAboutSite",
-    "resource://gre/modules/ForgetAboutSite.jsm"
-  );
+  ChromeUtils.defineESModuleGetters(this, {
+    ForgetAboutSite: "resource://gre/modules/ForgetAboutSite.sys.mjs",
+  });
 }
 
 PlacesController.prototype = {
@@ -716,10 +714,7 @@ PlacesController.prototype = {
     PlacesUIUtils.openMultipleLinksInTabs(
       node ? node : nodes,
       aEvent,
-      this._view,
-      this._view.id == "placesList"
-        ? PlacesSearchBox.updateHistorySearchTelemetry
-        : null
+      this._view
     );
   },
 

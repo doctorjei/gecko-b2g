@@ -531,6 +531,22 @@ void MediaFormatReader::DecoderFactory::DoInitDecoder(Data& aData) {
               DecoderBenchmark::CheckVersion(
                   ownerData.GetCurrentInfo()->mMimeType);
             }
+            if (aTrack == TrackInfo::kAudioTrack) {
+              nsCString processName = ownerData.mDecoder->GetProcessName();
+              nsCString audioProcessPerCodecName(
+                  processName + ","_ns + ownerData.mDecoder->GetCodecName());
+              if (processName != "utility"_ns) {
+                if (!StaticPrefs::media_rdd_process_enabled()) {
+                  audioProcessPerCodecName += ",rdd-disabled"_ns;
+                }
+                if (!StaticPrefs::media_utility_process_enabled()) {
+                  audioProcessPerCodecName += ",utility-disabled"_ns;
+                }
+              }
+              Telemetry::ScalarAdd(
+                  Telemetry::ScalarID::MEDIA_AUDIO_PROCESS_PER_CODEC_NAME,
+                  NS_ConvertUTF8toUTF16(audioProcessPerCodecName), 1);
+            }
           },
           [this, &aData, &ownerData](const MediaResult& aError) {
             AUTO_PROFILER_LABEL("DecoderFactory::DoInitDecoder:Rejected",

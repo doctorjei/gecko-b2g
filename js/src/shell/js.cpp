@@ -4361,7 +4361,7 @@ static bool Sleep_fn(JSContext* cx, unsigned argc, Value* vp) {
     if (!ToNumber(cx, args[0], &t_secs)) {
       return false;
     }
-    if (mozilla::IsNaN(t_secs)) {
+    if (std::isnan(t_secs)) {
       JS_ReportErrorASCII(cx, "sleep interval is not a number");
       return false;
     }
@@ -4519,7 +4519,7 @@ static void CancelExecution(JSContext* cx) {
 }
 
 static bool SetTimeoutValue(JSContext* cx, double t) {
-  if (mozilla::IsNaN(t)) {
+  if (std::isnan(t)) {
     JS_ReportErrorASCII(cx, "timeout is not a number");
     return false;
   }
@@ -6706,6 +6706,13 @@ static bool NewGlobal(JSContext* cx, unsigned argc, Value* vp) {
     }
     if (v.isBoolean()) {
       creationOptions.setDefineSharedArrayBufferConstructor(v.toBoolean());
+    }
+
+    if (!JS_GetProperty(cx, opts, "shouldResistFingerprinting", &v)) {
+      return false;
+    }
+    if (v.isBoolean()) {
+      behaviors.setShouldResistFingerprinting(v.toBoolean());
     }
   }
 
@@ -9628,11 +9635,18 @@ static bool PrintEnumeratedHelp(JSContext* cx, HandleObject obj,
         }
       }
 
-      size_t ignored = 0;
-      if (!JSString::ensureLinear(cx, v.toString())) {
+      Rooted<JSString*> inputStr(cx, v.toString());
+      if (!inputStr->ensureLinear(cx)) {
         return false;
       }
-      Rooted<JSLinearString*> input(cx, &v.toString()->asLinear());
+
+      // Execute the regular expression in |regex|'s compartment.
+      AutoRealm ar(cx, regex);
+      if (!cx->compartment()->wrap(cx, &inputStr)) {
+        return false;
+      }
+      Rooted<JSLinearString*> input(cx, &inputStr->asLinear());
+      size_t ignored = 0;
       if (!ExecuteRegExpLegacy(cx, nullptr, regex, input, &ignored, true, &v)) {
         return false;
       }

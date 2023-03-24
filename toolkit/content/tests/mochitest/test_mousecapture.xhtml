@@ -25,6 +25,16 @@ var cachedMouseDown = null;
 var previousWidth = 0, originalWidth = 0;
 var loadInWindow = false;
 
+/**
+ * We'll make sure to suppress any dragstart events and prevent them
+ * from reaching the widget layer to avoid this assertion:
+ * https://searchfox.org/mozilla-central/rev/47aea2f603cc18144afcedbd604a418f11e90f9b/widget/nsBaseDragService.cpp#341-355
+ */
+addEventListener("dragstart", e => {
+  e.preventDefault();
+  e.stopPropagation();
+});
+
 function splitterCallback(adjustment) {
   var newWidth = parseInt($("leftbox").style.width); // getBoundingClientRect().width;
   var expectedWidth = previousWidth + adjustment;
@@ -283,9 +293,9 @@ SimpleTest.waitForFocus(runTests);
   </tooltip>
 
   <hbox id="splitterbox" style="margin-top: 5px;" onmousedown="this.setCapture()">
-    <hbox id="leftbox" style="width: 100px" flex="1"/>
+    <hbox id="leftbox" style="width: 100px; flex: 1 auto"/>
     <splitter id="splitter" style="width: 5px; height: 5px"/>
-    <hbox id="rightbox" style="width: 100px" flex="1"/>
+    <hbox id="rightbox" style="width: 100px; flex: 1 auto"/>
   </hbox>
 
   <vbox id="custom"  style="width: 10px; height: 10px" onmousedown="this.setCapture(); cachedMouseDown = event;"/>

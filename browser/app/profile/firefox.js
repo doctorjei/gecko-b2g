@@ -1272,13 +1272,8 @@ pref("browser.bookmarks.editDialog.firstEditField", "namePicker");
 // The number of recently selected folders in the edit bookmarks dialog.
 pref("browser.bookmarks.editDialog.maxRecentFolders", 7);
 
-// By default the Edit Bookmark dialog is instant-apply. This feature pref will allow to
-// just save on Accept, once the project is complete.
-#ifdef NIGHTLY_BUILD
-  pref("browser.bookmarks.editDialog.delayedApply.enabled", true);
-#else
-  pref("browser.bookmarks.editDialog.delayedApply.enabled", false);
-#endif
+// Whether the Edit Bookmark dialog is delayed-apply.
+pref("browser.bookmarks.editDialog.delayedApply.enabled", true);
 
 #if defined(XP_WIN) && defined(MOZ_SANDBOX)
   // This controls the strength of the Windows content process sandbox for
@@ -1831,6 +1826,11 @@ pref("media.videocontrols.picture-in-picture.audio-toggle.enabled", true);
 pref("media.videocontrols.picture-in-picture.video-toggle.enabled", true);
 pref("media.videocontrols.picture-in-picture.video-toggle.visibility-threshold", "1.0");
 pref("media.videocontrols.picture-in-picture.keyboard-controls.enabled", true);
+#ifdef NIGHTLY_BUILD
+  pref("media.videocontrols.picture-in-picture.urlbar-button.enabled", true);
+#else
+  pref("media.videocontrols.picture-in-picture.urlbar-button.enabled", false);
+#endif
 
 // Preferences for the older translation service backed by external services. This is
 // planned to be replaced with an integration of the Firefox Translations service.
@@ -2165,9 +2165,8 @@ pref("browser.migrate.brave.enabled", true);
 pref("browser.migrate.canary.enabled", true);
 
 pref("browser.migrate.chrome.enabled", true);
-// See comments in bug 1340115 on how we got to these numbers.
+// See comments in bug 1340115 on how we got to this number.
 pref("browser.migrate.chrome.history.limit", 2000);
-pref("browser.migrate.chrome.history.maxAgeInDays", 180);
 
 pref("browser.migrate.chrome-beta.enabled", true);
 pref("browser.migrate.chrome-dev.enabled", true);
@@ -2186,9 +2185,15 @@ pref("browser.migrate.vivaldi.enabled", true);
 pref("browser.migrate.content-modal.enabled", false);
 pref("browser.migrate.content-modal.import-all.enabled", false);
 
+// The maximum age of history entries we'll import, in days.
+pref("browser.migrate.history.maxAgeInDays", 180);
+
 pref("extensions.pocket.api", "api.getpocket.com");
+pref("extensions.pocket.bffApi", "firefox-api-proxy.readitlater.com");
+pref("extensions.pocket.bffRecentSaves", true);
 pref("extensions.pocket.enabled", true);
 pref("extensions.pocket.oAuthConsumerKey", "40249-e88c401e1b1f2242d9e441c4");
+pref("extensions.pocket.oAuthConsumerKeyBff", "94110-6d5ff7a89d72c869766af0e0");
 pref("extensions.pocket.site", "getpocket.com");
 pref("extensions.pocket.onSaveRecs", true);
 pref("extensions.pocket.onSaveRecs.locales", "en-US,en-GB,en-CA");

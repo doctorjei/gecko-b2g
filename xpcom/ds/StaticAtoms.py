@@ -1039,6 +1039,7 @@ STATIC_ATOMS = [
     Atom("popover", "popover"),
     Atom("popoverhidetarget", "popoverhidetarget"),
     Atom("popovershowtarget", "popovershowtarget"),
+    Atom("popovertargetaction", "popovertargetaction"),
     Atom("popovertoggletarget", "popovertoggletarget"),
     Atom("popup", "popup"),
     Atom("popupalign", "popupalign"),
@@ -1053,6 +1054,7 @@ STATIC_ATOMS = [
     Atom("preceding", "preceding"),
     Atom("precedingSibling", "preceding-sibling"),
     Atom("prefersReducedMotion", "prefers-reduced-motion"),
+    Atom("prefersReducedTransparency", "prefers-reduced-transparency"),
     Atom("prefersColorScheme", "prefers-color-scheme"),
     Atom("prefersContrast", "prefers-contrast"),
     Atom("prefersTextSize", "prefers-text-size"),
@@ -2200,7 +2202,6 @@ STATIC_ATOMS = [
     Atom("docLevelNativeAnonymousContent", "docLevelNativeAnonymousContent"),  # bool
     Atom("paintRequestTime", "PaintRequestTime"),
     Atom("pseudoProperty", "PseudoProperty"),  # PseudoStyleType
-    Atom("scrollTimelinesProperty", "SrollTimelinesProperty"),  # ScrollTimelineSet*
     Atom("manualNACProperty", "ManualNACProperty"),  # ManualNAC*
     Atom("markerPseudoProperty", "markerPseudoProperty"),  # nsXMLElement*
     # Languages for lang-specific transforms
@@ -2446,6 +2447,7 @@ STATIC_ATOMS = [
     Atom("_moz_mathml_core_maction_and_semantics", "-moz-mathml-core-maction-and-semantics"),
     # media query for MathML Core's implementation of ms
     Atom("_moz_mathml_core_ms", "-moz-mathml-core-ms"),
+    Atom("_moz_popover_enabled", "-moz-popover-enabled"),
     # Contextual Identity / Containers
     Atom("usercontextid", "usercontextid"),
     Atom("geckoViewSessionContextId", "geckoViewSessionContextId"),

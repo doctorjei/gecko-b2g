@@ -2401,13 +2401,15 @@ nsWindow::WaylandPopupGetPositionFromLayout() {
 
   const bool isTopContextMenu = mPopupContextMenu && !mPopupAnchored;
   const bool isRTL = IsPopupDirectionRTL();
-  int8_t popupAlign(popupFrame->GetPopupAlignment());
-  int8_t anchorAlign(popupFrame->GetPopupAnchor());
-  if (isTopContextMenu) {
-    anchorAlign = POPUPALIGNMENT_BOTTOMRIGHT;
-    popupAlign = POPUPALIGNMENT_TOPLEFT;
+  const bool anchored = popupFrame->IsAnchored();
+  int8_t popupAlign = POPUPALIGNMENT_TOPLEFT;
+  int8_t anchorAlign = POPUPALIGNMENT_BOTTOMRIGHT;
+  if (anchored) {
+    // See nsMenuPopupFrame::AdjustPositionForAnchorAlign.
+    popupAlign = popupFrame->GetPopupAlignment();
+    anchorAlign = popupFrame->GetPopupAnchor();
   }
-  if (isRTL) {
+  if (isRTL && (anchored || isTopContextMenu)) {
     popupAlign = -popupAlign;
     anchorAlign = -anchorAlign;
   }
@@ -4207,6 +4209,11 @@ void nsWindow::OnEnterNotifyEvent(GdkEventCrossing* aEvent) {
     return;
   }
 
+  if (aEvent->mode == GDK_CROSSING_GRAB ||
+      aEvent->mode == GDK_CROSSING_UNGRAB) {
+    return;
+  }
+
   // Check before checking for ungrab as the button state may have
   // changed while a non-Gecko ancestor window had a pointer grab.
   DispatchMissedButtonReleases(aEvent);
@@ -4238,6 +4245,7 @@ static bool IsBogusLeaveNotifyEvent(GdkWindow* aWindow,
     const auto& desktopEnv = GetDesktopEnvironmentIdentifier();
     return desktopEnv.EqualsLiteral("fluxbox") ||   // Bug 1805939 comment 0.
            desktopEnv.EqualsLiteral("blackbox") ||  // Bug 1805939 comment 32.
+           desktopEnv.EqualsLiteral("lg3d") ||      // Bug 1820405.
            StringBeginsWith(desktopEnv, "fvwm"_ns);
   }();
 
@@ -4281,6 +4289,11 @@ void nsWindow::OnLeaveNotifyEvent(GdkEventCrossing* aEvent) {
   // leaves a foreign (plugin) child window without passing over a visible
   // portion of a Gecko window.
   if (aEvent->subwindow) {
+    return;
+  }
+
+  if (aEvent->mode == GDK_CROSSING_GRAB ||
+      aEvent->mode == GDK_CROSSING_UNGRAB) {
     return;
   }
 
@@ -8750,6 +8763,8 @@ bool nsWindow::IsAlwaysUndecoratedWindow() const {
     return true;
   }
   if (mWindowType == WindowType::Dialog &&
+      mBorderStyle != BorderStyle::Default &&
+      mBorderStyle != BorderStyle::All &&
       !(mBorderStyle & BorderStyle::Title) &&
       !(mBorderStyle & BorderStyle::ResizeH)) {
     return true;

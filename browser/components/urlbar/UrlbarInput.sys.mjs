@@ -17,6 +17,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PartnerLinkAttribution: "resource:///modules/PartnerLinkAttribution.sys.mjs",
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
   PromiseUtils: "resource://gre/modules/PromiseUtils.sys.mjs",
+  ReaderMode: "resource://gre/modules/ReaderMode.sys.mjs",
   SearchUIUtils: "resource:///modules/SearchUIUtils.sys.mjs",
   SearchUtils: "resource://gre/modules/SearchUtils.sys.mjs",
   UrlbarController: "resource:///modules/UrlbarController.sys.mjs",
@@ -34,7 +35,6 @@ ChromeUtils.defineESModuleGetters(lazy, {
 XPCOMUtils.defineLazyModuleGetters(lazy, {
   BrowserUIUtils: "resource:///modules/BrowserUIUtils.jsm",
   ObjectUtils: "resource://gre/modules/ObjectUtils.jsm",
-  ReaderMode: "resource://gre/modules/ReaderMode.jsm",
 });
 
 XPCOMUtils.defineLazyServiceGetter(
@@ -329,12 +329,17 @@ export class UrlbarInput {
    * @param {boolean} [dontShowSearchTerms]
    *        True if userTypedValue should not be overidden by search terms
    *        and false otherwise.
+   * @param {boolean} [isSameDocument]
+   *        True if the caller of setURI loaded a new document and false
+   *        otherwise (e.g. the location change was from an anchor scroll
+   *        or a pushState event).
    */
   setURI(
     uri = null,
     dueToTabSwitch = false,
     dueToSessionRestore = false,
-    dontShowSearchTerms = false
+    dontShowSearchTerms = false,
+    isSameDocument = false
   ) {
     if (!this.window.gBrowser.userTypedValue) {
       this.window.gBrowser.selectedBrowser.searchTerms = "";
@@ -363,6 +368,12 @@ export class UrlbarInput {
       if (this.window.gBrowser.selectedBrowser.searchTerms) {
         value = this.window.gBrowser.selectedBrowser.searchTerms;
         valid = !dueToSessionRestore;
+        if (!isSameDocument) {
+          Services.telemetry.scalarAdd(
+            "urlbar.persistedsearchterms.view_count",
+            1
+          );
+        }
       } else {
         uri =
           this.window.gBrowser.selectedBrowser.currentAuthPromptURI ||
@@ -630,6 +641,7 @@ export class UrlbarInput {
       // If there's a selected one-off button then load a search using
       // the button's engine.
       result = this._resultForCurrentValue;
+
       let searchString =
         (result && (result.payload.suggestion || result.payload.query)) ||
         this._lastSearchString;
@@ -679,7 +691,7 @@ export class UrlbarInput {
 
     this.controller.engagementEvent.record(event, {
       searchString: typedValue,
-      selIndex: this.view.selectedRowIndex,
+      selIndex: selectedResult?.rowIndex ?? -1,
       selType,
       provider: selectedResult?.providerName,
     });
@@ -760,6 +772,20 @@ export class UrlbarInput {
     this.setURI(null, true, false, dontShowSearchTerms);
     if (this.value && this.focused) {
       this.select();
+    }
+  }
+
+  maybeHandleRevertFromPopup(anchorElement) {
+    if (
+      anchorElement?.closest("#urlbar") &&
+      this.window.gBrowser.selectedBrowser.searchTerms &&
+      !this.window.gBrowser.userTypedValue
+    ) {
+      this.handleRevert(true);
+      Services.telemetry.scalarAdd(
+        "urlbar.persistedsearchterms.revert_by_popup_count",
+        1
+      );
     }
   }
 

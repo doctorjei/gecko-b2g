@@ -120,7 +120,7 @@ const ServiceWorkerAssistant = {
           `Skip registering activities for ${aManifestURL} because serviceworker is not defined.`
         );
       }
-      return;
+      return Promise.reject();
     }
     debug(`register ${aManifestURL}`);
 
@@ -174,29 +174,29 @@ const ServiceWorkerAssistant = {
         updateViaCache,
         state
       );
-    } else {
-      let last = this._timers.length;
-      this._timers[last] = {
-        principal,
-        scope,
-        script,
-        updateViaCache,
-        state,
-      };
-
-      return new Promise((resolve, reject) => {
-        this._timers[last].id = setTimeout(() => {
-          this._doRegisterServiceWorker(
-            principal,
-            scope,
-            script,
-            updateViaCache,
-            state
-          ).then(resolve, reject);
-          this._timers[last].isCallbackExecuted = true;
-        }, 15000);
-      });
     }
+
+    let last = this._timers.length;
+    this._timers[last] = {
+      principal,
+      scope,
+      script,
+      updateViaCache,
+      state,
+    };
+
+    return new Promise((resolve, reject) => {
+      this._timers[last].id = setTimeout(() => {
+        this._doRegisterServiceWorker(
+          principal,
+          scope,
+          script,
+          updateViaCache,
+          state
+        ).then(resolve, reject);
+        this._timers[last].isCallbackExecuted = true;
+      }, 15000);
+    });
   },
 
   unregister(aManifestURL) {
