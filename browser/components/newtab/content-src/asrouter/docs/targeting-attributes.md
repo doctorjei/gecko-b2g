@@ -31,9 +31,11 @@ Please note that some targeting attributes require stricter controls on the tele
 * [topFrecentSites](#topfrecentsites)
 * [totalBookmarksCount](#totalbookmarkscount)
 * [usesFirefoxSync](#usesfirefoxsync)
-* [isFxAEnabled](#isFxAEnabled)
-* [isFxASignedIn](#isFxASignedIn)
-* [xpinstallEnabled](#xpinstallEnabled)
+* [isFxAEnabled](#isfxaenabled)
+* [isFxASignedIn](#isfxasignedin)
+* [creditCardsSaved](#creditcardssaved)
+* [addressesSaved](#addressessaved)
+* [xpinstallEnabled](#xpinstallenabled)
 * [hasPinnedTabs](#haspinnedtabs)
 * [hasAccessedFxAPanel](#hasaccessedfxapanel)
 * [isWhatsNewPanelEnabled](#iswhatsnewpanelenabled)
@@ -57,12 +59,12 @@ Please note that some targeting attributes require stricter controls on the tele
 * [doesAppNeedPrivatePin](#doesappneedprivatepin)
 * [isBackgroundTaskMode](#isbackgroundtaskmode)
 * [backgroundTaskName](#backgroundtaskname)
-* [userPrefersReducedMotion](#userPrefersReducedMotion)
-* [colorwaysActive](#colorwaysActive)
-* [userEnabledActiveColorway](#userEnabledActiveColorway)
-* [inMr2022Holdback](#inMr2022Holdback)
-* [distributionId](#distributionId)
-* [fxViewButtonAreaType](#fxViewButtonAreaType)
+* [userPrefersReducedMotion](#userprefersreducedmotion)
+* [colorwaysActive](#colorwaysactive)
+* [userEnabledActiveColorway](#userenabledactivecolorway)
+* [inMr2022Holdback](#inmr2022holdback)
+* [distributionId](#distributionid)
+* [fxViewButtonAreaType](#fxviewbuttonareatype)
 
 ## Detailed usage
 
@@ -525,6 +527,36 @@ Is the user signed in to a Firefox Account?
 
 ```ts
 declare const isFxASignedIn: Promise<boolean>
+```
+
+### `creditCardsSaved`
+
+The number of credit cards the user has saved for Forms and Autofill.
+
+#### Examples
+```java
+creditCardsSaved > 1
+```
+
+#### Definition
+
+```ts
+declare const creditCardsSaved: Promise<number>
+```
+
+### `addressesSaved`
+
+The number of addresses the user has saved for Forms and Autofill.
+
+#### Examples
+```java
+addressesSaved > 1
+```
+
+#### Definition
+
+```ts
+declare const addressesSaved: Promise<number>
 ```
 
 ### `xpinstallEnabled`

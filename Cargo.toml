@@ -103,9 +103,6 @@ darling = { path = "build/rust/darling" }
 # Patch redox_users to an empty crate
 redox_users = { path = "build/rust/redox_users" }
 
-# Patch memmap2 0.2 to 0.3
-memmap2 = { path = "build/rust/memmap2" }
-
 # Patch getrandom 0.7 to 0.8
 rand = { path = "build/rust/rand" }
 
@@ -127,9 +124,6 @@ bindgen = { path = "build/rust/bindgen" }
 
 # Patch memoffset 0.6 to 0.7
 memoffset = { path = "build/rust/memoffset" }
-
-# Patch nom 6 to 7
-nom = { path = "build/rust/nom" }
 
 # Patch nix 0.24 to 0.25
 nix = { path = "build/rust/nix" }

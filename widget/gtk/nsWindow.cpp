@@ -3380,17 +3380,6 @@ void* nsWindow::GetNativeData(uint32_t aDataType) {
       return mGdkWindow;
     }
 
-    case NS_NATIVE_DISPLAY: {
-#ifdef MOZ_X11
-      GdkDisplay* gdkDisplay = gdk_display_get_default();
-      if (GdkIsX11Display(gdkDisplay)) {
-        return GDK_DISPLAY_XDISPLAY(gdkDisplay);
-      }
-#endif /* MOZ_X11 */
-      // Don't bother to return native display on Wayland as it's for
-      // X11 only NPAPI plugins.
-      return nullptr;
-    }
     case NS_NATIVE_SHELLWIDGET:
       return GetToplevelWidget();
 
@@ -4331,15 +4320,19 @@ Maybe<GdkWindowEdge> nsWindow::CheckResizerEdge(
       // we still want the resizers there, even when tiled.
       return true;
     }
-    if (mDrawInTitlebar) {
-      // If we show top resizers on a (non-PIP) tiled window on GNOME, it
-      // doesn't really work, since the window is "stuck" to the top and
-      // bottom, so don't show them in that case.
-      return !mIsTiled;
+    if (!mDrawInTitlebar) {
+      return false;
     }
-    // If we're not a PIP window nor drawing to the titlebar, we don't need to
-    // add resizers.
-    return false;
+    // On KDE, allow for 1 extra pixel at the top of regular windows when
+    // drawing to the titlebar. This matches the native titlebar behavior on
+    // that environment. See bug 1813554.
+    //
+    // Don't do that on GNOME (see bug 1822764). If we wanted to do this on
+    // GNOME we'd need an extra check for mIsTiled, since the window is "stuck"
+    // to the top and bottom.
+    //
+    // Other DEs are untested.
+    return mDrawInTitlebar && IsKdeDesktopEnvironment();
   }();
 
   if (!canResize) {
@@ -5987,8 +5980,10 @@ nsresult nsWindow::Create(nsIWidget* aParent, nsNativeWidget aNativeParent,
         size.height);
     gtk_window_resize(GTK_WINDOW(mShell), size.width, size.height);
   }
-
-  if (mWindowType == WindowType::Dialog) {
+  if (mIsPIPWindow) {
+    LOG("    Is PIP Window\n");
+    gtk_window_set_type_hint(GTK_WINDOW(mShell), GDK_WINDOW_TYPE_HINT_UTILITY);
+  } else if (mWindowType == WindowType::Dialog) {
     mGtkWindowRoleName = "Dialog";
 
     SetDefaultIcon();
@@ -6087,12 +6082,6 @@ nsresult nsWindow::Create(nsIWidget* aParent, nsNativeWidget aNativeParent,
     SetDefaultIcon();
 
     LOG("nsWindow::Create() Toplevel\n");
-
-    if (mIsPIPWindow) {
-      LOG("    Is PIP Window\n");
-      gtk_window_set_type_hint(GTK_WINDOW(mShell),
-                               GDK_WINDOW_TYPE_HINT_UTILITY);
-    }
 
     // each toplevel window gets its own window group
     GtkWindowGroup* group = gtk_window_group_new();

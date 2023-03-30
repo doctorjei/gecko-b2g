@@ -27,6 +27,7 @@
 #include "jit/MIRGraph.h"
 #include "jit/RangeAnalysis.h"
 #include "jit/VMFunctions.h"
+#include "jit/WarpBuilderShared.h"
 #include "js/Conversions.h"
 #include "js/experimental/JitInfo.h"  // JSJitInfo, JSTypedMethodJitInfo
 #include "js/ScalarType.h"            // js::Scalar::Type
@@ -2198,14 +2199,13 @@ bool MPhi::congruentTo(const MDefinition* ins) const {
   return congruentIfOperandsEqual(ins);
 }
 
-bool MPhi::updateForReplacement(MDefinition* def) {
+void MPhi::updateForReplacement(MPhi* other) {
   // This function is called to fix the current Phi flags using it as a
-  // replacement of the other Phi instruction |def|.
+  // replacement of the other Phi instruction |other|.
   //
   // When dealing with usage analysis, any Use will replace all other values,
   // such as Unused and Unknown. Unless both are Unused, the merge would be
   // Unknown.
-  MPhi* other = def->toPhi();
   if (usageAnalysis_ == PhiUsage::Used ||
       other->usageAnalysis_ == PhiUsage::Used) {
     usageAnalysis_ = PhiUsage::Used;
@@ -2220,7 +2220,6 @@ bool MPhi::updateForReplacement(MDefinition* def) {
                usageAnalysis_ == PhiUsage::Unknown);
     MOZ_ASSERT(usageAnalysis_ == other->usageAnalysis_);
   }
-  return true;
 }
 
 /* static */
@@ -3231,17 +3230,6 @@ void MMul::analyzeEdgeCasesBackward() {
   if (canBeNegativeZero() && !NeedNegativeZeroCheck(this)) {
     setCanBeNegativeZero(false);
   }
-}
-
-bool MMul::updateForReplacement(MDefinition* ins_) {
-  MMul* ins = ins_->toMul();
-  bool negativeZero = canBeNegativeZero() || ins->canBeNegativeZero();
-  setCanBeNegativeZero(negativeZero);
-  // Remove the imul annotation when merging imul and normal multiplication.
-  if (mode_ == Integer && ins->mode() != Integer) {
-    mode_ = Normal;
-  }
-  return true;
 }
 
 bool MMul::canOverflow() const {
@@ -7027,6 +7015,26 @@ MGetInlinedArgument* MGetInlinedArgument::New(
   ins->initOperand(0, index);
   for (uint32_t i = 0; i < argc; i++) {
     ins->initOperand(i + NumNonArgumentOperands, args->getArg(i));
+  }
+
+  return ins;
+}
+
+MGetInlinedArgument* MGetInlinedArgument::New(TempAllocator& alloc,
+                                              MDefinition* index,
+                                              const CallInfo& callInfo) {
+  MGetInlinedArgument* ins = new (alloc) MGetInlinedArgument();
+
+  uint32_t argc = callInfo.argc();
+  MOZ_ASSERT(argc <= ArgumentsObject::MaxInlinedArgs);
+
+  if (!ins->init(alloc, argc + NumNonArgumentOperands)) {
+    return nullptr;
+  }
+
+  ins->initOperand(0, index);
+  for (uint32_t i = 0; i < argc; i++) {
+    ins->initOperand(i + NumNonArgumentOperands, callInfo.getArg(i));
   }
 
   return ins;

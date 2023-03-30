@@ -39,6 +39,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   NewTabUtils: "resource://gre/modules/NewTabUtils.sys.mjs",
   OsEnvironment: "resource://gre/modules/OsEnvironment.sys.mjs",
   PageDataService: "resource:///modules/pagedata/PageDataService.sys.mjs",
+  PdfJs: "resource://pdf.js/PdfJs.sys.mjs",
   PermissionUI: "resource:///modules/PermissionUI.sys.mjs",
   PlacesBackups: "resource://gre/modules/PlacesBackups.sys.mjs",
   PlacesDBUtils: "resource://gre/modules/PlacesDBUtils.sys.mjs",
@@ -50,6 +51,7 @@ ChromeUtils.defineESModuleGetters(lazy, {
   PublicSuffixList:
     "resource://gre/modules/netwerk-dns/PublicSuffixList.sys.mjs",
   QuickSuggest: "resource:///modules/QuickSuggest.sys.mjs",
+  RFPHelper: "resource://gre/modules/RFPHelper.sys.mjs",
 
   RemoteSecuritySettings:
     "resource://gre/modules/psm/RemoteSecuritySettings.sys.mjs",
@@ -97,10 +99,8 @@ XPCOMUtils.defineLazyModuleGetters(lazy, {
 
   PageActions: "resource:///modules/PageActions.jsm",
   PageThumbs: "resource://gre/modules/PageThumbs.jsm",
-  PdfJs: "resource://pdf.js/PdfJs.jsm",
   PluralForm: "resource://gre/modules/PluralForm.jsm",
   ProcessHangMonitor: "resource:///modules/ProcessHangMonitor.jsm",
-  RFPHelper: "resource://gre/modules/RFPHelper.jsm",
   SafeBrowsing: "resource://gre/modules/SafeBrowsing.jsm",
   Sanitizer: "resource:///modules/Sanitizer.jsm",
   SaveToPocket: "chrome://pocket/content/SaveToPocket.jsm",
@@ -606,7 +606,8 @@ let JSWINDOWACTORS = {
       esModuleURI: "resource:///actors/MigrationWizardChild.sys.mjs",
       events: {
         "MigrationWizard:RequestState": { wantUntrusted: true },
-        "MigrationWizard:BeginMigration": { wantsUntrusted: true },
+        "MigrationWizard:BeginMigration": { wantUntrusted: true },
+        "MigrationWizard:RequestSafariPermissions": { wantUntrusted: true },
       },
     },
 
@@ -645,10 +646,10 @@ let JSWINDOWACTORS = {
 
   Pdfjs: {
     parent: {
-      moduleURI: "resource://pdf.js/PdfjsParent.jsm",
+      esModuleURI: "resource://pdf.js/PdfjsParent.sys.mjs",
     },
     child: {
-      moduleURI: "resource://pdf.js/PdfjsChild.jsm",
+      esModuleURI: "resource://pdf.js/PdfjsChild.sys.mjs",
     },
     allFrames: true,
   },
@@ -793,10 +794,10 @@ let JSWINDOWACTORS = {
 
   UITour: {
     parent: {
-      moduleURI: "resource:///modules/UITourParent.jsm",
+      esModuleURI: "resource:///modules/UITourParent.sys.mjs",
     },
     child: {
-      moduleURI: "resource:///modules/UITourChild.jsm",
+      esModuleURI: "resource:///modules/UITourChild.sys.mjs",
       events: {
         mozUITour: { wantUntrusted: true },
       },

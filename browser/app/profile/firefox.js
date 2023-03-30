@@ -287,11 +287,7 @@ pref("browser.shell.setDefaultPDFHandler.onlyReplaceBrowsers", true);
 // The behavior of option 3 is detailed at: http://wiki.mozilla.org/Session_Restore
 pref("browser.startup.page",                1);
 pref("browser.startup.homepage",            "about:home");
-#ifdef NIGHTLY_BUILD
 pref("browser.startup.homepage.abouthome_cache.enabled", true);
-#else
-pref("browser.startup.homepage.abouthome_cache.enabled", false);
-#endif
 pref("browser.startup.homepage.abouthome_cache.loglevel", "Warn");
 
 // Whether we should skip the homepage when opening the first-run page
@@ -988,6 +984,8 @@ pref("browser.gesture.twist.end", "cmd_gestureRotateEnd");
 #else
   pref("browser.gesture.tap", "");
 #endif
+
+pref("browser.history_swipe_animation.disabled", false);
 
 // 0: Nothing happens
 // 1: Scrolling contents
@@ -2188,8 +2186,16 @@ pref("browser.migrate.content-modal.import-all.enabled", false);
 // The maximum age of history entries we'll import, in days.
 pref("browser.migrate.history.maxAgeInDays", 180);
 
+// These following prefs are set to true if the user has at some
+// point in the past migrated one of these resource types from
+// another browser. We also attempt to transfer these preferences
+// across profile resets.
+pref("browser.migrate.interactions.bookmarks", false);
+pref("browser.migrate.interactions.history", false);
+pref("browser.migrate.interactions.passwords", false);
+
 pref("extensions.pocket.api", "api.getpocket.com");
-pref("extensions.pocket.bffApi", "firefox-api-proxy.readitlater.com");
+pref("extensions.pocket.bffApi", "firefox-api-proxy.cdn.mozilla.net");
 pref("extensions.pocket.bffRecentSaves", true);
 pref("extensions.pocket.enabled", true);
 pref("extensions.pocket.oAuthConsumerKey", "40249-e88c401e1b1f2242d9e441c4");
@@ -2456,6 +2462,10 @@ pref("devtools.gridinspector.showGridLineNumbers", false);
 pref("devtools.gridinspector.showInfiniteLines", false);
 // Max number of grid highlighters that can be displayed
 pref("devtools.gridinspector.maxHighlighters", 3);
+
+// Whether or not simplified highlighters should be used when
+// prefers-reduced-motion is enabled.
+pref("devtools.inspector.simple-highlighters-reduced-motion", false);
 
 // Whether or not the box model panel is opened in the layout view
 pref("devtools.layout.boxmodel.opened", true);
@@ -2828,4 +2838,9 @@ pref("cookiebanners.ui.desktop.cfrVariant", 0);
   pref("browser.swipe.navigation-icon-end-position", 60);
   pref("browser.swipe.navigation-icon-min-radius", 12);
   pref("browser.swipe.navigation-icon-max-radius", 20);
+#endif
+
+// Trigger FOG's Artifact Build support on artifact builds.
+#ifdef MOZ_ARTIFACT_BUILDS
+  pref("telemetry.fog.artifact_build", true);
 #endif

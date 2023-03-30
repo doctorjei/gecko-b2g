@@ -21,6 +21,8 @@ export class MigrationWizard extends HTMLElement {
   #resourceTypeList = null;
   #shadowRoot = null;
   #importButton = null;
+  #safariPermissionButton = null;
+  #selectAllCheckbox = null;
 
   static get markup() {
     return `
@@ -62,7 +64,7 @@ export class MigrationWizard extends HTMLElement {
                   <input type="checkbox" class="select-all-checkbox"/><span data-l10n-id="migration-select-all-option-label"></span>
                 </label>
                 <label id="bookmarks" data-resource-type="BOOKMARKS"/>
-                  <input type="checkbox"/><span data-l10n-id="migration-bookmarks-option-label"></span>
+                  <input type="checkbox"/><span default-data-l10n-id="migration-bookmarks-option-label" ie-edge-data-l10n-id="migration-favorites-option-label"></span>
                 </label>
                 <label id="logins-and-passwords" data-resource-type="PASSWORDS">
                   <input type="checkbox"/><span data-l10n-id="migration-logins-and-passwords-option-label"></span>
@@ -87,7 +89,7 @@ export class MigrationWizard extends HTMLElement {
             <div class="resource-progress">
               <div data-resource-type="BOOKMARKS" class="resource-progress-group">
                 <span class="progress-icon-parent"><span class="progress-icon" role="img"></span></span>
-                <span data-l10n-id="migration-bookmarks-option-label"></span>
+                <span default-data-l10n-id="migration-bookmarks-option-label" ie-edge-data-l10n-id="migration-favorites-option-label"></span>
                 <span class="success-text deemphasized-text">&nbsp;</span>
               </div>
 
@@ -112,6 +114,24 @@ export class MigrationWizard extends HTMLElement {
             <moz-button-group class="buttons">
               <button class="cancel-close" data-l10n-id="migration-cancel-button-label" disabled></button>
               <button class="primary" id="done-button" data-l10n-id="migration-done-button-label"></button>
+            </moz-button-group>
+          </div>
+
+          <div name="page-safari-password-permission">
+            <h1 data-l10n-id="migration-safari-password-import-header"></h1>
+            <span data-l10n-id="migration-safari-password-import-steps-header"></span>
+            <ol>
+              <li data-l10n-id="migration-safari-password-import-step1"></li>
+              <li data-l10n-id="migration-safari-password-import-step2"><img class="safari-icon-3dots" data-l10n-name="safari-icon-3dots"/></li>
+              <li data-l10n-id="migration-safari-password-import-step3"></li>
+              <li class="safari-icons-group">
+                <span data-l10n-id="migration-safari-password-import-step4"></span>
+                <span class="page-portrait-icon"></span>
+              </li>
+            </ol>
+            <moz-button-group class="buttons">
+              <button class="cancel-close" data-l10n-id="migration-safari-password-import-skip-button"></button>
+              <button class="primary" data-l10n-id="migration-safari-password-import-select-button"></button>
             </moz-button-group>
           </div>
 
@@ -196,6 +216,13 @@ export class MigrationWizard extends HTMLElement {
     this.#browserProfileSelector.addEventListener("click", this);
     this.#resourceTypeList = shadow.querySelector("#resource-type-list");
     this.#resourceTypeList.addEventListener("change", this);
+
+    this.#safariPermissionButton = shadow.querySelector(
+      "#safari-request-permissions"
+    );
+    this.#safariPermissionButton.addEventListener("click", this);
+
+    this.#selectAllCheckbox = shadow.querySelector("#select-all").control;
 
     this.#shadowRoot = shadow;
   }
@@ -287,6 +314,17 @@ export class MigrationWizard extends HTMLElement {
     this.#browserProfileSelector.querySelector(".profile-name").textContent =
       panelItem.profile?.name || "";
 
+    if (panelItem.brandImage) {
+      this.#browserProfileSelector.querySelector(
+        ".migrator-icon"
+      ).style.content = `url(${panelItem.brandImage})`;
+    } else {
+      this.#browserProfileSelector.querySelector(
+        ".migrator-icon"
+      ).style.content = "url(chrome://global/skin/icons/defaultFavicon.svg)";
+    }
+
+    let key = panelItem.getAttribute("key");
     let resourceTypes = panelItem.resourceTypes;
     for (let child of this.#resourceTypeList.children) {
       child.hidden = true;
@@ -300,12 +338,28 @@ export class MigrationWizard extends HTMLElement {
       if (resourceLabel) {
         resourceLabel.hidden = false;
         resourceLabel.control.checked = true;
+
+        let labelSpan = resourceLabel.querySelector(
+          "span[default-data-l10n-id]"
+        );
+        if (labelSpan) {
+          if (MigrationWizardConstants.USES_FAVORITES.includes(key)) {
+            document.l10n.setAttributes(
+              labelSpan,
+              labelSpan.getAttribute("ie-edge-data-l10n-id")
+            );
+          } else {
+            document.l10n.setAttributes(
+              labelSpan,
+              labelSpan.getAttribute("default-data-l10n-id")
+            );
+          }
+        }
       }
     }
     let selectAll = this.#shadowRoot.querySelector("#select-all").control;
     selectAll.checked = true;
     this.#displaySelectedResources();
-    this.#browserProfileSelector.selectedPanelItem = panelItem;
   }
 
   /**
@@ -335,6 +389,8 @@ export class MigrationWizard extends HTMLElement {
       opt.profile = migrator.profile;
       opt.displayName = migrator.displayName;
       opt.resourceTypes = migrator.resourceTypes;
+      opt.hasPermissions = migrator.hasPermissions;
+      opt.brandImage = migrator.brandImage;
 
       // Bug 1823489 - since the panel-list and panel-items are slotted, we
       // cannot style them directly from migration-wizard.css. We use inline
@@ -344,7 +400,11 @@ export class MigrationWizard extends HTMLElement {
       // stylesheet instead.
       let button = opt.shadowRoot.querySelector("button");
       button.style.minHeight = "40px";
-      button.style.backgroundImage = `url("chrome://global/skin/icons/defaultFavicon.svg")`;
+      if (migrator.brandImage) {
+        button.style.backgroundImage = `url(${migrator.brandImage})`;
+      } else {
+        button.style.backgroundImage = `url("chrome://global/skin/icons/defaultFavicon.svg")`;
+      }
 
       if (migrator.profile) {
         document.l10n.setAttributes(
@@ -392,6 +452,8 @@ export class MigrationWizard extends HTMLElement {
    * @param {object} state
    *   The state object passed into setState. The following properties are
    *   used:
+   * @param {string} state.key
+   *   The key of the migrator being used.
    * @param {Object<string, ProgressState>} state.progress
    *   An object whose keys match one of DISPLAYED_RESOURCE_TYPES.
    *
@@ -415,6 +477,21 @@ export class MigrationWizard extends HTMLElement {
 
       let progressIcon = group.querySelector(".progress-icon");
       let successText = group.querySelector(".success-text");
+
+      let labelSpan = group.querySelector("span[default-data-l10n-id]");
+      if (labelSpan) {
+        if (MigrationWizardConstants.USES_FAVORITES.includes(state.key)) {
+          document.l10n.setAttributes(
+            labelSpan,
+            labelSpan.getAttribute("ie-edge-data-l10n-id")
+          );
+        } else {
+          document.l10n.setAttributes(
+            labelSpan,
+            labelSpan.getAttribute("default-data-l10n-id")
+          );
+        }
+      }
 
       if (state.progress[resourceType].inProgress) {
         document.l10n.setAttributes(
@@ -477,9 +554,45 @@ export class MigrationWizard extends HTMLElement {
    * externally to perform the actual migration.
    */
   #doImport() {
+    let migrationEventDetail = this.#gatherMigrationEventDetails();
+
+    this.dispatchEvent(
+      new CustomEvent("MigrationWizard:BeginMigration", {
+        bubbles: true,
+        detail: migrationEventDetail,
+      })
+    );
+  }
+
+  /**
+   * @typedef {object} MigrationDetails
+   * @property {string} key
+   *   The key for a MigratorBase subclass.
+   * @property {object|null} profile
+   *   A representation of a browser profile. This is serialized and originally
+   *   sent down from the parent via the GetAvailableMigrators message.
+   * @property {string[]} resourceTypes
+   *   An array of resource types that the user is attempted to import. These
+   *   strings should be from MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.
+   * @property {boolean} hasPermissions
+   *   True if this MigrationWizardChild told us that the associated
+   *   MigratorBase subclass for the key has enough permission to read
+   *   the requested resources.
+   */
+
+  /**
+   * Pulls information from the DOM state of the MigrationWizard and constructs
+   * and returns an object that can be used to begin migration via and event
+   * sent to the MigrationWizardChild.
+   *
+   * @returns {MigrationDetails} details
+   */
+  #gatherMigrationEventDetails() {
     let panelItem = this.#browserProfileSelector.selectedPanelItem;
     let key = panelItem.getAttribute("key");
     let profile = panelItem.profile;
+    let hasPermissions = panelItem.hasPermissions;
+
     let resourceTypeFields = this.#resourceTypeList.querySelectorAll(
       "label[data-resource-type]"
     );
@@ -490,14 +603,25 @@ export class MigrationWizard extends HTMLElement {
       }
     }
 
+    return {
+      key,
+      profile,
+      resourceTypes,
+      hasPermissions,
+    };
+  }
+
+  /**
+   * Sends a request to gain read access to the Safari profile folder on
+   * macOS, and upon gaining access, performs a migration using the current
+   * settings as gathered by #gatherMigrationEventDetails
+   */
+  #requestSafariPermissions() {
+    let migrationEventDetail = this.#gatherMigrationEventDetails();
     this.dispatchEvent(
-      new CustomEvent("MigrationWizard:BeginMigration", {
+      new CustomEvent("MigrationWizard:RequestSafariPermissions", {
         bubbles: true,
-        detail: {
-          key,
-          profile,
-          resourceTypes,
-        },
+        detail: migrationEventDetail,
       })
     );
   }
@@ -510,13 +634,15 @@ export class MigrationWizard extends HTMLElement {
     let resourceTypeLabels = this.#resourceTypeList.querySelectorAll(
       "label:not([hidden])[data-resource-type]"
     );
+    let panelItem = this.#browserProfileSelector.selectedPanelItem;
+    let key = panelItem.getAttribute("key");
 
     let totalResources = resourceTypeLabels.length;
     let checkedResources = 0;
 
     let selectedData = this.#shadowRoot.querySelector(".selected-data");
     let selectedDataArray = [];
-    const RESOURCE_TYPE_TO_LABEL_IDS = {
+    let resourceTypeToLabelIDs = {
       [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.BOOKMARKS]:
         "migration-list-bookmark-label",
       [MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.PASSWORDS]:
@@ -527,8 +653,14 @@ export class MigrationWizard extends HTMLElement {
         "migration-list-autofill-label",
     };
 
-    let resourceTypes = Object.keys(RESOURCE_TYPE_TO_LABEL_IDS);
-    let labelIds = Object.values(RESOURCE_TYPE_TO_LABEL_IDS).map(id => {
+    if (MigrationWizardConstants.USES_FAVORITES.includes(key)) {
+      resourceTypeToLabelIDs[
+        MigrationWizardConstants.DISPLAYED_RESOURCE_TYPES.BOOKMARKS
+      ] = "migration-list-favorites-label";
+    }
+
+    let resourceTypes = Object.keys(resourceTypeToLabelIDs);
+    let labelIds = Object.values(resourceTypeToLabelIDs).map(id => {
       return { id };
     });
     let labels = await document.l10n.formatValues(labelIds);
@@ -611,21 +743,32 @@ export class MigrationWizard extends HTMLElement {
           event.target != this.#browserProfileSelectorList
         ) {
           this.#onBrowserProfileSelectionChanged(event.target);
+        } else if (event.target == this.#safariPermissionButton) {
+          this.#requestSafariPermissions();
         }
         break;
       }
       case "change": {
         if (event.target == this.#browserProfileSelector) {
           this.#onBrowserProfileSelectionChanged();
-        } else if (event.target.classList.contains("select-all-checkbox")) {
+        } else if (event.target == this.#selectAllCheckbox) {
           let checkboxes = this.#shadowRoot.querySelectorAll(
-            'label[data-resource-type] > input[type="checkbox"]'
+            'label[data-resource-type]:not([hidden]) > input[type="checkbox"]'
           );
           for (let checkbox of checkboxes) {
-            checkbox.checked = event.target.checked;
+            checkbox.checked = this.#selectAllCheckbox.checked;
           }
           this.#displaySelectedResources();
         } else {
+          let checkboxes = this.#shadowRoot.querySelectorAll(
+            'label[data-resource-type]:not([hidden]) > input[type="checkbox"]'
+          );
+
+          let allVisibleChecked = Array.from(checkboxes).every(checkbox => {
+            return checkbox.checked;
+          });
+
+          this.#selectAllCheckbox.checked = allVisibleChecked;
           this.#displaySelectedResources();
         }
         break;

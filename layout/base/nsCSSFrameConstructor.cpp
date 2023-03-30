@@ -66,7 +66,6 @@
 #include "nsIFormControl.h"
 #include "nsCSSAnonBoxes.h"
 #include "nsTextFragment.h"
-#include "nsTextBoxFrame.h"
 #include "nsIAnonymousContentCreator.h"
 #include "nsContentUtils.h"
 #include "nsIScriptError.h"
@@ -76,8 +75,6 @@
 #include "ChildIterator.h"
 #include "nsError.h"
 #include "nsLayoutUtils.h"
-#include "nsBoxFrame.h"
-#include "nsBoxLayout.h"
 #include "nsFlexContainerFrame.h"
 #include "nsGridContainerFrame.h"
 #include "RubyUtils.h"
@@ -173,6 +170,8 @@ nsIFrame* NS_NewSVGFELeafFrame(PresShell* aPresShell, ComputedStyle* aStyle);
 nsIFrame* NS_NewSVGFEImageFrame(PresShell* aPresShell, ComputedStyle* aStyle);
 nsIFrame* NS_NewSVGFEUnstyledLeafFrame(PresShell* aPresShell,
                                        ComputedStyle* aStyle);
+nsIFrame* NS_NewFileControlLabelFrame(PresShell*, ComputedStyle*);
+nsIFrame* NS_NewMiddleCroppingLabelFrame(PresShell*, ComputedStyle*);
 
 #include "mozilla/dom/NodeInfo.h"
 #include "prenv.h"
@@ -221,8 +220,8 @@ nsIFrame* NS_NewSliderFrame(PresShell* aPresShell, ComputedStyle* aStyle);
 
 nsIFrame* NS_NewScrollbarFrame(PresShell* aPresShell, ComputedStyle* aStyle);
 
-nsIFrame* NS_NewScrollbarButtonFrame(PresShell* aPresShell,
-                                     ComputedStyle* aStyle);
+nsIFrame* NS_NewScrollbarButtonFrame(PresShell*, ComputedStyle*);
+nsIFrame* NS_NewSimpleXULLeafFrame(PresShell*, ComputedStyle*);
 
 nsIFrame* NS_NewXULImageFrame(PresShell*, ComputedStyle*);
 nsIFrame* NS_NewImageFrameForContentProperty(PresShell*, ComputedStyle*);
@@ -246,10 +245,9 @@ static void AssertAnonymousFlexOrGridItemParent(const nsIFrame* aChild,
                                                 const nsIFrame* aParent) {
   MOZ_ASSERT(IsAnonymousItem(aChild), "expected an anonymous item child frame");
   MOZ_ASSERT(aParent, "expected a parent frame");
-  MOZ_ASSERT(aParent->IsFlexContainerFrame() ||
-                 aParent->IsGridContainerFrame() || aParent->IsXULBoxFrame(),
-             "anonymous items should only exist as children of "
-             "flex/grid/-moz-box container frames");
+  MOZ_ASSERT(aParent->IsFlexOrGridContainer(),
+             "anonymous items should only exist as children of flex/grid "
+             "container frames");
 }
 #else
 #  define AssertAnonymousFlexOrGridItemParent(x, y) PR_BEGIN_MACRO PR_END_MACRO
@@ -305,7 +303,7 @@ static bool IsLastContinuationForColumnContent(const nsIFrame* aFrame) {
  * lower-level descendents inside them, of course).
  */
 static bool ShouldSuppressFloatingOfDescendants(nsIFrame* aFrame) {
-  return aFrame->IsFlexOrGridContainer() || aFrame->IsXULBoxFrame() ||
+  return aFrame->IsFlexOrGridContainer() ||
          aFrame->IsFrameOfType(nsIFrame::eMathML);
 }
 
@@ -501,6 +499,33 @@ static bool ParentIsWrapperAnonBox(nsIFrame* aParent) {
     maybeAnonBox = maybeAnonBox->GetParent();
   }
   return maybeAnonBox->Style()->IsWrapperAnonBox();
+}
+
+static bool InsertSeparatorBeforeAccessKey() {
+  static bool sInitialized = false;
+  static bool sValue = false;
+  if (!sInitialized) {
+    sInitialized = true;
+
+    const char* prefName = "intl.menuitems.insertseparatorbeforeaccesskeys";
+    nsAutoString val;
+    Preferences::GetLocalizedString(prefName, val);
+    sValue = val.EqualsLiteral("true");
+  }
+  return sValue;
+}
+
+static bool AlwaysAppendAccessKey() {
+  static bool sInitialized = false;
+  static bool sValue = false;
+  if (!sInitialized) {
+    sInitialized = true;
+    const char* prefName = "intl.menuitems.alwaysappendaccesskeys";
+    nsAutoString val;
+    Preferences::GetLocalizedString(prefName, val);
+    sValue = val.EqualsLiteral("true");
+  }
+  return sValue;
 }
 
 //----------------------------------------------------------------------
@@ -1613,14 +1638,14 @@ void nsCSSFrameConstructor::CreateGeneratedContent(
         ToUpperCase(accesskey);
         nsAutoString accessKeyLabel = u"("_ns + accesskey + u")"_ns;
         if (!StringEndsWith(value, accessKeyLabel)) {
-          if (nsTextBoxFrame::InsertSeparatorBeforeAccessKey() &&
-              !value.IsEmpty() && !NS_IS_SPACE(value.Last())) {
+          if (InsertSeparatorBeforeAccessKey() && !value.IsEmpty() &&
+              !NS_IS_SPACE(value.Last())) {
             value.Append(' ');
           }
           value.Append(accessKeyLabel);
         }
       };
-      if (nsTextBoxFrame::AlwaysAppendAccessKey()) {
+      if (AlwaysAppendAccessKey()) {
         AppendAccessKeyLabel();
         RefPtr c = CreateGenConTextNode(aState, value, nullptr);
         aAddChild(c);
@@ -2291,8 +2316,7 @@ static inline bool NeedFrameFor(const nsFrameConstructorState& aState,
   // white-space, where we know we'll be dropping them all anyway, and involve
   // an extra walk down the frame construction item list.
   auto excludesIgnorableWhitespace = [](nsIFrame* aParentFrame) {
-    return aParentFrame->IsFrameOfType(nsIFrame::eXULBox) ||
-           aParentFrame->IsFrameOfType(nsIFrame::eMathML);
+    return aParentFrame->IsFrameOfType(nsIFrame::eMathML);
   };
   if (!aParentFrame || !excludesIgnorableWhitespace(aParentFrame) ||
       aParentFrame->IsGeneratedContentFrame() || !aChildContent->IsText()) {
@@ -2479,15 +2503,10 @@ nsIFrame* nsCSSFrameConstructor::ConstructDocElementFrame(
         state, item, mDocElementContainingBlock, display, frameList));
   } else if (display->mDisplay == StyleDisplay::Flex ||
              display->mDisplay == StyleDisplay::WebkitBox ||
-             display->mDisplay == StyleDisplay::Grid ||
-             display->mDisplay == StyleDisplay::MozBox) {
+             display->mDisplay == StyleDisplay::Grid) {
     auto func = [&] {
       if (display->mDisplay == StyleDisplay::Grid) {
         return NS_NewGridContainerFrame;
-      }
-      if (display->mDisplay == StyleDisplay::MozBox &&
-          !computedStyle->StyleVisibility()->EmulateMozBoxWithFlex()) {
-        return NS_NewBoxFrame;
       }
       return NS_NewFlexContainerFrame;
     }();
@@ -2643,8 +2662,7 @@ void nsCSSFrameConstructor::SetUpDocElementContainingBlock(
         nsHTMLScrollFrame (if needed)
           nsCanvasFrame [abs-cb]
             root element frame (nsBlockFrame, SVGOuterSVGFrame,
-                                nsTableWrapperFrame, nsPlaceholderFrame,
-                                nsBoxFrame)
+                                nsTableWrapperFrame, nsPlaceholderFrame)
 
   Print presentation, non-XUL
 
@@ -3459,6 +3477,15 @@ nsCSSFrameConstructor::FindHTMLData(const Element& aElement,
                        PseudoStyleType::fieldsetContent ||
                    aParentFrame->GetParent()->IsFieldSetFrame(),
                "Unexpected parent for fieldset content anon box");
+
+  if (aElement.IsInNativeAnonymousSubtree() &&
+      aElement.NodeInfo()->NameAtom() == nsGkAtoms::label &&
+      aParentFrame->IsFileControlFrame()) {
+    static constexpr FrameConstructionData sFileLabelData(
+        NS_NewFileControlLabelFrame);
+    return &sFileLabelData;
+  }
+
   static constexpr FrameConstructionDataByTag sHTMLData[] = {
       SIMPLE_TAG_CHAIN(img, nsCSSFrameConstructor::FindImgData),
       SIMPLE_TAG_CHAIN(mozgeneratedcontentimage,
@@ -4136,8 +4163,11 @@ nsCSSFrameConstructor::FindXULTagData(const Element& aElement,
       SIMPLE_XUL_CREATE(editor, NS_NewSubDocumentFrame),
       SIMPLE_XUL_CREATE(browser, NS_NewSubDocumentFrame),
       SIMPLE_XUL_CREATE(splitter, NS_NewSplitterFrame),
-      SIMPLE_XUL_CREATE(slider, NS_NewSliderFrame),
       SIMPLE_XUL_CREATE(scrollbar, NS_NewScrollbarFrame),
+      SIMPLE_XUL_CREATE(slider, NS_NewSliderFrame),
+      SIMPLE_XUL_CREATE(thumb, NS_NewSimpleXULLeafFrame),
+      SIMPLE_XUL_CREATE(scrollcorner, NS_NewSimpleXULLeafFrame),
+      SIMPLE_XUL_CREATE(resizer, NS_NewSimpleXULLeafFrame),
       SIMPLE_XUL_CREATE(scrollbarbutton, NS_NewScrollbarButtonFrame),
       {nsGkAtoms::panel, kPopupData},
       {nsGkAtoms::menupopup, kPopupData},
@@ -4162,9 +4192,9 @@ nsCSSFrameConstructor::FindXULLabelOrDescriptionData(const Element& aElement,
     return nullptr;
   }
 
-  static constexpr FrameConstructionData sXULTextBoxData =
-      SIMPLE_XUL_FCDATA(NS_NewTextBoxFrame);
-  return &sXULTextBoxData;
+  static constexpr FrameConstructionData sMiddleCroppingData =
+      SIMPLE_XUL_FCDATA(NS_NewMiddleCroppingLabelFrame);
+  return &sMiddleCroppingData;
 }
 
 #ifdef XP_MACOSX
@@ -4301,7 +4331,6 @@ void nsCSSFrameConstructor::BuildScrollFrame(nsFrameConstructorState& aState,
 
 const nsCSSFrameConstructor::FrameConstructionData*
 nsCSSFrameConstructor::FindDisplayData(const nsStyleDisplay& aDisplay,
-                                       const StyleMozBoxLayout aMozBoxLayout,
                                        const Element& aElement) {
   static_assert(eParentTypeCount < (1 << (32 - FCDATA_PARENT_TYPE_OFFSET)),
                 "Check eParentTypeCount should not overflow");
@@ -4310,8 +4339,7 @@ nsCSSFrameConstructor::FindDisplayData(const nsStyleDisplay& aDisplay,
   // block-level.
   NS_ASSERTION(
       !(aDisplay.IsFloatingStyle() || aDisplay.IsAbsolutelyPositionedStyle()) ||
-          aDisplay.IsBlockOutsideStyle() ||
-          aDisplay.DisplayOutside() == StyleDisplayOutside::XUL,
+          aDisplay.IsBlockOutsideStyle(),
       "Style system did not apply CSS2.1 section 9.7 fixups");
 
   // If this is "body", try propagating its scroll style to the viewport
@@ -4441,23 +4469,6 @@ nsCSSFrameConstructor::FindDisplayData(const nsStyleDisplay& aDisplay,
           &nsCSSFrameConstructor::ConstructTableCell,
           FCDATA_IS_TABLE_PART | FCDATA_DESIRED_PARENT_TYPE_TO_BITS(eTypeRow));
       return &data;
-    }
-    case StyleDisplayInside::MozBox: {
-      if (!aElement.IsInNativeAnonymousSubtree() &&
-          aElement.OwnerDoc()->IsContentDocument()) {
-        aElement.OwnerDoc()->WarnOnceAbout(
-            DeprecatedOperations::eMozBoxOrInlineBoxDisplay);
-      }
-
-      // If we're emulating -moz-box with flexbox, then treat it as non-XUL and
-      // fall through.
-      if (aMozBoxLayout == StyleMozBoxLayout::Legacy) {
-        static constexpr FrameConstructionData data =
-            SCROLLABLE_ABSPOS_CONTAINER_XUL_FCDATA(
-                ToCreationFunc(NS_NewBoxFrame));
-        return &data;
-      }
-      [[fallthrough]];
     }
     case StyleDisplayInside::Flex:
     case StyleDisplayInside::WebkitBox: {
@@ -5246,7 +5257,6 @@ nsCSSFrameConstructor::FindElementData(const Element& aElement,
     return &sImgData;
   }
 
-  const auto boxLayout = aStyle.StyleVisibility()->mMozBoxLayout;
   const bool shouldBlockify = aFlags.contains(ItemFlag::IsForRenderedLegend) ||
                               aFlags.contains(ItemFlag::IsForOutsideMarker);
   if (shouldBlockify && !aStyle.StyleDisplay()->IsBlockOutsideStyle()) {
@@ -5256,11 +5266,11 @@ nsCSSFrameConstructor::FindElementData(const Element& aElement,
     uint16_t rawDisplayValue =
         Servo_ComputedValues_BlockifiedDisplay(&aStyle, isRootElement);
     display.mDisplay = StyleDisplay(rawDisplayValue);
-    return FindDisplayData(display, boxLayout, aElement);
+    return FindDisplayData(display, aElement);
   }
 
   const auto& display = *aStyle.StyleDisplay();
-  return FindDisplayData(display, boxLayout, aElement);
+  return FindDisplayData(display, aElement);
 }
 
 const nsCSSFrameConstructor::FrameConstructionData*
@@ -8681,8 +8691,7 @@ void nsCSSFrameConstructor::CreateNeededAnonFlexOrGridItems(
     return;
   }
 
-  if (!aParentFrame->IsFlexOrGridContainer() &&
-      !aParentFrame->IsXULBoxFrame()) {
+  if (!aParentFrame->IsFlexOrGridContainer()) {
     return;
   }
 
@@ -9309,8 +9318,7 @@ void nsCSSFrameConstructor::CreateNeededPseudoSiblings(
  */
 static bool FrameWantsToBeInAnonymousItem(const nsIFrame* aContainerFrame,
                                           const nsIFrame* aFrame) {
-  MOZ_ASSERT(aContainerFrame->IsFlexOrGridContainer() ||
-             aContainerFrame->IsXULBoxFrame());
+  MOZ_ASSERT(aContainerFrame->IsFlexOrGridContainer());
 
   // Any line-participant frames (e.g. text) definitely want to be wrapped in
   // an anonymous flex/grid item.
@@ -9332,8 +9340,7 @@ static bool FrameWantsToBeInAnonymousItem(const nsIFrame* aContainerFrame,
 static void VerifyGridFlexContainerChildren(nsIFrame* aParentFrame,
                                             const nsFrameList& aChildren) {
 #ifdef DEBUG
-  if (!aParentFrame->IsFlexOrGridContainer() &&
-      !aParentFrame->IsXULBoxFrame()) {
+  if (!aParentFrame->IsFlexOrGridContainer()) {
     return;
   }
 
@@ -9493,10 +9500,17 @@ inline void nsCSSFrameConstructor::ConstructFramesFromItemList(
   VerifyGridFlexContainerChildren(aParentFrame, aFrameList);
 
   // Calculate and propagate page-name values for each frame in the frame list.
-  // This will be affected by https://bugzilla.mozilla.org/1782597
+  // We do not want to compute and propagate page-name values from frames that
+  // are children of any subclasses of block frames, but not actually a block
+  // frame. The page-name property does not apply to frames which cannot create
+  // class A breakpoints (currently no subclass of BlockFrame can). Because the
+  // property does not apply, those children also cannot propagate page-name
+  // values.
+  // This assumption helps avoid unnecessarily handling page-names for frames
+  // such as form controls, which also avoids bug 1819468.
   if (aState.mPresContext->IsPaginated() &&
       StaticPrefs::layout_css_named_pages_enabled() &&
-      aParentFrame->IsBlockFrameOrSubclass()) {
+      aParentFrame->IsBlockFrame()) {
     // Set the start/end page values while iterating the frame list, to walk
     // up the frame tree only once after iterating the frame list.
     // This also avoids extra property lookups on these frames.
@@ -9581,7 +9595,7 @@ inline void nsCSSFrameConstructor::ConstructFramesFromItemList(
       // frame that is not a block frame.
       for (nsContainerFrame* ancestorFrame = aParentFrame;
            (startPageValue || endPageValue) && ancestorFrame &&
-           ancestorFrame->IsBlockFrameOrSubclass();
+           ancestorFrame->IsBlockFrame();
            ancestorFrame = ancestorFrame->GetParent()) {
         MOZ_ASSERT(!ancestorFrame->GetPrevInFlow(),
                    "Should not have fragmentation yet");
@@ -9772,9 +9786,6 @@ void nsCSSFrameConstructor::ProcessChildren(
   ConstructFramesFromItemList(aState, itemsToConstruct, aFrame,
                               /* aParentIsWrapperAnonBox = */ false,
                               aFrameList);
-
-  NS_ASSERTION(!allowFirstPseudos || !aFrame->IsXULBoxFrame(),
-               "can't be both block and box");
 
   if (listItem) {
     if (auto* markerFrame = nsLayoutUtils::GetMarkerFrame(aContent)) {
@@ -11328,10 +11339,10 @@ bool nsCSSFrameConstructor::WipeContainingBlock(
 
   nsIFrame* nextSibling = ::GetInsertNextSibling(aFrame, aPrevSibling);
 
-  // Situation #2 is a flex / grid / XUL box container frame into which we're
-  // inserting new inline non-replaced children, adjacent to an existing
-  // anonymous flex or grid item.
-  if (aFrame->IsFlexOrGridContainer() || aFrame->IsXULBoxFrame()) {
+  // Situation #2 is a flex / grid  container frame into which we're inserting
+  // new inline non-replaced children, adjacent to an existing anonymous flex or
+  // grid item.
+  if (aFrame->IsFlexOrGridContainer()) {
     FCItemIterator iter(aItems);
 
     // Check if we're adding to-be-wrapped content right *after* an existing

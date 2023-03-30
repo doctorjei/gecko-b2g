@@ -5724,10 +5724,14 @@ void HTMLInputElement::ShowPicker(ErrorResult& aRv) {
     return;
   }
 
-  if (IsDateTimeInputType(mType) && IsInComposedDoc()) {
-    DateTimeValue value;
-    GetDateTimeInputBoxValue(value);
-    OpenDateTimePicker(value);
+  if (CreatesDateTimeWidget() && IsInComposedDoc()) {
+    if (RefPtr<Element> dateTimeBoxElement = GetDateTimeBoxElement()) {
+      // Event is dispatched to closed-shadow tree and doesn't bubble.
+      RefPtr<Document> doc = dateTimeBoxElement->OwnerDoc();
+      nsContentUtils::DispatchTrustedEvent(doc, dateTimeBoxElement,
+                                           u"MozDateTimeShowPickerForJS"_ns,
+                                           CanBubble::eNo, Cancelable::eNo);
+    }
   }
 }
 
@@ -6874,6 +6878,20 @@ bool HTMLInputElement::HasCachedSelection() {
 
 void HTMLInputElement::SetRevealPassword(bool aValue) {
   if (NS_WARN_IF(mType != FormControlType::InputPassword)) {
+    return;
+  }
+  if (aValue == State().HasState(ElementState::REVEALED)) {
+    return;
+  }
+  RefPtr doc = OwnerDoc();
+  // We allow chrome code to prevent this. This is important for about:logins,
+  // which may need to run some OS-dependent authentication code before
+  // revealing the saved passwords.
+  bool defaultAction = true;
+  nsContentUtils::DispatchEventOnlyToChrome(
+      doc, ToSupports(this), u"MozWillToggleReveal"_ns, CanBubble::eYes,
+      Cancelable::eYes, &defaultAction);
+  if (NS_WARN_IF(!defaultAction)) {
     return;
   }
   if (aValue) {

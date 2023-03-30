@@ -824,7 +824,7 @@ async function selectSource(dbg, url, line, column) {
     createLocation({ source, line, column }),
     { keepContext: false }
   );
-  return waitForSelectedSource(dbg, url);
+  return waitForSelectedSource(dbg, source);
 }
 
 async function closeTab(dbg, url) {
@@ -1364,6 +1364,7 @@ const keyMappings = {
     code: "VK_F11",
     modifiers: { shiftKey: true },
   },
+  Backspace: { code: "VK_BACK_SPACE" },
 };
 
 /**
@@ -1666,6 +1667,7 @@ const selectors = {
   logPointInSecPane: ".breakpoint.is-log",
   searchField: ".search-field",
   blackbox: ".action.black-box",
+  projectSearchSearchInput: ".project-text-search .search-field input",
   projectSearchCollapsed: ".project-text-search .arrow:not(.expanded)",
   projectSearchExpandedResults: ".project-text-search .result",
   projectSearchFileResults: ".project-text-search .file-result",
@@ -1692,6 +1694,7 @@ const selectors = {
   previewPopupObjectObject: ".preview-popup .objectBox-object",
   sourceTreeRootNode: ".sources-panel .node .window",
   sourceTreeFolderNode: ".sources-panel .node .folder",
+  excludePatternsInput: ".project-text-search .exclude-patterns-field input",
 };
 
 function getSelector(elementName, ...args) {
@@ -1794,6 +1797,18 @@ function rightClickEl(dbg, el) {
   const doc = dbg.win.document;
   el.scrollIntoView();
   EventUtils.synthesizeMouseAtCenter(el, { type: "contextmenu" }, dbg.win);
+}
+
+async function clearElement(dbg, elementName) {
+  await clickElement(dbg, elementName);
+  await pressKey(dbg, "End");
+  const selector = getSelector(elementName);
+  const el = findElementWithSelector(dbg, getSelector(elementName));
+  let len = el.value.length;
+  while (len) {
+    pressKey(dbg, "Backspace");
+    len--;
+  }
 }
 
 async function clickGutter(dbg, line) {
@@ -2472,6 +2487,7 @@ function openProjectSearch(dbg) {
  * @return {Array} List of search results element nodes
  */
 async function doProjectSearch(dbg, searchTerm) {
+  await clearElement(dbg, "projectSearchSearchInput");
   type(dbg, searchTerm);
   pressKey(dbg, "Enter");
   return waitForSearchResults(dbg);
@@ -2494,18 +2510,6 @@ async function waitForSearchResults(dbg, expectedResults) {
     );
   }
   return findAllElements(dbg, "projectSearchFileResults");
-}
-
-/**
- * Closes the project search panel
- *
- * @param {Object} dbg
- * @return {Boolean} When the panel closes
- */
-function closeProjectSearch(dbg) {
-  info("Closing the project search panel");
-  synthesizeKeyShortcut("CmdOrCtrl+Shift+F");
-  return waitForState(dbg, state => !dbg.selectors.getActiveSearch());
 }
 
 /**

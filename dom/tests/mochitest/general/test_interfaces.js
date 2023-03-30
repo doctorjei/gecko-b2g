@@ -255,6 +255,8 @@ let interfaceNamesInGlobalScope = [
   // IMPORTANT: Do not change this list without review from a DOM peer!
   { name: "CompositionEvent", insecureContext: true },
   // IMPORTANT: Do not change this list without review from a DOM peer!
+  { name: "CompressionStream", insecureContext: true },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
   { name: "ConstantSourceNode", insecureContext: true },
   // IMPORTANT: Do not change this list without review from a DOM peer!
   {
@@ -332,6 +334,8 @@ let interfaceNamesInGlobalScope = [
   { name: "CustomElementRegistry", insecureContext: true },
   // IMPORTANT: Do not change this list without review from a DOM peer!
   { name: "CustomEvent", insecureContext: true },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
+  { name: "DecompressionStream", insecureContext: true },
   // IMPORTANT: Do not change this list without review from a DOM peer!
   { name: "DataTransfer", insecureContext: true },
   // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -1379,6 +1383,42 @@ let interfaceNamesInGlobalScope = [
   { name: "WebKitCSSMatrix", insecureContext: true },
   // IMPORTANT: Do not change this list without review from a DOM peer!
   { name: "WebSocket", insecureContext: true },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
+  {
+    name: "WebTransport",
+    insecureContext: false,
+    nightly: true,
+  },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
+  {
+    name: "WebTransportBidirectionalStream",
+    insecureContext: false,
+    nightly: true,
+  },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
+  {
+    name: "WebTransportDatagramDuplexStream",
+    insecureContext: false,
+    nightly: true,
+  },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
+  {
+    name: "WebTransportError",
+    insecureContext: false,
+    nightly: true,
+  },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
+  {
+    name: "WebTransportReceiveStream",
+    insecureContext: false,
+    nightly: true,
+  },
+  // IMPORTANT: Do not change this list without review from a DOM peer!
+  {
+    name: "WebTransportSendStream",
+    insecureContext: false,
+    nightly: true,
+  },
   // IMPORTANT: Do not change this list without review from a DOM peer!
   { name: "WheelEvent", insecureContext: true },
   // IMPORTANT: Do not change this list without review from a DOM peer!
