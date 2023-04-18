@@ -139,6 +139,7 @@ android::binder::Status PnoScanEventService::OnPnoScanFailed() {
   return android::binder::Status::ok();
 }
 
+#if ANDROID_VERSION <= 29
 android::binder::Status PnoScanEventService::OnPnoScanOverOffloadStarted() {
   return android::binder::Status::ok();
 }
@@ -147,3 +148,4 @@ android::binder::Status PnoScanEventService::OnPnoScanOverOffloadFailed(
     int32_t reason) {
   return android::binder::Status::ok();
 }
+#endif
