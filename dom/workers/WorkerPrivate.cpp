@@ -5955,7 +5955,8 @@ WorkerPrivate::EventTarget::IsOnCurrentThread(bool* aIsOnCurrentThread) {
   MutexAutoLock lock(mMutex);
 
   if (mShutdown) {
-    NS_WARNING("A worker's event target was used after the worker has !");
+    NS_WARNING(
+        "A worker's event target was used after the worker has shutdown!");
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -5972,7 +5973,8 @@ WorkerPrivate::EventTarget::IsOnCurrentThreadInfallible() {
   MutexAutoLock lock(mMutex);
 
   if (mShutdown) {
-    NS_WARNING("A worker's event target was used after the worker has !");
+    NS_WARNING(
+        "A worker's event target was used after the worker has shutdown!");
     return false;
   }
 

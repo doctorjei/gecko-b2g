@@ -245,7 +245,7 @@ if test "$GNU_CC"; then
                   LDFLAGS=$_SAVE_LDFLAGS)
 
     # While sha1 is deterministic, it is slower.
-    if test -z "$DEVELOPER_OPTIONS" -o "$OS_TARGET" = "Android"; then
+    if test -z "$DEVELOPER_OPTIONS"; then
         build_id=sha1
     else
         build_id=uuid
@@ -602,14 +602,8 @@ MOZ_CXX11
 
 AC_LANG_C
 
-case "${OS_TARGET}" in
-Darwin)
-  ;;
-*)
-  STL_FLAGS="-I${DIST}/stl_wrappers"
-  WRAP_STL_INCLUDES=1
-  ;;
-esac
+STL_FLAGS="-I${DIST}/stl_wrappers"
+WRAP_STL_INCLUDES=1
 
 if test "$MOZ_BUILD_APP" = "tools/crashreporter/injector"; then
     WRAP_STL_INCLUDES=
