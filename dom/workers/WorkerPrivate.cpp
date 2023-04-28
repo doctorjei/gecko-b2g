@@ -5364,6 +5364,10 @@ void WorkerPrivate::SetCCCollectedAnything(bool collectedAnything) {
   mWorkerThreadAccessible.Access()->mCCCollectedAnything = collectedAnything;
 }
 
+bool WorkerPrivate::isLastCCCollectedAnything() {
+  return mWorkerThreadAccessible.Access()->mCCCollectedAnything;
+}
+
 void WorkerPrivate::GarbageCollectInternal(JSContext* aCx, bool aShrinking,
                                            bool aCollectChildren) {
   // Perform GC followed by CC (the CC is triggered by
