@@ -4,23 +4,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-"use strict";
-
-this.EXPORTED_SYMBOLS = ["WifiApi"];
-
-const { XPCOMUtils } = ChromeUtils.import(
-  "resource://gre/modules/XPCOMUtils.jsm"
-);
-
 const lazy = {};
 
-XPCOMUtils.defineLazyModuleGetters(lazy, {
-  Subprocess: "resource://gre/modules/Subprocess.jsm",
+ChromeUtils.defineESModuleGetters(lazy, {
+  Subprocess: "resource://gre/modules/Subprocess.sys.mjs",
 });
 
-const { clearInterval, setInterval } = ChromeUtils.import(
-  "resource://gre/modules/Timer.jsm"
-);
+import {
+  clearInterval,
+  setInterval,
+} from "resource://gre/modules/Timer.sys.mjs";
 
 const kXpcomShutdownChangedTopic = "xpcom-shutdown";
 const kScreenStateChangedTopic = "screen-state-changed";
@@ -110,7 +103,7 @@ class NetworkManager {
     for (let line of lines) {
       // Each line is a set of ':' separated fields. However since fields can include
       // escaped ':' characters we can't just split() them.
-      if (line.length > 0) {
+      if (line.length) {
         let parsed = this.parseNmOutput(line);
         if (labels) {
           let obj = {};
@@ -152,7 +145,7 @@ class NetworkManager {
     let res = [];
     for (let network of networks) {
       // Filter out non-wifi connections.
-      if (network.name.length == 0 || network.type !== "802-11-wireless") {
+      if (!network.name.length || network.type !== "802-11-wireless") {
         continue;
       }
 
@@ -194,7 +187,7 @@ class NetworkManager {
     let res = [];
     for (let network of networks) {
       // Convert the NetworkManager strings into valid WifiNetwork properties when needed.
-      if (network.ssid.length == 0) {
+      if (!network.ssid.length) {
         continue;
       }
 
@@ -238,7 +231,7 @@ class NetworkManager {
     let status = res[0];
     this.log(`associate status: ${status}`);
     if (status.startsWith("Error:")) {
-      throw false;
+      throw new Error(false);
     } else {
       return true;
     }
@@ -266,7 +259,7 @@ class NetworkManager {
   }
 }
 
-class WifiApi {
+export class WifiApi {
   constructor() {
     this.log(`constructor`);
 
@@ -403,7 +396,7 @@ class WifiApi {
         return {
           enabled: this.nm.enabled,
         };
-        break;
+      // break;
 
       case "WifiManager:setWifiEnabled":
         this.relayCommand(message.name, "setEnabled", msg);
@@ -436,6 +429,7 @@ class WifiApi {
         kScanInterval
       );
     }
+    return true;
   }
 
   async relayCommand(message, command, msg) {
