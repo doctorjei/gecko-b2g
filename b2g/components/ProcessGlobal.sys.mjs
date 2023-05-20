@@ -317,10 +317,10 @@ ProcessGlobal.prototype = {
 
       AboutReader: {
         parent: {
-          moduleURI: "resource://gre/actors/AboutReaderParent.jsm",
+          esModuleURI: "resource://gre/actors/AboutReaderParent.sys.mjs",
         },
         child: {
-          moduleURI: "resource://gre/actors/AboutReaderChild.jsm",
+          esModuleURI: "resource://gre/actors/AboutReaderChild.sys.mjs",
           events: {
             DOMContentLoaded: {},
             pageshow: { mozSystemGroup: true },

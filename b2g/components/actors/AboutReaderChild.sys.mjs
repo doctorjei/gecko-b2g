@@ -2,27 +2,16 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-"use strict";
 
-var EXPORTED_SYMBOLS = ["AboutReaderChild"];
+const lazy = {};
 
-ChromeUtils.defineModuleGetter(
-  this,
-  "AboutReader",
-  "resource://gre/modules/AboutReader.jsm"
-);
-ChromeUtils.defineModuleGetter(
-  this,
-  "ReaderMode",
-  "resource://gre/modules/ReaderMode.jsm"
-);
-ChromeUtils.defineModuleGetter(
-  this,
-  "Readerable",
-  "resource://gre/modules/Readerable.jsm"
-);
+ChromeUtils.defineESModuleGetters(lazy, {
+  AboutReader: "resource://gre/modules/AboutReader.sys.mjs",
+  ReaderMode: "resource://gre/modules/ReaderMode.sys.mjs",
+  Readerable: "resource://gre/modules/Readerable.sys.mjs",
+});
 
-class AboutReaderChild extends JSWindowActorChild {
+export class AboutReaderChild extends JSWindowActorChild {
   constructor() {
     super();
 
@@ -47,8 +36,8 @@ class AboutReaderChild extends JSWindowActorChild {
     switch (message.name) {
       case "Reader:ToggleReaderMode":
         if (!this.isAboutReader) {
-          this._articlePromise = ReaderMode.parseDocument(this.document).catch(
-            Cu.reportError
+          this._articlePromise = lazy.ReaderMode.parseDocument(this.document).catch(
+            console.error
           );
 
           // Get the article data and cache it in the parent process. The reader mode
@@ -65,11 +54,11 @@ class AboutReaderChild extends JSWindowActorChild {
         this.updateReaderButton(!!(message.data && message.data.isArticle));
         break;
       case "Reader:EnterReaderMode": {
-        ReaderMode.enterReaderMode(this.docShell, this.contentWindow);
+        lazy.ReaderMode.enterReaderMode(this.docShell, this.contentWindow);
         break;
       }
       case "Reader:LeaveReaderMode": {
-        ReaderMode.leaveReaderMode(this.docShell, this.contentWindow);
+        lazy.ReaderMode.leaveReaderMode(this.docShell, this.contentWindow);
         break;
       }
     }
@@ -114,7 +103,7 @@ class AboutReaderChild extends JSWindowActorChild {
 
           // Update the toolbar icon to show the "reader active" icon.
           this.sendAsyncMessage("Reader:UpdateReaderButton");
-          this._reader = new AboutReader(this, this._articlePromise);
+          this._reader = new lazy.AboutReader(this, this._articlePromise);
           this._articlePromise = null;
         }
         break;
@@ -156,11 +145,11 @@ class AboutReaderChild extends JSWindowActorChild {
 
   canDoReadabilityCheck() {
     return (
-      Readerable.isEnabledForParseOnLoad &&
+      lazy.Readerable.isEnabledForParseOnLoad &&
       !this.isAboutReader &&
       this.contentWindow &&
       this.contentWindow.windowRoot &&
-      this.document instanceof this.contentWindow.HTMLDocument &&
+      this.contentWindow.HTMLDocument.isInstance(this.document) &&
       !this.document.mozSyntheticDocument
     );
   }
@@ -224,8 +213,8 @@ class AboutReaderChild extends JSWindowActorChild {
     // Only send updates when there are articles; there's no point updating with
     // |false| all the time.
     if (
-      Readerable.shouldCheckUri(document.baseURIObject, true) &&
-      Readerable.isProbablyReaderable(document)
+      lazy.Readerable.shouldCheckUri(document.baseURIObject, true) &&
+      lazy.Readerable.isProbablyReaderable(document)
     ) {
       this.sendAsyncMessage("Reader:UpdateReaderButton", {
         isArticle: true,
