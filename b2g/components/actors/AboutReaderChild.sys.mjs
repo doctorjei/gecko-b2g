@@ -36,9 +36,9 @@ export class AboutReaderChild extends JSWindowActorChild {
     switch (message.name) {
       case "Reader:ToggleReaderMode":
         if (!this.isAboutReader) {
-          this._articlePromise = lazy.ReaderMode.parseDocument(this.document).catch(
-            console.error
-          );
+          this._articlePromise = lazy.ReaderMode.parseDocument(
+            this.document
+          ).catch(console.error);
 
           // Get the article data and cache it in the parent process. The reader mode
           // page will retrieve it when it has loaded.

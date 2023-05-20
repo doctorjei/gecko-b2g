@@ -237,10 +237,9 @@ export class AboutReaderParent extends JSWindowActorParent {
   /**
    * Gets an article for a given URL. This method will download and parse a document.
    *
-   * @param url The article URL.
-   * @param browser The browser where the article is currently loaded.
-   * @returns {Promise}
-   * @resolves JS object representing the article, or null if no article is found.
+   * @param {string} url The article URL.
+   * @param {object} browser The browser where the article is currently loaded.
+   * @returns {Promise} JS object representing the article, or null if no article is found.
    */
   async _getArticle(url, browser) {
     return lazy.ReaderMode.downloadAndParseDocument(url).catch(e => {
