@@ -308,7 +308,7 @@ version = "0.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.cid]]
-version = "0.8.5"
+version = "0.10.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.clang-sys]]
@@ -664,7 +664,7 @@ version = "0.9.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.multihash]]
-version = "0.16.2"
+version = "0.18.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.multihash-derive]]
