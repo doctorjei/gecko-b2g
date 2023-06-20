@@ -271,6 +271,7 @@ BrowserParent::LayerToBrowserParentTable*
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(BrowserParent)
   NS_INTERFACE_MAP_ENTRY(nsIAuthPromptProvider)
   NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
+  NS_INTERFACE_MAP_ENTRY(nsIObserver)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMEventListener)
 NS_INTERFACE_MAP_END
 NS_IMPL_CYCLE_COLLECTION_WEAK(BrowserParent, mFrameLoader, mBrowsingContext)
@@ -342,10 +343,25 @@ BrowserParent::BrowserParent(ContentParent* aManager, const TabId& aTabId,
   if (aBrowsingContext->Top()->IsPriorityActive()) {
     ProcessPriorityManager::BrowserPriorityChanged(this, true);
   }
+
+  // Add observers.
+  nsCOMPtr<nsIObserverService> observerService =
+      mozilla::services::GetObserverService();
+  if (observerService) {
+    observerService->AddObserver(this, "theme-colors-changed", false);
+  }
 }
 
 BrowserParent::~BrowserParent() {
   RequestingAccessKeyEventData::OnBrowserParentDestroyed();
+}
+
+nsresult BrowserParent::Observe(nsISupports* aSubject, const char* aTopic,
+                                  const char16_t* aData) {
+  if (!nsCRT::strcmp(aTopic, "theme-colors-changed")) {
+    Unused << SendThemeColorsChanged();
+  }
+  return NS_OK;
 }
 
 /* static */

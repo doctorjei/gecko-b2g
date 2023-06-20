@@ -14760,6 +14760,51 @@
   mirror: always
 
 #---------------------------------------------------------------------------
+# Prefs used to hold themeing values.
+#---------------------------------------------------------------------------
+- name: theme.wallpaper.accent
+  type: DataMutexString
+  value: ""
+  mirror: always
+  rust: true
+
+- name: theme.wallpaper.vibrant
+  type: DataMutexString
+  value: ""
+  mirror: always
+  rust: true
+
+- name: theme.wallpaper.vibrant-dark
+  type: DataMutexString
+  value: ""
+  mirror: always
+  rust: true
+
+- name: theme.wallpaper.vibrant-light
+  type: DataMutexString
+  value: ""
+  mirror: always
+  rust: true
+
+- name: theme.wallpaper.muted
+  type: DataMutexString
+  value: ""
+  mirror: always
+  rust: true
+
+- name: theme.wallpaper.muted-dark
+  type: DataMutexString
+  value: ""
+  mirror: always
+  rust: true
+
+- name: theme.wallpaper.muted-light
+  type: DataMutexString
+  value: ""
+  mirror: always
+  rust: true
+
+#---------------------------------------------------------------------------
 # Prefs starting with "thread."
 #---------------------------------------------------------------------------
 
