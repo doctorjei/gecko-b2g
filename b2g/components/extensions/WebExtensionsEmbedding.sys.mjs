@@ -1,23 +1,17 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
-"use strict";
-
-const EXPORTED_SYMBOLS = ["WebExtensionsEmbedding", "mobileWindowTracker"];
 
 const { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-const { XPCOMUtils } = ChromeUtils.import(
-  "resource://gre/modules/XPCOMUtils.jsm"
-);
+import { EventEmitter } from "resource://gre/modules/EventEmitter.sys.mjs";
 
-const { EventEmitter } = ChromeUtils.import(
-  "resource://gre/modules/EventEmitter.jsm"
-);
+const lazy = {};
 
-XPCOMUtils.defineLazyModuleGetters(this, {
-  AddonManager: "resource://gre/modules/AddonManager.jsm",
-  Extension: "resource://gre/modules/Extension.jsm",
+ChromeUtils.defineESModuleGetters(lazy, {
+  AddonManager: "resource://gre/modules/AddonManager.sys.mjs",
+  Extension: "resource://gre/modules/Extension.sys.mjs",
+  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
 });
 
 async function filterPromptPermissions(aPermissions) {
@@ -26,7 +20,7 @@ async function filterPromptPermissions(aPermissions) {
   }
   const promptPermissions = [];
   for (const permission of aPermissions) {
-    if (!(await Extension.shouldPromptFor(permission))) {
+    if (!(await lazy.Extension.shouldPromptFor(permission))) {
       continue;
     }
     promptPermissions.push(permission);
@@ -67,7 +61,7 @@ async function exportExtension(aAddon, aPermissions, aSourceURI) {
     creatorName = name;
     creatorURL = url;
   }
-  const openOptionsPageInTab = optionsType === AddonManager.OPTIONS_TYPE_TAB;
+  const openOptionsPageInTab = optionsType === lazy.AddonManager.OPTIONS_TYPE_TAB;
   const disabledFlags = [];
   if (userDisabled) {
     disabledFlags.push("userDisabled");
@@ -229,7 +223,7 @@ class WebExtensionsEmbeddingImpl {
   }
 }
 
-const WebExtensionsEmbedding = new WebExtensionsEmbeddingImpl();
+export const WebExtensionsEmbedding = new WebExtensionsEmbeddingImpl();
 
 class MobileWindowTracker extends EventEmitter {
   constructor() {
@@ -253,12 +247,12 @@ class MobileWindowTracker extends EventEmitter {
   }
 
   setTabActive(aWindow, aActive) {
-    const { browser, tab, docShell } = aWindow;
+    const { browser, tab } = aWindow;
     tab.active = aActive;
 
     if (aActive) {
       this._topWindow = Cu.getWeakReference(aWindow);
-      const isPrivate = PrivateBrowsingUtils.isBrowserPrivate(browser);
+      const isPrivate = lazy.PrivateBrowsingUtils.isBrowserPrivate(browser);
       if (!isPrivate) {
         this._topNonPBWindow = this._topWindow;
       }
@@ -271,4 +265,4 @@ class MobileWindowTracker extends EventEmitter {
   }
 }
 
-const mobileWindowTracker = new MobileWindowTracker();
+export const mobileWindowTracker = new MobileWindowTracker();

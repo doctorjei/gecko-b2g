@@ -1,31 +1,26 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
-"use strict";
 
-const EXPORTED_SYMBOLS = ["BrowsingDataDelegate"];
+import { XPCOMUtils } from "resource://gre/modules/XPCOMUtils.sys.mjs";
+import { ExtensionUtils } from "resource://gre/modules/ExtensionUtils.sys.mjs";
 
-const { XPCOMUtils } = ChromeUtils.import(
-  "resource://gre/modules/XPCOMUtils.jsm"
-);
-const { ExtensionUtils } = ChromeUtils.import(
-  "resource://gre/modules/ExtensionUtils.jsm"
-);
+const lazy = {};
 
-XPCOMUtils.defineLazyModuleGetters(this, {
+XPCOMUtils.defineLazyModuleGetters(lazy, {
   EventDispatcher: "resource://gre/modules/Messaging.jsm",
 });
 
 const { ExtensionError } = ExtensionUtils;
 
-class BrowsingDataDelegate {
+export class BrowsingDataDelegate {
   constructor(extension) {
     this.extension = extension;
   }
 
   async sendRequestForResult(type, data) {
     try {
-      const result = await EventDispatcher.instance.sendRequestForResult({
+      const result = await lazy.EventDispatcher.instance.sendRequestForResult({
         type,
         extensionId: this.extension.id,
         ...data,
