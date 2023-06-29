@@ -468,7 +468,7 @@ class TabContext extends EventEmitter {
     this.emit(
       "location-change",
       {
-        id: tab.id,
+        id: tab._extensionId,
         linkedBrowser: browser,
         // TODO: we don't support selected so we just alway say we are
         selected: true,

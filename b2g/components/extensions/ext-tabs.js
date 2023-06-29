@@ -190,7 +190,7 @@ this.tabs = class extends ExtensionAPI {
               }
               let tabIds = Array.from(
                 windowWrapper.getHighlightedTabs(),
-                tab => tab.id
+                tab => tab._extensionId
               );
               fire.async({ tabIds, windowId: event.windowId });
             };
@@ -279,7 +279,7 @@ this.tabs = class extends ExtensionAPI {
             const fireForTab = (tab, changed) => {
               const [needed, changeInfo] = sanitize(tab, changed);
               if (needed) {
-                fire.async(tab.id, changeInfo, tab.convert());
+                fire.async(tab._extensionId, changeInfo, tab.convert());
               }
             };
 

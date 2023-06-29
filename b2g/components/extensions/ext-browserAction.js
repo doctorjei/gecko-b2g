@@ -93,7 +93,7 @@ class BrowserAction extends BrowserActionBase {
 
   updateOnChange(tab) {
     // console.log(`ext-BrowserAction::updateOnChange`);
-    const tabId = tab ? tab.id : null;
+    const tabId = tab ? tab._extensionId : null;
     const action = tab
       ? this.getContextData(tab)
       : this.helper.extractProperties(this.globals);
