@@ -3870,7 +3870,8 @@ bool nsFrameLoader::EnsureBrowsingContextAttached() {
 
     // <iframe mozbrowser> is allowed to set `mozprivatebrowsing` to
     // force-enable private browsing.
-    if (OwnerIsMozBrowserFrame()) {
+    uint32_t namespaceID = mOwnerContent->GetNameSpaceID();
+    if (namespaceID == kNameSpaceID_XUL || OwnerIsMozBrowserFrame()) {
       if (mOwnerContent->HasAttr(kNameSpaceID_None,
                                  nsGkAtoms::mozprivatebrowsing)) {
         attrs.SyncAttributesWithPrivateBrowsing(true);
