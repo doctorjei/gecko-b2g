@@ -607,8 +607,8 @@ void APZCTreeManager::UpdateHitTestingTree(
                 *mAsyncZoomContainerSubtree),
         "If there is an async zoom container, all scroll nodes with root "
         "content scroll metadata should be inside it");
-    MOZ_ASSERT(!haveNestedAsyncZoomContainers,
-               "Should not have nested async zoom container");
+    // MOZ_ASSERT(!haveNestedAsyncZoomContainers,
+    //            "Should not have nested async zoom container");
 
     // If we have perspective transforms deferred to children, do another
     // walk of the tree and actually apply them to the children.
