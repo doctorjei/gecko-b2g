@@ -1289,6 +1289,26 @@
 
     // Returns a promis resolving to the current background color.
     webViewGetBackgroundColor() {
+      if (!this.isRemoteBrowser) {
+        let backgroundcolor = "transparent";
+        try {
+          let win = this.contentDocument.defaultView;
+          backgroundcolor = win
+            .getComputedStyle(win.document.body)
+            .getPropertyValue("background-color");
+          // If the computed color is "transparent" on the body,
+          // get it from the "html" element.
+          if (backgroundcolor == "rgba(0, 0, 0, 0)") {
+            backgroundcolor = win
+            .getComputedStyle(win.document.body.parentNode)
+            .getPropertyValue("background-color");
+          }
+          return Promise.resolve(backgroundcolor);
+        } catch (e) {
+          return Promise.reject();
+        }
+      }
+
       let id = `WebView::ReturnBackgroundColor::${this.webViewRequestId}`;
       this.webViewRequestId += 1;
 
@@ -1329,7 +1349,7 @@
       if (data.contextmenu) {
         var self = this;
         Cu.exportFunction(
-          function(id) {
+          function (id) {
             self.messageManager.sendAsyncMessage("WebView::fire-ctx-callback", {
               menuitem: id,
             });
