@@ -42,6 +42,7 @@
     PopupBlocker: "resource://gre/actors/PopupBlockingParent.sys.mjs",
     SelectParentHelper: "resource://gre/actors/SelectParent.sys.mjs",
     RemoteWebNavigation: "resource://gre/modules/RemoteWebNavigation.sys.mjs",
+    ScreenshotUtils: "resource://gre/modules/ScreenshotUtils.sys.mjs",
   });
 
   XPCOMUtils.defineLazyModuleGetters(lazy, {
@@ -1255,6 +1256,20 @@
     // We don't use drawSnapshot because we can't get the content
     // size from it.
     webViewGetScreenshot(maxWidth, maxHeight, mimeType) {
+      if (!this.isRemoteBrowser) {
+        try {
+          let win = this.contentDocument.defaultView;
+          return lazy.ScreenshotUtils.getScreenshot(
+            win,
+            maxWidth,
+            maxHeight,
+            mimeType
+          );
+        } catch (e) {
+          return Promise.reject();
+        }
+      }
+
       let id = `WebView::ReturnScreenShot::${this.webViewRequestId}`;
       this.webViewRequestId += 1;
 
@@ -1300,8 +1315,8 @@
           // get it from the "html" element.
           if (backgroundcolor == "rgba(0, 0, 0, 0)") {
             backgroundcolor = win
-            .getComputedStyle(win.document.body.parentNode)
-            .getPropertyValue("background-color");
+              .getComputedStyle(win.document.body.parentNode)
+              .getPropertyValue("background-color");
           }
           return Promise.resolve(backgroundcolor);
         } catch (e) {
