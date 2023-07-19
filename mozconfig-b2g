@@ -1,3 +1,5 @@
+. $topsrcdir/mozconfig-capyloon-env
+
 # Compiler
 export CC=$HOME/.mozbuild/clang/bin/clang
 export CXX=$HOME/.mozbuild/clang/bin/clang++
