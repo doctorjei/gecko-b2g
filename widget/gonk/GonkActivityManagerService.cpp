@@ -93,6 +93,7 @@ int GonkActivityManagerService::openContentUri(
   return -1;
 }
 
+#if ANDROID_VERSION < 33
 void GonkActivityManagerService::registerUidObserver(
     const android::sp<android::IUidObserver>& observer, const int32_t event,
     const int32_t cutpoint, const android::String16& callingPackage) {
@@ -105,6 +106,30 @@ void GonkActivityManagerService::unregisterUidObserver(
   // Gonk doesn't use this interface currently.
   ALOGV("%s(), line:%d", __func__, __LINE__);
 }
+#else
+android::status_t GonkActivityManagerService::registerUidObserver(
+    const android::sp<android::IUidObserver>& observer, const int32_t event,
+    const int32_t cutpoint, const android::String16& callingPackage) {
+  // Gonk doesn't use this interface currently.
+  ALOGV("%s(), line:%d", __func__, __LINE__);
+  return 0;
+}
+
+android::status_t GonkActivityManagerService::unregisterUidObserver(
+    const android::sp<android::IUidObserver>& observer) {
+  // Gonk doesn't use this interface currently.
+  ALOGV("%s(), line:%d", __func__, __LINE__);
+  return 0;
+}
+
+android::status_t GonkActivityManagerService::checkPermission(
+  const android::String16& permission, pid_t pid,
+  uid_t uid, int32_t* outResult) {
+  // Gonk doesn't use this interface currently.
+  ALOGV("%s(), line:%d", __func__, __LINE__);
+  return 0;
+}
+#endif
 
 bool GonkActivityManagerService::isUidActive(
     const uid_t uid, const android::String16& callingPackage) {

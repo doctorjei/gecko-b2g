@@ -214,7 +214,7 @@ GonkDisplayP::GonkDisplayP()
   (void)mPowerModule;
 
   ALOGI("created native window\n");
-  native_gralloc_initialize(1);
+  native_gralloc_initialize(0);
 
 #if ANDROID_VERSION >= 30
   mPower = android::waitForVintfService<IPower>();
@@ -252,7 +252,11 @@ GonkDisplayP::GonkDisplayP()
     // dequeueBuffer() / queueBuffer(). We connect it here for use
     // later or it will be failed to queue buffers.
     Surface* surface = static_cast<Surface*>(mBootAnimSTClient.get());
+#if ANDROID_VERSION < 33
     static sp<IProducerListener> listener = new DummyProducerListener();
+#else
+    static sp<IProducerListener> listener = new StubProducerListener();
+#endif
     surface->connect(NATIVE_WINDOW_API_CPU, listener);
   }
 
@@ -291,7 +295,11 @@ GonkDisplayP::GonkDisplayP()
         // dequeueBuffer() / queueBuffer(). We connect it here for use
         // later or it will be failed to queue buffers.
         Surface* surface = static_cast<Surface*>(mExtSTClient.get());
+#if ANDROID_VERSION < 33
         static sp<IProducerListener> listener = new DummyProducerListener();
+#else
+        static sp<IProducerListener> listener = new StubProducerListener();
+#endif
         surface->connect(NATIVE_WINDOW_API_CPU, listener);
       }
     } else {

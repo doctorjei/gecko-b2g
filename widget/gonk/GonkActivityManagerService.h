@@ -45,11 +45,22 @@ class GonkActivityManagerService
 
   // From IActivityManager
   virtual int openContentUri(const android::String16& stringUri) override;
+#if ANDROID_VERSION < 33
   virtual void registerUidObserver(
       const android::sp<android::IUidObserver>& observer, const int32_t event,
       const int32_t cutpoint, const android::String16& callingPackage) override;
   virtual void unregisterUidObserver(
       const android::sp<android::IUidObserver>& observer) override;
+#else
+  virtual android::status_t registerUidObserver(
+      const android::sp<android::IUidObserver>& observer, const int32_t event,
+      const int32_t cutpoint, const android::String16& callingPackage) override;
+  virtual android::status_t unregisterUidObserver(
+      const android::sp<android::IUidObserver>& observer) override;
+  virtual android::status_t checkPermission(const android::String16& permission, pid_t pid,
+                       uid_t uid, int32_t* outResult) override;
+#endif
+
   virtual bool isUidActive(const uid_t uid,
                            const android::String16& callingPackage) override;
   virtual int32_t getUidProcessState(

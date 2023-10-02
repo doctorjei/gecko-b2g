@@ -2127,6 +2127,7 @@ CommandResult NetworkUtils::startClatd(NetworkParams& aOptions) {
     return CommandResult(result);
   }
 
+#if ANDROID_VERSION < 33 // FIXME: 'clatdStart' is deprecated:
   std::string clatAddress;
   Status status = gNetd->clatdStart(GET_CHAR(mIfname), GET_CHAR(mNat64Prefix),
                                     &clatAddress);
@@ -2137,7 +2138,7 @@ CommandResult NetworkUtils::startClatd(NetworkParams& aOptions) {
   }
   NU_DBG("startClatd result: %s %s", clatAddress.c_str(),
          result.mResult ? "success" : "false");
-
+#endif
   return CommandResult(result);
 }
 
@@ -2154,9 +2155,11 @@ CommandResult NetworkUtils::stopClatd(NetworkParams& aOptions) {
     return CommandResult(result);
   }
 
+#if ANDROID_VERSION < 33 // FIXME:  'clatdStop' is deprecated.
   Status status = gNetd->clatdStop(GET_CHAR(mIfname));
   result.mResult = status.isOk();
   NU_DBG("stopClatd result: %s", result.mResult ? "success" : "false");
+#endif
 
   return CommandResult(result);
 }

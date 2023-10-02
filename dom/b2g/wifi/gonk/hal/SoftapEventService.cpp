@@ -98,6 +98,9 @@ android::binder::Status SoftapEventService::onNumAssociatedStationsChanged(
 
 android::binder::Status SoftapEventService::onSoftApChannelSwitched(
     int32_t frequency, int32_t bandwidth) {
+  WIFI_LOGI(LOG_TAG, "onSoftApChannelSwitched frequency=%d bandwith=%d",
+    frequency, bandwidth);
   return android::binder::Status::ok();
 }
+
 #endif

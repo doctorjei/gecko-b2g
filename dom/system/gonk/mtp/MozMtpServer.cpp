@@ -262,7 +262,10 @@ bool MozMtpServer::Init() {
   property_get("ro.version", propValueDeviceVersion, "");
   property_get("ro.serialno", propValueSerialNumber, "");
 
+  #if ANDROID_VERSION < 33
+  // FIXME
   mMozMtpDatabase = new MozMtpDatabase();
+  #endif
   mMtpServer = new RefCountedMtpServer(
       mMozMtpDatabase.get(),   // IMtpDatabase
       0,                       // controlFd
