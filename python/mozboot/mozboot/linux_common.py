@@ -71,7 +71,7 @@ class Boot2GeckoSysrootInstall(object):
         from mozboot import android
 
         android.ensure_android(
-            "linux", ndk_only=False, no_interactive=self.no_interactive
+            "linux", os_arch = platform.machine(), ndk_only=False, no_interactive=self.no_interactive
         )
 
     def ensure_b2g_sysroot_packages(self, state_dir, checkout_root):
